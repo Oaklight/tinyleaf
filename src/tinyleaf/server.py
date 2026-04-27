@@ -58,6 +58,8 @@ class TexliveHandler(BaseHTTPRequestHandler):
             self._handle_api("docker_pull")
         elif path == "/api/docker/rmi":
             self._handle_api("docker_rmi")
+        elif path == "/api/docker/cancel-pull":
+            self._handle_api("cancel_docker_pull")
         elif path.startswith("/api/projects/"):
             self._route_project_post(path)
         else:
@@ -159,6 +161,9 @@ class TexliveHandler(BaseHTTPRequestHandler):
 
         if sub == "compile":
             self._handle_api("compile", name=name)
+        elif sub.startswith("compile/") and sub.endswith("/cancel"):
+            compile_id = sub[8:-7]
+            self._handle_api("cancel_compile", name=name, compile_id=compile_id)
         elif sub == "clean":
             self._handle_api("clean", name=name)
         elif sub == "mkdir":

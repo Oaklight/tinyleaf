@@ -22,8 +22,10 @@ class CompileJob:
         self.docker_image = docker_image
         self.registry_mirror = registry_mirror
         self.log_lines = []
-        self.status = "running"  # running | success | error
+        self.status = "running"  # running | success | error | cancelled
         self.pdf_path = None
+        self.proc = None  # subprocess.Popen reference for cancellation
+        self._cancelled = False
         self._lock = threading.Lock()
         self._done_event = threading.Event()
 
@@ -43,6 +45,18 @@ class CompileJob:
     def wait(self, timeout=None):
         self._done_event.wait(timeout)
 
+    def cancel(self):
+        """Cancel this compilation by killing the subprocess."""
+        self._cancelled = True
+        if self.proc and self.proc.poll() is None:
+            self.proc.kill()
+        self.append_log("Cancelled by user.", level="warning")
+        self.finish("cancelled")
+
+    @property
+    def is_cancelled(self):
+        return self._cancelled
+
     @property
     def is_done(self):
         return self._done_event.is_set()
@@ -56,6 +70,19 @@ _jobs_lock = threading.Lock()
 def get_job(compile_id):
     with _jobs_lock:
         return _jobs.get(compile_id)
+
+
+def cancel_compile(compile_id):
+    """Cancel a running compilation job.
+
+    Returns:
+        True if the job was found and cancelled, False otherwise.
+    """
+    job = get_job(compile_id)
+    if not job or job.is_done:
+        return False
+    job.cancel()
+    return True
 
 
 def start_compile(
@@ -117,8 +144,13 @@ def _run_compile(job: CompileJob):
         if job.use_docker:
             # Auto-pull image if not available locally
             if not _docker_image_exists(job.docker_image):
+                if job.is_cancelled:
+                    return
                 if not _docker_pull(job, job.docker_image, job.registry_mirror):
                     return  # pull failed, job already finished with error
+
+            if job.is_cancelled:
+                return
 
             cmd = [
                 "docker",
@@ -143,13 +175,19 @@ def _run_compile(job: CompileJob):
             text=True,
             bufsize=1,
         )
+        job.proc = proc
 
         for line in proc.stdout:
+            if job.is_cancelled:
+                break
             line = line.rstrip("\n")
             level = _classify_log_line(line)
             job.append_log(line, level=level)
 
         proc.wait()
+
+        if job.is_cancelled:
+            return
 
         # Find output PDF
         base = os.path.splitext(job.main_file)[0]
@@ -170,8 +208,9 @@ def _run_compile(job: CompileJob):
                 job.finish("error")
 
     except Exception as e:
-        job.append_log(f"Internal error: {e}", level="error")
-        job.finish("error")
+        if not job.is_cancelled:
+            job.append_log(f"Internal error: {e}", level="error")
+            job.finish("error")
 
 
 def _classify_log_line(line):
@@ -219,9 +258,18 @@ def _docker_pull(job, image, registry_mirror=None):
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             text=True, bufsize=1,
         )
+        job.proc = proc
+
         for line in proc.stdout:
+            if job.is_cancelled:
+                proc.kill()
+                proc.wait()
+                return False
             job.append_log(line.rstrip("\n"))
         proc.wait()
+
+        if job.is_cancelled:
+            return False
 
         if proc.returncode != 0:
             job.append_log(f"Failed to pull image '{pull_image}'", level="error")
@@ -259,12 +307,27 @@ def docker_pull_image(image, registry_mirror=None):
         pull_image = image
 
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             ["docker", "pull", pull_image],
-            capture_output=True, text=True, timeout=600,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True,
         )
-        if result.returncode != 0:
-            return False, result.stderr.strip() or "Pull failed"
+        with _pull_procs_lock:
+            _pull_procs[image] = proc
+
+        output_lines = []
+        for line in proc.stdout:
+            output_lines.append(line)
+        proc.wait()
+
+        with _pull_procs_lock:
+            _pull_procs.pop(image, None)
+
+        if proc.returncode != 0:
+            stderr = "".join(output_lines).strip()
+            if proc.returncode == -9 or proc.returncode == -15:
+                return False, "Cancelled"
+            return False, stderr or "Pull failed"
 
         if registry_mirror and pull_image != image:
             subprocess.run(["docker", "tag", pull_image, image], timeout=10)
@@ -274,7 +337,28 @@ def docker_pull_image(image, registry_mirror=None):
     except subprocess.TimeoutExpired:
         return False, "Pull timed out"
     except Exception as e:
+        with _pull_procs_lock:
+            _pull_procs.pop(image, None)
         return False, str(e)
+
+
+# Track standalone pull processes for cancellation
+_pull_procs: dict[str, subprocess.Popen] = {}
+_pull_procs_lock = threading.Lock()
+
+
+def cancel_docker_pull(image):
+    """Cancel a running standalone docker pull.
+
+    Returns:
+        True if a pull was found and killed, False otherwise.
+    """
+    with _pull_procs_lock:
+        proc = _pull_procs.pop(image, None)
+    if proc and proc.poll() is None:
+        proc.kill()
+        return True
+    return False
 
 
 def docker_remove_image(image):

@@ -933,6 +933,7 @@ const I18N = {
     pushed: "Pushed",
     compile_success: "Compilation successful",
     compile_failed: "Compilation failed",
+    compile_cancelled: "Compilation cancelled",
     compile_error: "Compile error",
     connection_lost: "Compilation connection lost",
     loading_pdf: "Loading PDF...",
@@ -972,6 +973,7 @@ const I18N = {
     pulling_image: "Pulling image...",
     pull_success: "Image pulled successfully",
     pull_failed: "Failed to pull image",
+    pull_cancelled: "Image pull cancelled",
     image_removed: "Image removed",
     remove_failed: "Failed to remove image",
     confirm_rmi: "Remove local image \"{name}\"?",
@@ -1032,6 +1034,7 @@ const I18N = {
     pushed: "已推送",
     compile_success: "编译成功",
     compile_failed: "编译失败",
+    compile_cancelled: "编译已取消",
     compile_error: "编译错误",
     connection_lost: "编译连接断开",
     loading_pdf: "加载 PDF...",
@@ -1071,6 +1074,7 @@ const I18N = {
     pulling_image: "正在拉取镜像...",
     pull_success: "镜像拉取成功",
     pull_failed: "镜像拉取失败",
+    pull_cancelled: "镜像拉取已取消",
     image_removed: "镜像已删除",
     remove_failed: "删除镜像失败",
     confirm_rmi: "删除本地镜像 \"{name}\"？",
@@ -1259,6 +1263,8 @@ const S = {
   modified: new Set(),
   editorView: null,
   compiling: false,
+  compileId: null,
+  pulling: false,
   pdfDoc: null,
   autoSaveTimer: null,
   autoSaveInterval: 2000,
@@ -1412,13 +1418,25 @@ function setupSettingsPopup() {
     const image = sel.value;
     if (!image) return;
     const btn = document.getElementById("btn-docker-pull");
-    btn.disabled = true;
-    btn.textContent = "...";
+    if (S.pulling) {
+      // Cancel the running pull
+      btn.disabled = true;
+      try {
+        await api("POST", "/api/docker/cancel-pull", { image: S.pullingImage });
+      } catch {}
+      btn.disabled = false;
+      return;
+    }
+    S.pulling = true;
+    S.pullingImage = image;
+    btn.textContent = t("cancel");
     setStatus(t("pulling_image"));
     try {
       const res = await api("POST", "/api/docker/pull", { image });
       if (res.success) {
         setStatus(t("pull_success"), "success");
+      } else if (res.message === "Cancelled") {
+        setStatus(t("pull_cancelled"), "warning");
       } else {
         setStatus(t("pull_failed") + ": " + res.message, "error");
       }
@@ -1426,7 +1444,8 @@ function setupSettingsPopup() {
     } catch (e) {
       setStatus(t("pull_failed") + ": " + e.message, "error");
     } finally {
-      btn.disabled = false;
+      S.pulling = false;
+      S.pullingImage = null;
       btn.textContent = t("pull");
     }
   };
@@ -2223,15 +2242,22 @@ document.addEventListener("visibilitychange", () => {
 // Compile
 // ══════════════════════════════════════════
 async function compile() {
-  if (S.compiling) return;
+  if (S.compiling) {
+    // Cancel the running compilation
+    if (S.compileId) {
+      try {
+        await api("POST", `/api/projects/${enc(S.projectName)}/compile/${S.compileId}/cancel`);
+      } catch {}
+    }
+    return;
+  }
   S.compiling = true;
 
   if (S.modified.has(S.currentFile)) await saveCurrentFile();
 
   const engine = document.getElementById("engine-select").value;
   const btnCompile = document.getElementById("btn-compile");
-  btnCompile.disabled = true;
-  btnCompile.textContent = t("compiling");
+  btnCompile.textContent = t("cancel");
   openLog();
   clearLog();
   setStatus(t("compiling"));
@@ -2241,6 +2267,7 @@ async function compile() {
     if (S.useDocker) body.docker_image = S.dockerImage;
 
     const result = await api("POST", `/api/projects/${enc(S.projectName)}/compile`, body);
+    S.compileId = result.compile_id;
     const evtSource = new EventSource(
       `/api/projects/${enc(S.projectName)}/compile/${result.compile_id}/stream`
     );
@@ -2254,12 +2281,15 @@ async function compile() {
       const d = JSON.parse(e.data);
       evtSource.close();
       S.compiling = false;
-      btnCompile.disabled = false;
+      S.compileId = null;
       btnCompile.textContent = t("compile");
 
       if (d.status === "success") {
         setStatus(t("compile_success"), "success");
         document.getElementById("log-status").innerHTML = `<span class="badge success">OK</span>`;
+      } else if (d.status === "cancelled") {
+        setStatus(t("compile_cancelled"), "warning");
+        document.getElementById("log-status").innerHTML = `<span class="badge warning">CANCELLED</span>`;
       } else {
         setStatus(t("compile_failed"), "error");
         document.getElementById("log-status").innerHTML = `<span class="badge error">FAILED</span>`;
@@ -2272,13 +2302,13 @@ async function compile() {
     evtSource.onerror = () => {
       evtSource.close();
       S.compiling = false;
-      btnCompile.disabled = false;
+      S.compileId = null;
       btnCompile.textContent = t("compile");
       setStatus(t("connection_lost"), "error");
     };
   } catch (err) {
     S.compiling = false;
-    btnCompile.disabled = false;
+    S.compileId = null;
     btnCompile.textContent = t("compile");
     setStatus(`${t("compile_error")}: ${err.message}`, "error");
   }

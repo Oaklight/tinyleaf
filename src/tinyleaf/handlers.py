@@ -19,6 +19,7 @@ def handle_request(handler, action, **kwargs):
         "list_docker_images": _list_docker_images,
         "docker_pull": _docker_pull,
         "docker_rmi": _docker_rmi,
+        "cancel_docker_pull": _cancel_docker_pull,
         "list_projects": _list_projects,
         "create_project": _create_project,
         "register_project": _register_project,
@@ -39,6 +40,7 @@ def handle_request(handler, action, **kwargs):
         "get_config": _get_config,
         "put_config": _put_config,
         "compile": _compile,
+        "cancel_compile": _cancel_compile,
         "compile_stream": _compile_stream,
         "get_output": _get_output,
         "clean": _clean,
@@ -211,6 +213,18 @@ def _docker_rmi(handler):
 
     success, msg = compiler.docker_remove_image(image)
     handler.send_json({"success": success, "message": msg})
+
+
+def _cancel_docker_pull(handler):
+    """Cancel a running docker pull."""
+    body = handler.read_json_body()
+    image = body.get("image")
+    if not image:
+        handler.send_json({"error": "Missing image"}, status=400)
+        return
+
+    cancelled = compiler.cancel_docker_pull(image)
+    handler.send_json({"cancelled": cancelled})
 
 
 # ── Projects ──
@@ -767,6 +781,12 @@ def _compile(handler, name):
     )
 
     handler.send_json({"compile_id": compile_id, "main_file": main_file, "engine": engine})
+
+
+def _cancel_compile(handler, name, compile_id):
+    """Cancel a running compilation."""
+    cancelled = compiler.cancel_compile(compile_id)
+    handler.send_json({"cancelled": cancelled})
 
 
 def _compile_stream(handler, name, compile_id):
