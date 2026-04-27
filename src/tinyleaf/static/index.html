@@ -763,7 +763,11 @@ select:focus { border-color: var(--accent); outline: none; }
         <option value="0" data-i18n="off">Off</option>
       </select>
     </div>
-    <div class="settings-popup-item" id="docker-image-row" style="display:none">
+    <div class="settings-popup-item">
+      <label data-i18n="use_docker">Docker</label>
+      <input type="checkbox" id="docker-toggle" style="cursor:pointer">
+    </div>
+    <div class="settings-popup-item" id="docker-image-row">
       <label data-i18n="docker_image">Image</label>
       <select id="docker-image-select"></select>
     </div>
@@ -812,6 +816,7 @@ const I18N = {
     theme: "Theme",
     language: "Language",
     docker_image: "Image",
+    use_docker: "Docker",
     js_modules: "JS Modules",
     update: "Update",
     downloading: "Downloading...",
@@ -887,6 +892,7 @@ const I18N = {
     theme: "主题",
     language: "语言",
     docker_image: "镜像",
+    use_docker: "Docker",
     js_modules: "JS 模块",
     update: "更新",
     downloading: "下载中...",
@@ -1140,11 +1146,10 @@ async function init() {
   S.useDocker = info.docker;
   S.dockerImage = info.image || "oaklight/texlive:latest";
 
-  // Show/hide docker image config
-  if (S.useDocker) {
-    document.getElementById("docker-image-row").style.display = "flex";
-    await loadDockerImages();
-  }
+  // Always load docker images list and sync toggle
+  document.getElementById("docker-toggle").checked = S.useDocker;
+  document.getElementById("docker-image-row").style.display = S.useDocker ? "flex" : "none";
+  await loadDockerImages();
 
   if (S.mode === "multi") {
     showProjectList();
@@ -1197,6 +1202,14 @@ function setupSettingsPopup() {
     const val = e.target.value;
     localStorage.setItem("tinyleaf-autosave", val);
     S.autoSaveInterval = parseInt(val, 10);
+  };
+
+  document.getElementById("docker-toggle").onchange = (e) => {
+    S.useDocker = e.target.checked;
+    document.getElementById("docker-image-row").style.display = S.useDocker ? "flex" : "none";
+    if (S.projectName) {
+      api("PUT", `/api/projects/${enc(S.projectName)}/config`, { use_docker: S.useDocker });
+    }
   };
 
   document.getElementById("docker-image-select").onchange = (e) => {
@@ -1675,6 +1688,17 @@ async function openProject(name) {
   const config = await api("GET", `/api/projects/${enc(name)}/config`);
   document.getElementById("engine-select").value = config.engine || "pdflatex";
 
+  // Sync docker toggle with project config
+  if ("use_docker" in config) {
+    S.useDocker = config.use_docker;
+    document.getElementById("docker-toggle").checked = S.useDocker;
+    document.getElementById("docker-image-row").style.display = S.useDocker ? "flex" : "none";
+  }
+  if (config.docker_image) {
+    S.dockerImage = config.docker_image;
+    document.getElementById("docker-image-select").value = S.dockerImage;
+  }
+
   await refreshFiles();
 
   const mainFile = config.main_file || "main.tex";
@@ -1855,7 +1879,7 @@ async function compile() {
   setStatus(t("compiling"));
 
   try {
-    const body = { engine };
+    const body = { engine, use_docker: S.useDocker };
     if (S.useDocker) body.docker_image = S.dockerImage;
 
     const result = await api("POST", `/api/projects/${enc(S.projectName)}/compile`, body);

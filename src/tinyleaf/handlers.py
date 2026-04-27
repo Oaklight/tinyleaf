@@ -626,7 +626,8 @@ def _compile(handler, name):
     engine = body.get("engine") or config_data.get("engine", "pdflatex")
 
     server_config = handler.config
-    # Allow overriding docker image from request or project config
+    # Allow overriding docker settings from request or project config
+    use_docker = body.get("use_docker", config_data.get("use_docker", server_config["use_docker"]))
     docker_image = (
         body.get("docker_image") or config_data.get("docker_image") or server_config["docker_image"]
     )
@@ -634,7 +635,7 @@ def _compile(handler, name):
         project_dir=project_dir,
         main_file=main_file,
         engine=engine,
-        use_docker=server_config["use_docker"],
+        use_docker=use_docker,
         docker_image=docker_image,
     )
 
