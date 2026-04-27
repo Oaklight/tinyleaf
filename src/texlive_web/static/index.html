@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TeXlive Web</title>
+<style>
+/* ── CSS Variables (Light - default, from llm-rosetta) ── */
+:root {
+  --bg: #ffffff;
+  --bg-card: #f6f8fa;
+  --bg-hover: #eef1f5;
+  --border: #d1d9e0;
+  --text: #1f2328;
+  --text-dim: #656d76;
+  --accent: #0969da;
+  --accent-hover: #0550ae;
+  --green: #1a7f37;
+  --red: #cf222e;
+  --orange: #bf8700;
+  --blue: #0969da;
+  --radius: 8px;
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  --sidebar-width: 260px;
+  --toolbar-height: 48px;
+  --statusbar-height: 28px;
+}
+
+/* ── Reset ── */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* ── Layout ── */
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  height: var(--toolbar-height);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#main { display: flex; flex: 1; overflow: hidden; }
+
+#sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+#workspace { flex: 1; display: flex; overflow: hidden; }
+
+#editor-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+#pdf-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--border);
+  min-width: 0;
+}
+
+#statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: var(--statusbar-height);
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+/* ── Toolbar ── */
+.toolbar-brand {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--accent);
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.toolbar-sep {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.toolbar-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* ── Buttons & Controls ── */
+button {
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: var(--font);
+  transition: all 0.15s;
+}
+button:hover { background: var(--bg-hover); }
+button.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+button.primary:hover { background: var(--accent-hover); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.sm { padding: 3px 8px; font-size: 12px; }
+button.danger { color: var(--red); }
+button.icon-btn {
+  padding: 4px 8px;
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  color: var(--text-dim);
+}
+button.icon-btn:hover { color: var(--accent); background: var(--bg-hover); border-radius: var(--radius); }
+
+select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: var(--font);
+  cursor: pointer;
+}
+select:focus { border-color: var(--accent); outline: none; }
+
+/* ── Sidebar ── */
+.sidebar-section {
+  border-bottom: 1px solid var(--border);
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+}
+
+#file-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+
+.tree-dir {
+  user-select: none;
+}
+.tree-dir-header {
+  padding: 4px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+  font-weight: 500;
+  transition: all 0.1s;
+}
+.tree-dir-header:hover { background: var(--bg-hover); }
+.tree-dir-header .arrow {
+  display: inline-block;
+  width: 14px;
+  font-size: 10px;
+  color: var(--text-dim);
+  transition: transform 0.15s;
+}
+.tree-dir-header .arrow.open { transform: rotate(90deg); }
+.tree-dir-children {
+  display: none;
+}
+.tree-dir-children.open {
+  display: block;
+}
+
+.file-item {
+  padding: 4px 14px 4px 18px;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+  transition: all 0.1s;
+  font-family: var(--mono);
+}
+.file-item:hover { background: var(--bg-hover); }
+.file-item.active {
+  background: var(--bg-hover);
+  color: var(--accent);
+  font-weight: 500;
+}
+.file-item.modified::after {
+  content: " \u25CF";
+  color: var(--orange);
+  font-size: 10px;
+}
+
+/* ── Git panel ── */
+#git-panel {
+  max-height: 180px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.git-file {
+  padding: 3px 14px 3px 18px;
+  font-size: 12px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+}
+.git-status {
+  display: inline-block;
+  width: 22px;
+  font-weight: 700;
+  font-size: 11px;
+}
+.git-status.M { color: var(--orange); }
+.git-status.A, .git-status.new { color: var(--green); }
+.git-status.D { color: var(--red); }
+
+/* ── Editor ── */
+#editor-container { flex: 1; overflow: hidden; }
+#editor-container .cm-editor { height: 100%; }
+#editor-container .cm-editor .cm-scroller {
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1.6;
+}
+#editor-container .cm-editor .cm-gutters {
+  background: var(--bg-card);
+  color: var(--text-dim);
+  border-right: 1px solid var(--border);
+}
+#editor-container .cm-editor .cm-activeLine { background: var(--bg-hover); }
+#editor-container .cm-editor .cm-activeLineGutter { background: var(--bg-hover); }
+#editor-container .cm-editor .cm-selectionBackground { background: color-mix(in srgb, var(--accent) 20%, transparent); }
+#editor-container .cm-editor .cm-cursor { border-left-color: var(--accent); }
+#editor-container .cm-editor { background: var(--bg); }
+
+/* ── PDF Viewer ── */
+#pdf-container {
+  flex: 1;
+  overflow: auto;
+  background: color-mix(in srgb, var(--bg) 80%, #525252);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  gap: 16px;
+}
+#pdf-container canvas { box-shadow: 0 2px 12px rgba(0,0,0,0.15); border-radius: 2px; }
+
+#pdf-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.pdf-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+/* ── Compile Log ── */
+#log-panel {
+  height: 0;
+  overflow: hidden;
+  transition: height 0.2s;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#log-panel.open { height: 200px; }
+
+#log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 14px;
+  background: var(--bg-hover);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+#log-content {
+  height: calc(100% - 30px);
+  overflow-y: auto;
+  padding: 6px 14px;
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: var(--bg);
+}
+
+.log-line { padding: 1px 0; }
+.log-line.error { color: var(--red); }
+.log-line.warning { color: var(--orange); }
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  min-width: 380px;
+  max-width: 500px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.modal h3 { margin-bottom: 16px; font-size: 16px; }
+.modal input, .modal textarea {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+.modal input:focus, .modal textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+.modal textarea { resize: vertical; min-height: 60px; font-family: var(--mono); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* ── Project List (multi-project mode) ── */
+#project-list-view {
+  display: none;
+  flex: 1;
+  padding: 48px;
+  overflow-y: auto;
+}
+#project-list-view h1 { margin-bottom: 24px; font-size: 24px; }
+
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.project-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.project-card:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.project-card h3 { font-size: 16px; margin-bottom: 6px; }
+.project-card .meta { font-size: 12px; color: var(--text-dim); }
+.project-card.create-new {
+  border-style: dashed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+.project-card.create-new:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ── Editor View ── */
+#editor-view {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Settings dropdown ── */
+.dropdown {
+  position: relative;
+}
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  min-width: 260px;
+  z-index: 100;
+  padding: 8px;
+}
+.dropdown-menu.open { display: block; }
+.dropdown-item {
+  padding: 8px 12px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dropdown-item label {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.dropdown-item select, .dropdown-item input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--mono);
+}
+
+/* ── Badge ── */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 11px;
+}
+.badge.success { background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); }
+.badge.error { background: color-mix(in srgb, var(--red) 15%, transparent); color: var(--red); }
+.badge.info { background: color-mix(in srgb, var(--blue) 15%, transparent); color: var(--blue); }
+
+/* ── Loading overlay ── */
+#loading-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  font-size: 16px;
+  color: var(--text-dim);
+  transition: opacity 0.3s;
+}
+#loading-overlay.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Prevent layout shift: hide app until ready */
+#app { visibility: hidden; }
+#app.ready { visibility: visible; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<div id="loading-overlay">Loading TeXlive Web...</div>
+
+<div id="app">
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <span class="toolbar-brand">TeXlive Web</span>
+    <span class="toolbar-sep"></span>
+    <span id="project-name" style="font-size: 13px; color: var(--text-dim);">&mdash;</span>
+    <span style="flex:1"></span>
+
+    <select id="engine-select" title="Engine">
+      <option value="pdflatex">pdflatex</option>
+      <option value="lualatex">lualatex</option>
+      <option value="xelatex">xelatex</option>
+    </select>
+    <button id="btn-compile" class="primary" data-i18n="compile">Compile</button>
+    <button id="btn-clean" class="sm danger" data-i18n="clean" title="Remove build artifacts">Clean</button>
+    <span class="toolbar-sep"></span>
+    <button id="btn-save" class="sm" data-i18n="save">Save</button>
+    <button id="btn-commit" class="sm" data-i18n="commit">Commit</button>
+    <button id="btn-push" class="sm" data-i18n="push">Push</button>
+    <span class="toolbar-sep"></span>
+
+    <!-- Settings dropdown -->
+    <div class="dropdown" id="settings-dropdown">
+      <button class="icon-btn" id="btn-settings" title="Settings">&#9881;</button>
+      <div class="dropdown-menu" id="settings-menu">
+        <div class="dropdown-item">
+          <label data-i18n="theme">Theme</label>
+          <select id="theme-select"></select>
+        </div>
+        <div class="dropdown-item">
+          <label data-i18n="language">Language</label>
+          <select id="lang-select">
+            <option value="en">English</option>
+            <option value="zh">中文</option>
+          </select>
+        </div>
+        <div class="dropdown-item" id="docker-image-row" style="display:none">
+          <label data-i18n="docker_image">Image</label>
+          <select id="docker-image-select"></select>
+        </div>
+      </div>
+    </div>
+    <button class="icon-btn" id="btn-log-toggle" title="Toggle log">&#9776;</button>
+  </div>
+
+  <div id="main">
+    <!-- Project List View -->
+    <div id="project-list-view">
+      <h1 data-i18n="projects">Projects</h1>
+      <div id="project-grid" class="project-grid"></div>
+    </div>
+
+    <!-- Editor View -->
+    <div id="editor-view">
+      <div style="display: flex; flex: 1; overflow: hidden;">
+        <!-- Sidebar -->
+        <div id="sidebar">
+          <div class="sidebar-section">
+            <div class="sidebar-header">
+              <span data-i18n="files">Files</span>
+              <button class="sm" id="btn-new-file" title="New file">+</button>
+            </div>
+            <div id="file-tree"></div>
+          </div>
+          <div class="sidebar-section" id="git-panel">
+            <div class="sidebar-header">
+              <span id="git-branch">Git</span>
+            </div>
+            <div id="git-files"></div>
+          </div>
+        </div>
+
+        <!-- Workspace -->
+        <div id="workspace">
+          <div id="editor-pane">
+            <div id="editor-container"></div>
+          </div>
+          <div id="pdf-pane">
+            <div id="pdf-toolbar">
+              <span id="pdf-status" data-i18n="no_pdf">No PDF</span>
+              <span style="flex:1"></span>
+              <button class="sm" id="btn-pdf-refresh" data-i18n="refresh">Refresh</button>
+            </div>
+            <div id="pdf-container">
+              <div class="pdf-placeholder" data-i18n="compile_to_preview">Compile to see PDF preview</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Compile Log -->
+      <div id="log-panel">
+        <div id="log-header">
+          <span data-i18n="compile_log">Compile Log</span>
+          <span id="log-status"></span>
+        </div>
+        <div id="log-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div id="statusbar">
+    <span id="status-left" data-i18n="ready">Ready</span>
+    <span id="status-right"></span>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay" class="modal-overlay" style="display:none">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3 id="modal-title"></h3>
+    <div id="modal-body"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<script type="module">
+// ══════════════════════════════════════════
+// i18n
+// ══════════════════════════════════════════
+const I18N = {
+  en: {
+    compile: "Compile",
+    compiling: "Compiling...",
+    clean: "Clean",
+    cleaned: "Cleaned {n} file(s)",
+    save: "Save",
+    commit: "Commit",
+    push: "Push",
+    theme: "Theme",
+    language: "Language",
+    docker_image: "Image",
+    files: "Files",
+    no_pdf: "No PDF",
+    refresh: "Refresh",
+    compile_to_preview: "Compile to see PDF preview",
+    compile_log: "Compile Log",
+    ready: "Ready",
+    projects: "Projects",
+    new_project: "+ New Project",
+    new_project_title: "New Project",
+    project_name: "Project name",
+    create: "Create",
+    cancel: "Cancel",
+    new_file_title: "New File",
+    filename: "filename.tex",
+    git_commit_title: "Git Commit",
+    commit_message: "Commit message",
+    saved: "Saved",
+    committed: "Committed",
+    pushing: "Pushing...",
+    pushed: "Pushed",
+    compile_success: "Compilation successful",
+    compile_failed: "Compilation failed",
+    compile_error: "Compile error",
+    connection_lost: "Compilation connection lost",
+    loading_pdf: "Loading PDF...",
+    pdf_error: "Failed to load PDF",
+    pages: "page(s)",
+  },
+  zh: {
+    compile: "编译",
+    compiling: "编译中...",
+    clean: "清理",
+    cleaned: "已清理 {n} 个文件",
+    save: "保存",
+    commit: "提交",
+    push: "推送",
+    theme: "主题",
+    language: "语言",
+    docker_image: "镜像",
+    files: "文件",
+    no_pdf: "无 PDF",
+    refresh: "刷新",
+    compile_to_preview: "编译后预览 PDF",
+    compile_log: "编译日志",
+    ready: "就绪",
+    projects: "项目",
+    new_project: "+ 新建项目",
+    new_project_title: "新建项目",
+    project_name: "项目名称",
+    create: "创建",
+    cancel: "取消",
+    new_file_title: "新建文件",
+    filename: "文件名.tex",
+    git_commit_title: "Git 提交",
+    commit_message: "提交信息",
+    saved: "已保存",
+    committed: "已提交",
+    pushing: "推送中...",
+    pushed: "已推送",
+    compile_success: "编译成功",
+    compile_failed: "编译失败",
+    compile_error: "编译错误",
+    connection_lost: "编译连接断开",
+    loading_pdf: "加载 PDF...",
+    pdf_error: "PDF 加载失败",
+    pages: "页",
+  },
+};
+
+let currentLang = localStorage.getItem("texlive-web-lang") || "en";
+
+function t(key) { return I18N[currentLang]?.[key] || I18N.en[key] || key; }
+
+function applyI18n() {
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    const key = el.getAttribute("data-i18n");
+    const val = t(key);
+    if (el.tagName === "INPUT") el.placeholder = val;
+    else el.textContent = val;
+  });
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem("texlive-web-lang", lang);
+  document.getElementById("lang-select").value = lang;
+  applyI18n();
+}
+
+// ══════════════════════════════════════════
+// Themes (from llm-rosetta)
+// ══════════════════════════════════════════
+const THEMES = {
+  light: {
+    "--bg": "#ffffff", "--bg-card": "#f6f8fa", "--bg-hover": "#eef1f5",
+    "--border": "#d1d9e0", "--text": "#1f2328", "--text-dim": "#656d76",
+    "--accent": "#0969da", "--accent-hover": "#0550ae",
+    "--green": "#1a7f37", "--red": "#cf222e", "--orange": "#bf8700", "--blue": "#0969da",
+  },
+  "indigo-dark": {
+    "--bg": "#0f1117", "--bg-card": "#1a1d27", "--bg-hover": "#242838",
+    "--border": "#2d3148", "--text": "#e4e7ef", "--text-dim": "#8b90a5",
+    "--accent": "#6366f1", "--accent-hover": "#818cf8",
+    "--green": "#22c55e", "--red": "#ef4444", "--orange": "#f59e0b", "--blue": "#3b82f6",
+  },
+  dracula: {
+    "--bg": "#282a36", "--bg-card": "#2d2f3d", "--bg-hover": "#383a4a",
+    "--border": "#44475a", "--text": "#f8f8f2", "--text-dim": "#6272a4",
+    "--accent": "#bd93f9", "--accent-hover": "#caa8fc",
+    "--green": "#50fa7b", "--red": "#ff5555", "--orange": "#ffb86c", "--blue": "#8be9fd",
+  },
+  nord: {
+    "--bg": "#2e3440", "--bg-card": "#3b4252", "--bg-hover": "#434c5e",
+    "--border": "#4c566a", "--text": "#eceff4", "--text-dim": "#81a1c1",
+    "--accent": "#88c0d0", "--accent-hover": "#8fbcbb",
+    "--green": "#a3be8c", "--red": "#bf616a", "--orange": "#d08770", "--blue": "#5e81ac",
+  },
+  solarized: {
+    "--bg": "#002b36", "--bg-card": "#073642", "--bg-hover": "#0a4050",
+    "--border": "#586e75", "--text": "#fdf6e3", "--text-dim": "#839496",
+    "--accent": "#b58900", "--accent-hover": "#cb9a09",
+    "--green": "#859900", "--red": "#dc322f", "--orange": "#cb4b16", "--blue": "#268bd2",
+  },
+  "one-dark": {
+    "--bg": "#282c34", "--bg-card": "#2c313c", "--bg-hover": "#353b48",
+    "--border": "#3e4452", "--text": "#abb2bf", "--text-dim": "#636d83",
+    "--accent": "#61afef", "--accent-hover": "#80bfff",
+    "--green": "#98c379", "--red": "#e06c75", "--orange": "#d19a66", "--blue": "#61afef",
+  },
+  "rose-pine": {
+    "--bg": "#191724", "--bg-card": "#1f1d2e", "--bg-hover": "#26233a",
+    "--border": "#403d52", "--text": "#e0def4", "--text-dim": "#908caa",
+    "--accent": "#c4a7e7", "--accent-hover": "#d4bff7",
+    "--green": "#9ccfd8", "--red": "#eb6f92", "--orange": "#f6c177", "--blue": "#31748f",
+  },
+};
+
+let currentTheme = localStorage.getItem("texlive-web-theme") || "light";
+
+function setTheme(name) {
+  const vars = THEMES[name];
+  if (!vars) return;
+  const root = document.documentElement;
+  for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
+  currentTheme = name;
+  localStorage.setItem("texlive-web-theme", name);
+  document.getElementById("theme-select").value = name;
+}
+
+function initThemeSelect() {
+  const sel = document.getElementById("theme-select");
+  for (const name of Object.keys(THEMES)) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name.charAt(0).toUpperCase() + name.slice(1).replace("-", " ");
+    sel.appendChild(opt);
+  }
+  sel.value = currentTheme;
+  sel.onchange = () => setTheme(sel.value);
+}
+
+// ══════════════════════════════════════════
+// PDF.js
+// ══════════════════════════════════════════
+const pdfjsLib = await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.min.mjs");
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.worker.min.mjs";
+
+// ══════════════════════════════════════════
+// CodeMirror 6
+// ══════════════════════════════════════════
+const CDN = "https://cdn.jsdelivr.net/npm/";
+const [
+  { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection },
+  { EditorState },
+  { defaultKeymap, history, historyKeymap, indentWithTab },
+  { syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldGutter, foldKeymap },
+  { closeBrackets, closeBracketsKeymap, autocompletion },
+  { search, searchKeymap, highlightSelectionMatches },
+  cmLaTeX,
+] = await Promise.all([
+  import(CDN + "@codemirror/view@6/+esm"),
+  import(CDN + "@codemirror/state@6/+esm"),
+  import(CDN + "@codemirror/commands@6/+esm"),
+  import(CDN + "@codemirror/language@6/+esm"),
+  import(CDN + "@codemirror/autocomplete@6/+esm"),
+  import(CDN + "@codemirror/search@6/+esm"),
+  import(CDN + "codemirror-lang-latex@1/+esm").catch(() => null),
+]);
+
+// ══════════════════════════════════════════
+// Application State
+// ══════════════════════════════════════════
+const S = {
+  mode: "single",
+  projectName: null,
+  currentFile: null,
+  files: [],
+  modified: new Set(),
+  editorView: null,
+  compiling: false,
+  pdfDoc: null,
+  autoSaveTimer: null,
+  useDocker: false,
+  dockerImage: "oaklight/texlive:latest",
+};
+
+// ── API ──
+async function api(method, path, body = null) {
+  const opts = { method, headers: {} };
+  if (body !== null) {
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
+  }
+  const resp = await fetch(path, opts);
+  const ct = resp.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+    return data;
+  }
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp;
+}
+
+function enc(s) { return encodeURIComponent(s); }
+function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+function setStatus(msg) { document.getElementById("status-left").textContent = msg; }
+
+// ══════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════
+async function init() {
+  initThemeSelect();
+  setTheme(currentTheme);
+  setLang(currentLang);
+
+  const info = await api("GET", "/api/mode");
+  S.mode = info.mode;
+  S.useDocker = info.docker;
+  S.dockerImage = info.image || "oaklight/texlive:latest";
+
+  // Show/hide docker image config
+  if (S.useDocker) {
+    document.getElementById("docker-image-row").style.display = "flex";
+    await loadDockerImages();
+  }
+
+  if (S.mode === "multi") {
+    showProjectList();
+  } else {
+    const projects = await api("GET", "/api/projects");
+    if (projects.length > 0) openProject(projects[0].name);
+  }
+
+  setupKeybindings();
+  setupSettingsDropdown();
+  setStatus(t("ready"));
+
+  // Reveal UI
+  document.getElementById("app").classList.add("ready");
+  const overlay = document.getElementById("loading-overlay");
+  overlay.classList.add("hidden");
+  setTimeout(() => overlay.remove(), 300);
+}
+
+// ── Settings dropdown ──
+function setupSettingsDropdown() {
+  const btn = document.getElementById("btn-settings");
+  const menu = document.getElementById("settings-menu");
+
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    menu.classList.toggle("open");
+  };
+  document.addEventListener("click", () => menu.classList.remove("open"));
+  menu.onclick = (e) => e.stopPropagation();
+
+  document.getElementById("lang-select").onchange = (e) => setLang(e.target.value);
+
+  document.getElementById("docker-image-select").onchange = (e) => {
+    S.dockerImage = e.target.value;
+    if (S.projectName) {
+      api("PUT", `/api/projects/${enc(S.projectName)}/config`, { docker_image: S.dockerImage });
+    }
+  };
+}
+
+async function loadDockerImages() {
+  const sel = document.getElementById("docker-image-select");
+  sel.innerHTML = "";
+  try {
+    const images = await api("GET", "/api/docker/images");
+    for (const img of images) {
+      const opt = document.createElement("option");
+      opt.value = img;
+      opt.textContent = img.replace("oaklight/texlive:", "");
+      sel.appendChild(opt);
+    }
+    // Select current image or first available
+    if (images.includes(S.dockerImage)) {
+      sel.value = S.dockerImage;
+    } else if (images.length > 0) {
+      sel.value = images[0];
+      S.dockerImage = images[0];
+    }
+  } catch {
+    const opt = document.createElement("option");
+    opt.value = S.dockerImage;
+    opt.textContent = S.dockerImage;
+    sel.appendChild(opt);
+  }
+}
+
+// ══════════════════════════════════════════
+// Project List (multi-project)
+// ══════════════════════════════════════════
+async function showProjectList() {
+  document.getElementById("project-list-view").style.display = "block";
+  document.getElementById("editor-view").style.display = "none";
+
+  const projects = await api("GET", "/api/projects");
+  const grid = document.getElementById("project-grid");
+  grid.innerHTML = "";
+
+  for (const p of projects) {
+    const card = document.createElement("div");
+    card.className = "project-card";
+    card.innerHTML = `<h3>${esc(p.name)}</h3><div class="meta">${p.git ? "git" : ""}</div>`;
+    card.onclick = () => openProject(p.name);
+    grid.appendChild(card);
+  }
+
+  const newCard = document.createElement("div");
+  newCard.className = "project-card create-new";
+  newCard.textContent = t("new_project");
+  newCard.onclick = showCreateProjectModal;
+  grid.appendChild(newCard);
+}
+
+function showCreateProjectModal() {
+  showModal(t("new_project_title"), `<input id="inp-project" placeholder="${t("project_name")}" autofocus>`, [
+    { label: t("cancel"), action: closeModal },
+    { label: t("create"), primary: true, action: async () => {
+      const name = document.getElementById("inp-project").value.trim();
+      if (!name) return;
+      await api("POST", "/api/projects", { name });
+      closeModal();
+      showProjectList();
+    }},
+  ]);
+  setTimeout(() => document.getElementById("inp-project")?.focus(), 50);
+}
+
+// ══════════════════════════════════════════
+// Open Project
+// ══════════════════════════════════════════
+async function openProject(name) {
+  S.projectName = name;
+  document.getElementById("project-name").textContent = name;
+  document.getElementById("project-list-view").style.display = "none";
+  document.getElementById("editor-view").style.display = "flex";
+
+  const config = await api("GET", `/api/projects/${enc(name)}/config`);
+  document.getElementById("engine-select").value = config.engine || "pdflatex";
+
+  await refreshFiles();
+
+  const mainFile = config.main_file || "main.tex";
+  if (S.files.includes(mainFile)) await openFile(mainFile);
+  else if (S.files.length > 0) await openFile(S.files[0]);
+
+  await refreshGit();
+
+  // Try loading existing PDF
+  const pdfName = (config.main_file || "main.tex").replace(/\.tex$/, ".pdf");
+  try {
+    const r = await fetch(`/api/projects/${enc(name)}/output/${enc(pdfName)}`);
+    if (r.ok) loadPDF(`/api/projects/${enc(name)}/output/${enc(pdfName)}`);
+  } catch {}
+}
+
+// ══════════════════════════════════════════
+// File Tree
+// ══════════════════════════════════════════
+async function refreshFiles() {
+  S.fileTree = await api("GET", `/api/projects/${enc(S.projectName)}/files`);
+  // Flatten for quick lookups
+  S.files = [];
+  function collect(nodes) {
+    for (const n of nodes) {
+      if (n.type === "file") S.files.push(n.path);
+      else if (n.children) collect(n.children);
+    }
+  }
+  collect(S.fileTree);
+  renderFileTree();
+}
+
+// Track which dirs are expanded (persisted in memory)
+const expandedDirs = new Set();
+
+function renderFileTree() {
+  const container = document.getElementById("file-tree");
+  container.innerHTML = "";
+  renderTreeNodes(S.fileTree || [], container, 0);
+}
+
+function renderTreeNodes(nodes, parent, depth) {
+  for (const node of nodes) {
+    if (node.name === ".texlive-web.json") continue;
+
+    if (node.type === "dir") {
+      const dirEl = document.createElement("div");
+      dirEl.className = "tree-dir";
+
+      const header = document.createElement("div");
+      header.className = "tree-dir-header";
+      header.style.paddingLeft = (14 + depth * 16) + "px";
+
+      const isOpen = expandedDirs.has(node.path);
+      header.innerHTML = `<span class="arrow ${isOpen ? "open" : ""}">&#9654;</span> ${esc(node.name)}`;
+      header.onclick = () => {
+        if (expandedDirs.has(node.path)) expandedDirs.delete(node.path);
+        else expandedDirs.add(node.path);
+        renderFileTree();
+      };
+      dirEl.appendChild(header);
+
+      const childrenEl = document.createElement("div");
+      childrenEl.className = "tree-dir-children" + (isOpen ? " open" : "");
+      renderTreeNodes(node.children || [], childrenEl, depth + 1);
+      dirEl.appendChild(childrenEl);
+
+      parent.appendChild(dirEl);
+    } else {
+      const div = document.createElement("div");
+      div.className = "file-item" +
+        (node.path === S.currentFile ? " active" : "") +
+        (S.modified.has(node.path) ? " modified" : "");
+      div.style.paddingLeft = (18 + depth * 16) + "px";
+      div.textContent = node.name;
+      div.title = node.path;
+      div.onclick = () => openFile(node.path);
+      parent.appendChild(div);
+    }
+  }
+}
+
+// ══════════════════════════════════════════
+// Editor
+// ══════════════════════════════════════════
+async function openFile(filePath) {
+  if (S.currentFile && S.modified.has(S.currentFile)) await saveCurrentFile();
+
+  const data = await api("GET", `/api/projects/${enc(S.projectName)}/files/${enc(filePath)}`);
+  S.currentFile = filePath;
+
+  if (S.editorView) S.editorView.destroy();
+
+  const extensions = [
+    lineNumbers(),
+    highlightActiveLine(),
+    highlightActiveLineGutter(),
+    drawSelection(),
+    history(),
+    bracketMatching(),
+    closeBrackets(),
+    foldGutter(),
+    autocompletion(),
+    search(),
+    highlightSelectionMatches(),
+    syntaxHighlighting(defaultHighlightStyle),
+    keymap.of([
+      ...defaultKeymap, ...historyKeymap, ...closeBracketsKeymap,
+      ...foldKeymap, ...searchKeymap, indentWithTab,
+    ]),
+    EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        S.modified.add(S.currentFile);
+        renderFileTree();
+        scheduleAutoSave();
+      }
+    }),
+    EditorView.lineWrapping,
+  ];
+  if (cmLaTeX?.latex) extensions.push(cmLaTeX.latex());
+
+  S.editorView = new EditorView({
+    state: EditorState.create({ doc: data.content, extensions }),
+    parent: document.getElementById("editor-container"),
+  });
+  renderFileTree();
+}
+
+function scheduleAutoSave() {
+  if (S.autoSaveTimer) clearTimeout(S.autoSaveTimer);
+  S.autoSaveTimer = setTimeout(() => saveCurrentFile(), 2000);
+}
+
+async function saveCurrentFile() {
+  if (!S.currentFile || !S.editorView) return;
+  const content = S.editorView.state.doc.toString();
+  await api("PUT", `/api/projects/${enc(S.projectName)}/files/${enc(S.currentFile)}`, { content });
+  S.modified.delete(S.currentFile);
+  renderFileTree();
+  setStatus(`${t("saved")} ${S.currentFile}`);
+}
+
+// ══════════════════════════════════════════
+// Compile
+// ══════════════════════════════════════════
+async function compile() {
+  if (S.compiling) return;
+  S.compiling = true;
+
+  if (S.modified.has(S.currentFile)) await saveCurrentFile();
+
+  const engine = document.getElementById("engine-select").value;
+  const btnCompile = document.getElementById("btn-compile");
+  btnCompile.disabled = true;
+  btnCompile.textContent = t("compiling");
+  openLog();
+  clearLog();
+  setStatus(t("compiling"));
+
+  try {
+    const body = { engine };
+    // Pass docker image override if changed
+    if (S.useDocker) body.docker_image = S.dockerImage;
+
+    const result = await api("POST", `/api/projects/${enc(S.projectName)}/compile`, body);
+    const evtSource = new EventSource(
+      `/api/projects/${enc(S.projectName)}/compile/${result.compile_id}/stream`
+    );
+
+    evtSource.addEventListener("log", (e) => {
+      const d = JSON.parse(e.data);
+      appendLog(d.line, d.level);
+    });
+
+    evtSource.addEventListener("done", (e) => {
+      const d = JSON.parse(e.data);
+      evtSource.close();
+      S.compiling = false;
+      btnCompile.disabled = false;
+      btnCompile.textContent = t("compile");
+
+      if (d.status === "success") {
+        setStatus(t("compile_success"));
+        document.getElementById("log-status").innerHTML = `<span class="badge success">OK</span>`;
+      } else {
+        setStatus(t("compile_failed"));
+        document.getElementById("log-status").innerHTML = `<span class="badge error">FAILED</span>`;
+      }
+      if (d.pdf_url) loadPDF(d.pdf_url);
+      refreshFiles();
+      refreshGit();
+    });
+
+    evtSource.onerror = () => {
+      evtSource.close();
+      S.compiling = false;
+      btnCompile.disabled = false;
+      btnCompile.textContent = t("compile");
+      setStatus(t("connection_lost"));
+    };
+  } catch (err) {
+    S.compiling = false;
+    btnCompile.disabled = false;
+    btnCompile.textContent = t("compile");
+    setStatus(`${t("compile_error")}: ${err.message}`);
+  }
+}
+
+// ══════════════════════════════════════════
+// Clean
+// ══════════════════════════════════════════
+async function doClean() {
+  if (!S.projectName) return;
+  try {
+    const r = await api("POST", `/api/projects/${enc(S.projectName)}/clean`);
+    setStatus(t("cleaned").replace("{n}", r.count));
+    await refreshFiles();
+  } catch (err) {
+    setStatus(`Clean error: ${err.message}`);
+  }
+}
+
+// ══════════════════════════════════════════
+// PDF Viewer
+// ══════════════════════════════════════════
+async function loadPDF(url) {
+  const container = document.getElementById("pdf-container");
+  container.innerHTML = "";
+  document.getElementById("pdf-status").textContent = t("loading_pdf");
+
+  try {
+    const pdfUrl = url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();
+    const doc = await pdfjsLib.getDocument(pdfUrl).promise;
+    S.pdfDoc = doc;
+    document.getElementById("pdf-status").textContent = `${doc.numPages} ${t("pages")}`;
+
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i);
+      const scale = (container.clientWidth - 40) / page.getViewport({ scale: 1 }).width;
+      const viewport = page.getViewport({ scale: Math.min(scale, 2) });
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      container.appendChild(canvas);
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    }
+  } catch (err) {
+    container.innerHTML = `<div class="pdf-placeholder">${t("pdf_error")}: ${esc(err.message)}</div>`;
+    document.getElementById("pdf-status").textContent = t("pdf_error");
+  }
+}
+
+// ══════════════════════════════════════════
+// Compile Log
+// ══════════════════════════════════════════
+function openLog() { document.getElementById("log-panel").classList.add("open"); }
+function toggleLog() { document.getElementById("log-panel").classList.toggle("open"); }
+function clearLog() {
+  document.getElementById("log-content").innerHTML = "";
+  document.getElementById("log-status").innerHTML = "";
+}
+function appendLog(line, level = "info") {
+  const el = document.getElementById("log-content");
+  const div = document.createElement("div");
+  div.className = "log-line " + level;
+  div.textContent = line;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+// ══════════════════════════════════════════
+// Git
+// ══════════════════════════════════════════
+async function refreshGit() {
+  try {
+    const st = await api("GET", `/api/projects/${enc(S.projectName)}/git/status`);
+    if (!st.git) { document.getElementById("git-panel").style.display = "none"; return; }
+    document.getElementById("git-panel").style.display = "";
+    document.getElementById("git-branch").textContent =
+      `${st.branch || "???"}` +
+      (st.ahead ? ` \u21915${st.ahead}` : "") +
+      (st.behind ? ` \u2193${st.behind}` : "");
+
+    const fd = document.getElementById("git-files");
+    fd.innerHTML = "";
+    for (const f of st.files) {
+      const cls = f.status === "??" ? "new" : f.status.includes("D") ? "D" : "M";
+      const div = document.createElement("div");
+      div.className = "git-file";
+      div.innerHTML = `<span class="git-status ${cls}">${esc(f.status)}</span>${esc(f.path)}`;
+      fd.appendChild(div);
+    }
+  } catch { document.getElementById("git-panel").style.display = "none"; }
+}
+
+async function doCommit() {
+  showModal(t("git_commit_title"), `<textarea id="inp-commit" placeholder="${t("commit_message")}" rows="3"></textarea>`, [
+    { label: t("cancel"), action: closeModal },
+    { label: t("commit"), primary: true, action: async () => {
+      const msg = document.getElementById("inp-commit").value.trim();
+      if (!msg) return;
+      if (S.modified.has(S.currentFile)) await saveCurrentFile();
+      const r = await api("POST", `/api/projects/${enc(S.projectName)}/git/commit`, { message: msg });
+      closeModal();
+      setStatus(r.success ? t("committed") : r.message);
+      refreshGit();
+    }},
+  ]);
+  setTimeout(() => document.getElementById("inp-commit")?.focus(), 50);
+}
+
+async function doPush() {
+  setStatus(t("pushing"));
+  const r = await api("POST", `/api/projects/${enc(S.projectName)}/git/push`);
+  setStatus(r.success ? t("pushed") : r.message);
+  refreshGit();
+}
+
+// ══════════════════════════════════════════
+// New File
+// ══════════════════════════════════════════
+function showNewFileModal() {
+  showModal(t("new_file_title"), `<input id="inp-newfile" placeholder="${t("filename")}" autofocus>`, [
+    { label: t("cancel"), action: closeModal },
+    { label: t("create"), primary: true, action: async () => {
+      const fname = document.getElementById("inp-newfile").value.trim();
+      if (!fname) return;
+      await api("PUT", `/api/projects/${enc(S.projectName)}/files/${enc(fname)}`, { content: "" });
+      closeModal();
+      await refreshFiles();
+      await openFile(fname);
+    }},
+  ]);
+  setTimeout(() => document.getElementById("inp-newfile")?.focus(), 50);
+}
+
+// ══════════════════════════════════════════
+// Modal
+// ══════════════════════════════════════════
+function showModal(title, bodyHtml, buttons) {
+  document.getElementById("modal-title").textContent = title;
+  document.getElementById("modal-body").innerHTML = bodyHtml;
+  const actions = document.getElementById("modal-actions");
+  actions.innerHTML = "";
+  for (const b of buttons) {
+    const btn = document.createElement("button");
+    btn.textContent = b.label;
+    if (b.primary) btn.className = "primary";
+    btn.onclick = b.action;
+    actions.appendChild(btn);
+  }
+  const overlay = document.getElementById("modal-overlay");
+  overlay.style.display = "flex";
+  overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+}
+
+function closeModal() { document.getElementById("modal-overlay").style.display = "none"; }
+
+// ══════════════════════════════════════════
+// Keyboard Shortcuts
+// ══════════════════════════════════════════
+function setupKeybindings() {
+  document.addEventListener("keydown", (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); saveCurrentFile(); }
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); compile(); }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "C") { e.preventDefault(); doCommit(); }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "P") { e.preventDefault(); doPush(); }
+    if (e.key === "Escape") closeModal();
+  });
+}
+
+// ══════════════════════════════════════════
+// Wire up buttons
+// ══════════════════════════════════════════
+document.getElementById("btn-compile").onclick = compile;
+document.getElementById("btn-clean").onclick = doClean;
+document.getElementById("btn-save").onclick = saveCurrentFile;
+document.getElementById("btn-commit").onclick = doCommit;
+document.getElementById("btn-push").onclick = doPush;
+document.getElementById("btn-log-toggle").onclick = toggleLog;
+document.getElementById("btn-new-file").onclick = showNewFileModal;
+document.getElementById("log-header").onclick = toggleLog;
+document.getElementById("btn-pdf-refresh").onclick = () => {
+  if (S.projectName) {
+    const base = (S.currentFile || "main.tex").replace(/\.tex$/, ".pdf");
+    loadPDF(`/api/projects/${enc(S.projectName)}/output/${enc(base)}`);
+  }
+};
+
+// ── Auto-refresh on window focus ──
+window.addEventListener("focus", () => {
+  if (S.projectName) {
+    refreshFiles();
+    refreshGit();
+  }
+});
+
+// ── Start ──
+init();
+</script>
+</body>
+</html>

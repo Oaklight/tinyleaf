@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "texlive-web"
+dynamic = ["version"]
+authors = [{ name = "Oaklight", email = "oaklight@users.noreply.github.com" }]
+description = "Lightweight web-based LaTeX editor powered by TeX Live"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+
+[project.urls]
+Repository = "https://github.com/Oaklight/texlive-web"
+Issues = "https://github.com/Oaklight/texlive-web/issues"
+
+[project.scripts]
+texlive-web = "texlive_web.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "texlive_web.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"texlive_web" = ["static/*.html"]
+
+[tool.ruff]
+line-length = 100
