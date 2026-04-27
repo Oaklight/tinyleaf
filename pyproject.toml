@@ -20,10 +20,10 @@ tinyleaf = "tinyleaf.cli:main"
 
 [project.optional-dependencies]
 dev = [
-    "ruff>=0.11.0",
-    "ty>=0.0.1a7",
-    "complexipy>=0.8.0",
-    "build>=1.2.0",
+    "complexipy>=5.2.0",
+    "ruff>=0.15.0",
+    "ty>=0.0.31",
+    "build>=1.2.2.post1",
     "twine>=6.1.0",
 ]
 
