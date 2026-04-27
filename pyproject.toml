@@ -18,6 +18,15 @@ Issues = "https://github.com/Oaklight/tinyleaf/issues"
 [project.scripts]
 tinyleaf = "tinyleaf.cli:main"
 
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.11.0",
+    "ty>=0.0.1a7",
+    "complexipy>=0.8.0",
+    "build>=1.2.0",
+    "twine>=6.1.0",
+]
+
 [tool.setuptools.dynamic]
 version = { attr = "tinyleaf.__version__" }
 
