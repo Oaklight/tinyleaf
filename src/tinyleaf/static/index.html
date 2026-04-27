@@ -661,20 +661,20 @@ select:focus { border-color: var(--accent); outline: none; }
     <span id="project-name" style="font-size: 13px; color: var(--text-dim);">&mdash;</span>
     <span style="flex:1"></span>
 
-    <select id="engine-select" title="Engine">
+    <select id="engine-select" title="Engine" data-i18n-title="engine">
       <option value="pdflatex">pdflatex</option>
       <option value="lualatex">lualatex</option>
       <option value="xelatex">xelatex</option>
       <option value="latexmk">latexmk</option>
     </select>
     <button id="btn-compile" class="primary" data-i18n="compile">Compile</button>
-    <button id="btn-clean" class="sm danger" data-i18n="clean" title="Remove build artifacts">Clean</button>
+    <button id="btn-clean" class="sm danger" data-i18n="clean" title="Remove build artifacts" data-i18n-title="clean_title">Clean</button>
     <span class="toolbar-sep"></span>
     <button id="btn-save" class="sm" data-i18n="save">Save</button>
     <button id="btn-commit" class="sm" data-i18n="commit">Commit</button>
     <button id="btn-push" class="sm" data-i18n="push">Push</button>
     <span class="toolbar-sep"></span>
-    <button class="icon-btn" id="btn-log-toggle" title="Toggle log"><svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
+    <button class="icon-btn" id="btn-log-toggle" title="Toggle log" data-i18n-title="toggle_log"><svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
   </div>
 
   <div id="main">
@@ -693,11 +693,11 @@ select:focus { border-color: var(--accent); outline: none; }
             <div class="sidebar-header">
               <span data-i18n="files">Files</span>
               <div class="sidebar-actions">
-                <button class="icon-btn" id="btn-collapse-all" title="Collapse all"><svg viewBox="0 0 24 24"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
-                <button class="icon-btn" id="btn-search-file" title="Search files"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
-                <button class="icon-btn" id="btn-upload-file" title="Upload file"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>
-                <button class="icon-btn" id="btn-new-folder" title="New folder"><svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/></svg></button>
-                <button class="icon-btn" id="btn-new-file" title="New file"><svg viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
+                <button class="icon-btn" id="btn-collapse-all" title="Collapse all" data-i18n-title="collapse_all"><svg viewBox="0 0 24 24"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
+                <button class="icon-btn" id="btn-search-file" title="Search files" data-i18n-title="search_files_title"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+                <button class="icon-btn" id="btn-upload-file" title="Upload file" data-i18n-title="upload_file_title"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>
+                <button class="icon-btn" id="btn-new-folder" title="New folder" data-i18n-title="new_folder_title"><svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/></svg></button>
+                <button class="icon-btn" id="btn-new-file" title="New file" data-i18n-title="new_file_title"><svg viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
               </div>
             </div>
             <div id="file-search-box">
@@ -718,7 +718,7 @@ select:focus { border-color: var(--accent); outline: none; }
           <div id="editor-pane">
             <div id="editor-breadcrumb">
               <span id="breadcrumb-path">—</span>
-              <button class="icon-btn" id="btn-locate-file" title="Locate in tree"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="2"/><line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="2"/><line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" stroke-width="2"/><line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="2"/></svg></button>
+              <button class="icon-btn" id="btn-locate-file" title="Locate in tree" data-i18n-title="locate_in_tree"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="2"/><line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="2"/><line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" stroke-width="2"/><line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="2"/></svg></button>
             </div>
             <div id="editor-container"></div>
           </div>
@@ -751,7 +751,7 @@ select:focus { border-color: var(--accent); outline: none; }
     <span id="status-left" data-i18n="ready">Ready</span>
     <span id="status-right"></span>
     <span class="toolbar-sep"></span>
-    <button class="icon-btn" id="btn-settings" title="Settings" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    <button class="icon-btn" id="btn-settings" title="Settings" data-i18n-title="settings" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
   </div>
 </div>
 
@@ -917,6 +917,12 @@ const I18N = {
     auto_save: "Auto save",
     off: "Off",
     collapse_all: "Collapse all",
+    engine: "Engine",
+    clean_title: "Remove build artifacts",
+    toggle_log: "Toggle log",
+    search_files_title: "Search files",
+    upload_file_title: "Upload file",
+    locate_in_tree: "Locate in tree",
   },
     compile: "编译",
     compiling: "编译中...",
@@ -997,6 +1003,12 @@ const I18N = {
     auto_save: "自动保存",
     off: "关闭",
     collapse_all: "全部折叠",
+    engine: "引擎",
+    clean_title: "清理构建产物",
+    toggle_log: "切换日志",
+    search_files_title: "搜索文件",
+    upload_file_title: "上传文件",
+    locate_in_tree: "在文件树中定位",
   },
 
 let currentLang = localStorage.getItem("tinyleaf-lang") || "en";
@@ -1009,6 +1021,9 @@ function applyI18n() {
     const val = t(key);
     if (el.tagName === "INPUT") el.placeholder = val;
     else el.textContent = val;
+  });
+  document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+    el.title = t(el.getAttribute("data-i18n-title"));
   });
 }
 
