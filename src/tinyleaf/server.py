@@ -54,6 +54,10 @@ class TexliveHandler(BaseHTTPRequestHandler):
             self._handle_api("register_project")
         elif path == "/api/vendor/update":
             self._handle_api("update_vendor")
+        elif path == "/api/docker/pull":
+            self._handle_api("docker_pull")
+        elif path == "/api/docker/rmi":
+            self._handle_api("docker_rmi")
         elif path.startswith("/api/projects/"):
             self._route_project_post(path)
         else:

@@ -17,6 +17,8 @@ def handle_request(handler, action, **kwargs):
     dispatch = {
         "get_mode": _get_mode,
         "list_docker_images": _list_docker_images,
+        "docker_pull": _docker_pull,
+        "docker_rmi": _docker_rmi,
         "list_projects": _list_projects,
         "create_project": _create_project,
         "register_project": _register_project,
@@ -179,6 +181,36 @@ def _list_docker_images(handler):
         full = f"{_DOCKER_IMAGE_PREFIX}:{name}"
         all_tags.append({"tag": full, "name": name, "local": full in local_tags})
     handler.send_json(all_tags)
+
+
+def _docker_pull(handler):
+    """Pull a Docker image, optionally via registry mirror."""
+    body = handler.read_json_body()
+    image = body.get("image")
+    if not image:
+        handler.send_json({"error": "Missing image"}, status=400)
+        return
+
+    config_dir = handler.config.get("config_dir")
+    registry_mirror = None
+    if config_dir:
+        settings = _read_settings(config_dir)
+        registry_mirror = settings.get("registry_mirror") or None
+
+    success, msg = compiler.docker_pull_image(image, registry_mirror=registry_mirror)
+    handler.send_json({"success": success, "message": msg})
+
+
+def _docker_rmi(handler):
+    """Remove a local Docker image."""
+    body = handler.read_json_body()
+    image = body.get("image")
+    if not image:
+        handler.send_json({"error": "Missing image"}, status=400)
+        return
+
+    success, msg = compiler.docker_remove_image(image)
+    handler.send_json({"success": success, "message": msg})
 
 
 # ── Projects ──
@@ -718,12 +750,20 @@ def _compile(handler, name):
     docker_image = (
         body.get("docker_image") or config_data.get("docker_image") or server_config["docker_image"]
     )
+    # Read registry mirror from global settings
+    config_dir = handler.config.get("config_dir")
+    registry_mirror = None
+    if config_dir:
+        settings = _read_settings(config_dir)
+        registry_mirror = settings.get("registry_mirror") or None
+
     compile_id = compiler.start_compile(
         project_dir=project_dir,
         main_file=main_file,
         engine=engine,
         use_docker=use_docker,
         docker_image=docker_image,
+        registry_mirror=registry_mirror,
     )
 
     handler.send_json({"compile_id": compile_id, "main_file": main_file, "engine": engine})

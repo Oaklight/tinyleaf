@@ -829,11 +829,19 @@ select:focus { border-color: var(--accent); outline: none; }
     </div>
     <div class="settings-popup-item" id="docker-image-row">
       <label data-i18n="docker_image">Image</label>
-      <select id="docker-image-select"></select>
+      <div style="display:flex;align-items:center;gap:4px">
+        <select id="docker-image-select" style="flex:1"></select>
+        <button id="btn-docker-pull" class="sm" style="font-size:11px;padding:2px 6px" data-i18n="pull">Pull</button>
+        <button id="btn-docker-rmi" class="sm danger" style="font-size:11px;padding:2px 6px" data-i18n="delete">Del</button>
+      </div>
     </div>
     <div class="settings-popup-item" id="debian-toggle-row">
       <label data-i18n="show_debian">Show Debian</label>
       <input type="checkbox" id="show-debian-toggle" style="cursor:pointer">
+    </div>
+    <div class="settings-popup-item">
+      <label data-i18n="registry_mirror">Registry Mirror</label>
+      <input id="registry-mirror-input" type="text" placeholder="docker.1ms.run" style="font-size:13px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);width:180px">
     </div>
     <div class="settings-popup-item">
       <label data-i18n="js_modules">JS Modules</label>
@@ -959,6 +967,14 @@ const I18N = {
     toggle_pdf: "Toggle PDF panel",
     image_error: "Failed to load image",
     binary_not_supported: "Binary file — cannot open in editor",
+    registry_mirror: "Registry Mirror",
+    pull: "Pull",
+    pulling_image: "Pulling image...",
+    pull_success: "Image pulled successfully",
+    pull_failed: "Failed to pull image",
+    image_removed: "Image removed",
+    remove_failed: "Failed to remove image",
+    confirm_rmi: "Remove local image \"{name}\"?",
   },
   zh: {
     compile: "编译",
@@ -1050,6 +1066,14 @@ const I18N = {
     toggle_pdf: "切换 PDF 面板",
     image_error: "图片加载失败",
     binary_not_supported: "二进制文件 — 无法在编辑器中打开",
+    registry_mirror: "镜像仓库",
+    pull: "拉取",
+    pulling_image: "正在拉取镜像...",
+    pull_success: "镜像拉取成功",
+    pull_failed: "镜像拉取失败",
+    image_removed: "镜像已删除",
+    remove_failed: "删除镜像失败",
+    confirm_rmi: "删除本地镜像 \"{name}\"？",
   },
 };
 
@@ -1286,6 +1310,9 @@ async function init() {
   try {
     const globalSettings = await api("GET", "/api/settings");
     document.getElementById("show-debian-toggle").checked = !!globalSettings.show_debian;
+    if (globalSettings.registry_mirror) {
+      document.getElementById("registry-mirror-input").value = globalSettings.registry_mirror;
+    }
   } catch {}
   await loadDockerImages();
 
@@ -1368,6 +1395,56 @@ function setupSettingsPopup() {
   document.getElementById("show-debian-toggle").onchange = (e) => {
     api("PUT", "/api/settings", { show_debian: e.target.checked });
     loadDockerImages(true);
+  };
+
+  // Registry mirror — save on blur
+  document.getElementById("registry-mirror-input").onblur = (e) => {
+    api("PUT", "/api/settings", { registry_mirror: e.target.value.trim() });
+  };
+
+  // Docker pull
+  document.getElementById("btn-docker-pull").onclick = async () => {
+    const sel = document.getElementById("docker-image-select");
+    const image = sel.value;
+    if (!image) return;
+    const btn = document.getElementById("btn-docker-pull");
+    btn.disabled = true;
+    btn.textContent = "...";
+    setStatus(t("pulling_image"));
+    try {
+      const res = await api("POST", "/api/docker/pull", { image });
+      if (res.success) {
+        setStatus(t("pull_success"));
+      } else {
+        setStatus(t("pull_failed") + ": " + res.message);
+      }
+      await loadDockerImages();
+    } catch (e) {
+      setStatus(t("pull_failed") + ": " + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = t("pull");
+    }
+  };
+
+  // Docker remove
+  document.getElementById("btn-docker-rmi").onclick = async () => {
+    const sel = document.getElementById("docker-image-select");
+    const image = sel.value;
+    if (!image) return;
+    const name = sel.options[sel.selectedIndex]?.textContent || image;
+    if (!confirm(t("confirm_rmi").replace("{name}", image))) return;
+    try {
+      const res = await api("POST", "/api/docker/rmi", { image });
+      if (res.success) {
+        setStatus(t("image_removed"));
+      } else {
+        setStatus(t("remove_failed") + ": " + res.message);
+      }
+      await loadDockerImages();
+    } catch (e) {
+      setStatus(t("remove_failed") + ": " + e.message);
+    }
   };
 
   // Vendor JS modules status + update
