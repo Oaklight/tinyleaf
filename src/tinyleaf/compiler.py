@@ -129,6 +129,7 @@ def _build_latexmk_args(engine, main_file):
     return [
         "latexmk",
         engine_flag,
+        "-cd",
         "-synctex=1",
         "-interaction=nonstopmode",
         "-file-line-error",
