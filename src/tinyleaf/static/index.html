@@ -583,7 +583,7 @@ select:focus { border-color: var(--accent); outline: none; }
 .project-card .rename-btn:hover { color: var(--accent); background: var(--bg-hover); }
 .project-card:hover .remove-btn, .project-card:hover .rename-btn { display: block; }
 .project-card .project-time { display: none; font-size: 12px; color: var(--text-dim); }
-.project-card .git-badge { color: var(--text-dim); line-height: 0; }
+.project-card .git-badge { color: var(--text-dim); line-height: 0; vertical-align: middle; margin-left: 4px; }
 .project-card:hover .git-badge { color: var(--accent); }
 
 /* List view */
@@ -2120,10 +2120,9 @@ async function showProjectList() {
     card.className = "project-card" + (p.exists === false ? " stale" : "");
     const timeStr = p.added_at ? new Date(p.added_at).toLocaleString() : "";
     const gitBadge = p.git ? `<span class="git-badge" title="Git repository"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></span>` : "";
-    card.innerHTML = `<h3>${esc(p.name)}</h3>`
+    card.innerHTML = `<h3>${esc(p.name)} ${gitBadge}</h3>`
       + `<div class="project-path">${esc(p.path || "")}</div>`
       + `<div class="project-time">${esc(timeStr)}</div>`
-      + gitBadge
       + `<button class="rename-btn" title="${t("rename_project")}"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>`
       + `<button class="remove-btn" title="${t("remove_project")}"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
     if (p.exists !== false) {
