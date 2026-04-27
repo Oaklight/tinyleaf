@@ -690,12 +690,17 @@ select:focus { border-color: var(--accent); outline: none; }
     <span id="project-name" style="font-size: 13px; color: var(--text-dim);">&mdash;</span>
     <span style="flex:1"></span>
 
+    <select id="main-file-select" title="Main file" data-i18n-title="main_file"></select>
     <select id="engine-select" title="Engine" data-i18n-title="engine">
       <option value="pdflatex">pdflatex</option>
       <option value="lualatex">lualatex</option>
       <option value="xelatex">xelatex</option>
       <option value="latexmk">latexmk</option>
     </select>
+    <label id="auto-compile-label" style="display:flex;align-items:center;gap:3px;font-size:11px;color:var(--text-dim);cursor:pointer" title="Auto compile on save" data-i18n-title="auto_compile_title">
+      <input type="checkbox" id="auto-compile-toggle" style="cursor:pointer" checked>
+      <span data-i18n="auto_compile">Auto</span>
+    </label>
     <button id="btn-compile" class="primary" data-i18n="compile">Compile</button>
     <button id="btn-clean" class="sm danger" data-i18n="clean" title="Remove build artifacts" data-i18n-title="clean_title">Clean</button>
     <span class="toolbar-sep"></span>
@@ -958,6 +963,9 @@ const I18N = {
     auto_save: "Auto save",
     off: "Off",
     collapse_all: "Collapse all",
+    main_file: "Main file",
+    auto_compile: "Auto",
+    auto_compile_title: "Auto compile on save",
     engine: "Engine",
     clean_title: "Remove build artifacts",
     toggle_log: "Toggle log",
@@ -1059,6 +1067,9 @@ const I18N = {
     auto_save: "自动保存",
     off: "关闭",
     collapse_all: "全部折叠",
+    main_file: "主文件",
+    auto_compile: "自动",
+    auto_compile_title: "保存后自动编译",
     engine: "引擎",
     clean_title: "清理构建产物",
     toggle_log: "切换日志",
@@ -1265,6 +1276,9 @@ const S = {
   compiling: false,
   compileId: null,
   pulling: false,
+  mainFile: "main.tex",
+  autoCompile: true,
+  autoCompileTimer: null,
   pdfDoc: null,
   autoSaveTimer: null,
   autoSaveInterval: 2000,
@@ -1950,6 +1964,10 @@ async function openProject(name) {
   const config = await api("GET", `/api/projects/${enc(name)}/config`);
   document.getElementById("engine-select").value = config.engine || "pdflatex";
 
+  // Sync auto-compile toggle with project config
+  S.autoCompile = config.auto_compile !== false; // default true
+  document.getElementById("auto-compile-toggle").checked = S.autoCompile;
+
   // Sync docker toggle with project config
   if ("use_docker" in config) {
     S.useDocker = config.use_docker;
@@ -1963,14 +1981,17 @@ async function openProject(name) {
 
   await refreshFiles();
 
-  const mainFile = config.main_file || "main.tex";
-  if (S.files.includes(mainFile)) await openFile(mainFile);
+  // Populate main file selector
+  S.mainFile = config.main_file || _detectMainFile();
+  _populateMainFileSelect();
+
+  if (S.files.includes(S.mainFile)) await openFile(S.mainFile);
   else if (S.files.length > 0) await openFile(S.files[0]);
 
   await refreshGit();
 
   // Try loading existing PDF
-  const pdfName = (config.main_file || "main.tex").replace(/\.tex$/, ".pdf");
+  const pdfName = S.mainFile.replace(/\.tex$/, ".pdf");
   try {
     const r = await fetch(`/api/projects/${enc(name)}/output/${enc(pdfName)}`);
     if (r.ok) loadPDF(`/api/projects/${enc(name)}/output/${enc(pdfName)}`);
@@ -1992,6 +2013,34 @@ async function refreshFiles() {
   }
   collect(S.fileTree);
   renderFileTree();
+  _populateMainFileSelect();
+}
+
+function _detectMainFile() {
+  const texFiles = S.files.filter((f) => f.endsWith(".tex"));
+  if (texFiles.includes("main.tex")) return "main.tex";
+  // Prefer root-level .tex files with \documentclass (server already detects this)
+  const rootTex = texFiles.filter((f) => !f.includes("/"));
+  if (rootTex.length > 0) return rootTex[0];
+  return texFiles[0] || "main.tex";
+}
+
+function _populateMainFileSelect() {
+  const sel = document.getElementById("main-file-select");
+  const texFiles = S.files.filter((f) => f.endsWith(".tex"));
+  sel.innerHTML = "";
+  for (const f of texFiles) {
+    const opt = document.createElement("option");
+    opt.value = f;
+    opt.textContent = f;
+    sel.appendChild(opt);
+  }
+  if (texFiles.includes(S.mainFile)) {
+    sel.value = S.mainFile;
+  } else if (texFiles.length > 0) {
+    S.mainFile = texFiles[0];
+    sel.value = S.mainFile;
+  }
 }
 
 // Track which dirs are expanded (persisted to localStorage)
@@ -2179,6 +2228,14 @@ async function saveCurrentFile() {
   S.modified.delete(S.currentFile);
   renderFileTree();
   setStatus(`${t("saved")} ${S.currentFile}`, "success");
+  // Auto-compile after save (guard against re-entry from compile's own save)
+  if (S.autoCompile && !S.compiling && !S._autoCompiling) {
+    clearTimeout(S.autoCompileTimer);
+    S.autoCompileTimer = setTimeout(() => {
+      S._autoCompiling = true;
+      compile().finally(() => { S._autoCompiling = false; });
+    }, 500);
+  }
 }
 
 // ══════════════════════════════════════════
@@ -2263,7 +2320,7 @@ async function compile() {
   setStatus(t("compiling"));
 
   try {
-    const body = { engine, use_docker: S.useDocker };
+    const body = { engine, main_file: S.mainFile, use_docker: S.useDocker };
     if (S.useDocker) body.docker_image = S.dockerImage;
 
     const result = await api("POST", `/api/projects/${enc(S.projectName)}/compile`, body);
@@ -2501,6 +2558,14 @@ document.getElementById("btn-home").onclick = () => {
 document.getElementById("btn-compile").onclick = compile;
 document.getElementById("btn-clean").onclick = doClean;
 document.getElementById("btn-save").onclick = saveCurrentFile;
+document.getElementById("main-file-select").onchange = (e) => {
+  S.mainFile = e.target.value;
+  api("PUT", `/api/projects/${enc(S.projectName)}/config`, { main_file: S.mainFile });
+};
+document.getElementById("auto-compile-toggle").onchange = (e) => {
+  S.autoCompile = e.target.checked;
+  api("PUT", `/api/projects/${enc(S.projectName)}/config`, { auto_compile: S.autoCompile });
+};
 document.getElementById("btn-commit").onclick = doCommit;
 document.getElementById("btn-push").onclick = doPush;
 document.getElementById("btn-log-toggle").onclick = toggleLog;
