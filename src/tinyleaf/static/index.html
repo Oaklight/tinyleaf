@@ -329,6 +329,10 @@ select:focus { border-color: var(--accent); outline: none; }
   color: var(--orange);
   font-size: 10px;
 }
+.file-item.artifact {
+  opacity: 0.45;
+  font-style: italic;
+}
 
 /* ── Git panel ── */
 #git-panel {
@@ -1239,6 +1243,18 @@ const [
 ]);
 
 // ── Language extensions (loaded on demand) ──
+// LaTeX build artifact extensions (grayed out in file tree)
+const ARTIFACT_EXTS = new Set([
+  ".aux", ".bbl", ".bcf", ".blg", ".fdb_latexmk", ".fls", ".log", ".out",
+  ".run.xml", ".synctex.gz", ".toc", ".lof", ".lot", ".nav", ".snm", ".vrb",
+  ".xdv", ".idx", ".ilg", ".ind", ".glo", ".gls", ".ist",
+]);
+function isArtifact(name) {
+  if (name.endsWith(".synctex.gz")) return true;
+  const dot = name.lastIndexOf(".");
+  return dot >= 0 && ARTIFACT_EXTS.has(name.slice(dot));
+}
+
 const LANG_MAP = {
   ".tex": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
   ".bib": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
@@ -2096,8 +2112,10 @@ function renderFileTree(searchFilter = "") {
 function renderFilteredFiles(query, parent) {
   for (const filePath of S.files) {
     if (!filePath.toLowerCase().includes(query)) continue;
+    const name = filePath.split("/").pop();
     const div = document.createElement("div");
-    div.className = "file-item" + (filePath === S.currentFile ? " active" : "");
+    div.className = "file-item" + (filePath === S.currentFile ? " active" : "") +
+      (isArtifact(name) ? " artifact" : "");
     div.textContent = filePath;
     div.title = filePath;
     div.onclick = () => openFile(filePath);
@@ -2138,7 +2156,8 @@ function renderTreeNodes(nodes, parent, depth) {
       const div = document.createElement("div");
       div.className = "file-item" +
         (node.path === S.currentFile ? " active" : "") +
-        (S.modified.has(node.path) ? " modified" : "");
+        (S.modified.has(node.path) ? " modified" : "") +
+        (isArtifact(node.name) ? " artifact" : "");
       div.style.paddingLeft = (18 + depth * 16) + "px";
       div.textContent = node.name;
       div.title = node.path;
