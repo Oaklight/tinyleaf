@@ -1,0 +1,108 @@
+site_name: Tinyleaf
+site_description: Tinyleaf - 轻量级、零依赖的 Web LaTeX 编辑器
+site_author: Peng Ding
+site_url: https://tinyleaf.readthedocs.io/zh-cn/latest
+repo_name: Oaklight/tinyleaf
+repo_url: https://github.com/Oaklight/tinyleaf
+copyright: Copyright &copy; 2025 Peng Ding
+
+theme:
+  name: material
+  language: zh
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: 切换到浅色模式
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: 切换到深色模式
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: 跟随系统偏好
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.indexes
+    - search.highlight
+    - search.share
+    - search.suggest
+    - content.code.copy
+    - content.action.edit
+
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - llmstxt:
+      full_output: llms-full.txt
+      sections:
+        首页:
+          - index.md
+        快速上手:
+          - getting-started/installation.md
+          - getting-started/quickstart.md
+        使用指南:
+          - guide/architecture.md
+          - guide/registry.md
+          - guide/compilation.md
+          - guide/docker.md
+        API 参考:
+          - api/index.md
+        更新日志:
+          - changelog.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Oaklight/tinyleaf
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/tinyleaf/
+  alternate:
+    - name: English
+      link: /en/
+      lang: en
+    - name: 中文
+      link: /zh-cn/
+      lang: zh
+
+nav:
+  - 首页: index.md
+  - 快速上手:
+      - 安装: getting-started/installation.md
+      - 快速开始: getting-started/quickstart.md
+  - 使用指南:
+      - 架构概览: guide/architecture.md
+      - 多项目注册表: guide/registry.md
+      - 编译: guide/compilation.md
+      - Docker: guide/docker.md
+  - API 参考:
+      - api/index.md
+  - 截图: screenshots.md
+  - 更新日志: changelog.md
