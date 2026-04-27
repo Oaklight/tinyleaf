@@ -21,3 +21,7 @@ env/
 *.toc
 *.lof
 *.lot
+
+# Documentation worktrees
+docs_en/
+docs_zh/

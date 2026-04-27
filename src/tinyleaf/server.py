@@ -26,10 +26,14 @@ class TexliveHandler(BaseHTTPRequestHandler):
 
         if path == "/" or path == "/index.html":
             self._serve_static("index.html", "text/html")
+        elif path.startswith("/vendor/"):
+            self._serve_vendor(path[8:])
         elif path == "/api/mode":
             self._handle_api("get_mode")
         elif path == "/api/docker/images":
             self._handle_api("list_docker_images")
+        elif path == "/api/vendor/status":
+            self._handle_api("vendor_status")
         elif path == "/api/projects":
             self._handle_api("list_projects")
         elif path.startswith("/api/fs/browse"):
@@ -46,6 +50,8 @@ class TexliveHandler(BaseHTTPRequestHandler):
             self._handle_api("create_project")
         elif path == "/api/projects/register":
             self._handle_api("register_project")
+        elif path == "/api/vendor/update":
+            self._handle_api("update_vendor")
         elif path.startswith("/api/projects/"):
             self._route_project_post(path)
         else:
@@ -71,6 +77,28 @@ class TexliveHandler(BaseHTTPRequestHandler):
         self.send_response(204)
         self._send_cors_headers()
         self.end_headers()
+
+    def do_HEAD(self):
+        """Handle HEAD requests (same routing as GET, no body)."""
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path.rstrip("/") or "/"
+
+        if path.startswith("/vendor/"):
+            filename = os.path.basename(path[8:])
+            config_dir = self.config.get("config_dir")
+            if config_dir:
+                filepath = os.path.join(config_dir, "vendor", filename)
+                if os.path.isfile(filepath):
+                    ct = (
+                        "application/javascript" if filename.endswith(".js") else "application/json"
+                    )
+                    self.send_response(200)
+                    self.send_header("Content-Type", ct)
+                    self.send_header("Content-Length", str(os.path.getsize(filepath)))
+                    self._send_cors_headers()
+                    self.end_headers()
+                    return
+        self._send_error(404, "Not found")
 
     # ── Project route parsing ──
 
@@ -180,6 +208,21 @@ class TexliveHandler(BaseHTTPRequestHandler):
             self.wfile.write(content)
         except FileNotFoundError:
             self._send_error(404, f"Static file not found: {filename}")
+
+    def _serve_vendor(self, filename):
+        """Serve a file from the vendor directory."""
+        config_dir = self.config.get("config_dir")
+        if not config_dir:
+            self._send_error(404, "Vendor not available in single mode")
+            return
+        # Sanitize filename to prevent path traversal
+        filename = os.path.basename(filename)
+        filepath = os.path.join(config_dir, "vendor", filename)
+        if not os.path.isfile(filepath):
+            self._send_error(404, f"Vendor file not found: {filename}")
+            return
+        ct = "application/javascript" if filename.endswith(".js") else "application/json"
+        self.send_file(filepath, content_type=ct)
 
     def send_json(self, data, status=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")

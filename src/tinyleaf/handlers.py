@@ -5,7 +5,7 @@ import os
 import subprocess
 import time
 
-from tinyleaf import compiler, git_ops, registry
+from tinyleaf import compiler, git_ops, registry, vendor
 
 # Project config file name
 CONFIG_FILE = ".tinyleaf.json"
@@ -21,6 +21,8 @@ def handle_request(handler, action, **kwargs):
         "register_project": _register_project,
         "delete_project": _delete_project,
         "browse_filesystem": _browse_filesystem,
+        "vendor_status": _vendor_status,
+        "update_vendor": _update_vendor,
         "list_files": _list_files,
         "read_file": _read_file,
         "write_file": _write_file,
@@ -270,6 +272,7 @@ def _browse_filesystem(handler):
     parsed = urllib.parse.urlparse(handler.path)
     params = urllib.parse.parse_qs(parsed.query)
     path = params.get("path", [os.path.expanduser("~")])[0]
+    path = os.path.expanduser(path)
 
     if not os.path.isdir(path):
         handler.send_json({"error": f"Not a directory: {path}"}, status=400)
@@ -288,6 +291,40 @@ def _browse_filesystem(handler):
         return
 
     handler.send_json({"path": path, "dirs": entries})
+
+
+# ── Vendor ──
+
+
+def _vendor_status(handler):
+    config_dir = handler.config.get("config_dir")
+    if not config_dir:
+        handler.send_json({"ready": False, "reason": "single mode"})
+        return
+    vendor_dir = os.path.join(config_dir, "vendor")
+    manifest = vendor.get_manifest(vendor_dir)
+    proxy = vendor.load_proxy(config_dir) or ""
+    if manifest:
+        handler.send_json({"ready": True, "manifest": manifest, "proxy": proxy})
+    else:
+        handler.send_json({"ready": False, "proxy": proxy})
+
+
+def _update_vendor(handler):
+    config_dir = handler.config.get("config_dir")
+    if not config_dir:
+        handler.send_json({"error": "Not available in single mode"}, status=400)
+        return
+    body = handler.read_json_body()
+    proxy = body.get("proxy", "").strip() if body else ""
+    # Persist proxy setting
+    vendor.save_proxy(config_dir, proxy)
+    vendor_dir = os.path.join(config_dir, "vendor")
+    try:
+        manifest = vendor.download_vendor(vendor_dir, proxy=proxy or None)
+        handler.send_json({"ok": True, "manifest": manifest})
+    except Exception as e:
+        handler.send_json({"error": str(e)}, status=500)
 
 
 # ── Files ──

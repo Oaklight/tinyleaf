@@ -88,6 +88,22 @@ def main():
                 if count:
                     print(f"  Migrated {count} project(s) from {projects_dir}")
 
+        # Auto-download vendor JS modules on first start
+        from tinyleaf import vendor
+
+        vendor_dir = os.path.join(config_dir, "vendor")
+        if not vendor.is_vendor_ready(vendor_dir):
+            proxy = vendor.load_proxy(config_dir)
+            print("  Downloading JS modules...")
+            if proxy:
+                print(f"  Using proxy: {proxy}")
+            try:
+                vendor.download_vendor(vendor_dir, proxy=proxy)
+                print("  JS modules ready")
+            except Exception as e:
+                print(f"  Warning: failed to download JS modules: {e}", file=sys.stderr)
+                print("  Editor will try CDN as fallback", file=sys.stderr)
+
     # Check compilation backend
     use_docker = args.docker
     if not use_docker and not shutil.which("latexmk"):

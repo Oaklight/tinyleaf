@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TeXlive Web</title>
+<title>Tinyleaf</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍃</text></svg>">
 <style>
 /* ── CSS Variables (Light - default, from llm-rosetta) ── */
 :root {
@@ -503,28 +504,38 @@ select:focus { border-color: var(--accent); outline: none; }
   overflow: hidden;
 }
 
-/* ── Settings popup (bottom-left) ── */
+/* ── Settings popup (centered modal) ── */
 .settings-popup {
   display: none;
   position: fixed;
-  bottom: calc(var(--statusbar-height) + 8px);
-  left: 8px;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.settings-popup.open { display: flex; }
+.settings-popup-panel {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
-  min-width: 260px;
-  z-index: 200;
-  padding: 8px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  min-width: 340px;
+  max-width: 440px;
+  padding: 24px;
 }
-.settings-popup.open { display: block; }
+.settings-popup-panel h3 {
+  margin-bottom: 16px;
+  font-size: 16px;
+  font-weight: 600;
+}
 .settings-popup-item {
-  padding: 8px 12px;
+  padding: 8px 0;
   font-size: 13px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 12px;
 }
 .settings-popup-item label {
   font-size: 12px;
@@ -617,15 +628,12 @@ select:focus { border-color: var(--accent); outline: none; }
 </head>
 <body>
 
-<div id="loading-overlay">Loading TeXlive Web...</div>
+<div id="loading-overlay">Loading Tinyleaf...</div>
 
 <div id="app">
   <!-- Toolbar -->
   <div id="toolbar">
-    <!-- Settings gear (top-left) -->
-    <button class="icon-btn" id="btn-settings" title="Settings"><svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
-    <span class="toolbar-sep"></span>
-    <span class="toolbar-brand">TeXlive Web</span>
+    <span class="toolbar-brand" id="btn-home" style="cursor:pointer">Tinyleaf</span>
     <span class="toolbar-sep"></span>
     <span id="project-name" style="font-size: 13px; color: var(--text-dim);">&mdash;</span>
     <span style="flex:1"></span>
@@ -634,6 +642,7 @@ select:focus { border-color: var(--accent); outline: none; }
       <option value="pdflatex">pdflatex</option>
       <option value="lualatex">lualatex</option>
       <option value="xelatex">xelatex</option>
+      <option value="latexmk">latexmk</option>
     </select>
     <button id="btn-compile" class="primary" data-i18n="compile">Compile</button>
     <button id="btn-clean" class="sm danger" data-i18n="clean" title="Remove build artifacts">Clean</button>
@@ -713,25 +722,62 @@ select:focus { border-color: var(--accent); outline: none; }
   <div id="statusbar">
     <span id="status-left" data-i18n="ready">Ready</span>
     <span id="status-right"></span>
+    <span class="toolbar-sep"></span>
+    <button class="icon-btn" id="btn-settings" title="Settings" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
   </div>
 </div>
 
-<!-- Settings popup (bottom-left) -->
-<div class="settings-popup" id="settings-popup">
-  <div class="settings-popup-item">
-    <label data-i18n="theme">Theme</label>
-    <select id="theme-select"></select>
-  </div>
-  <div class="settings-popup-item">
-    <label data-i18n="language">Language</label>
-    <select id="lang-select">
-      <option value="en">English</option>
-      <option value="zh">中文</option>
-    </select>
-  </div>
-  <div class="settings-popup-item" id="docker-image-row" style="display:none">
-    <label data-i18n="docker_image">Image</label>
-    <select id="docker-image-select"></select>
+<!-- Settings popup (centered modal) -->
+<div class="settings-popup" id="settings-popup" onclick="this.classList.remove('open')">
+  <div class="settings-popup-panel" onclick="event.stopPropagation()">
+    <h3 data-i18n="settings">Settings</h3>
+    <div class="settings-popup-item">
+      <label data-i18n="theme">Theme</label>
+      <select id="theme-select"></select>
+    </div>
+    <div class="settings-popup-item">
+      <label data-i18n="language">Language</label>
+      <select id="lang-select">
+        <option value="en">English</option>
+        <option value="zh">中文</option>
+      </select>
+    </div>
+    <div class="settings-popup-item">
+      <label data-i18n="editor_font_size">Font size</label>
+      <select id="fontsize-select">
+        <option value="12">12px</option>
+        <option value="13">13px</option>
+        <option value="14" selected>14px</option>
+        <option value="15">15px</option>
+        <option value="16">16px</option>
+        <option value="18">18px</option>
+        <option value="20">20px</option>
+      </select>
+    </div>
+    <div class="settings-popup-item">
+      <label data-i18n="auto_save">Auto save</label>
+      <select id="autosave-select">
+        <option value="1000">1s</option>
+        <option value="2000" selected>2s</option>
+        <option value="5000">5s</option>
+        <option value="0" data-i18n="off">Off</option>
+      </select>
+    </div>
+    <div class="settings-popup-item" id="docker-image-row" style="display:none">
+      <label data-i18n="docker_image">Image</label>
+      <select id="docker-image-select"></select>
+    </div>
+    <div class="settings-popup-item">
+      <label data-i18n="js_modules">JS Modules</label>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span id="vendor-status" style="font-size:12px;color:var(--text-dim)">—</span>
+        <button id="btn-update-vendor" style="font-size:12px;padding:2px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);cursor:pointer" data-i18n="update">Update</button>
+      </div>
+    </div>
+    <div class="settings-popup-item">
+      <label data-i18n="http_proxy">HTTP Proxy</label>
+      <input id="proxy-input" type="text" placeholder="http://localhost:7890" style="font-size:13px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);width:180px">
+    </div>
   </div>
 </div>
 
@@ -766,6 +812,12 @@ const I18N = {
     theme: "Theme",
     language: "Language",
     docker_image: "Image",
+    js_modules: "JS Modules",
+    update: "Update",
+    downloading: "Downloading...",
+    vendor_local: "Local",
+    vendor_cdn: "CDN fallback",
+    http_proxy: "HTTP Proxy",
     files: "Files",
     no_pdf: "No PDF",
     refresh: "Refresh",
@@ -819,6 +871,10 @@ const I18N = {
     renamed: "Renamed",
     uploaded: "Uploaded {n} file(s)",
     open: "Open",
+    settings: "Settings",
+    editor_font_size: "Font size",
+    auto_save: "Auto save",
+    off: "Off",
   },
   zh: {
     compile: "编译",
@@ -831,6 +887,12 @@ const I18N = {
     theme: "主题",
     language: "语言",
     docker_image: "镜像",
+    js_modules: "JS 模块",
+    update: "更新",
+    downloading: "下载中...",
+    vendor_local: "本地",
+    vendor_cdn: "CDN 回退",
+    http_proxy: "HTTP 代理",
     files: "文件",
     no_pdf: "无 PDF",
     refresh: "刷新",
@@ -884,6 +946,10 @@ const I18N = {
     renamed: "已重命名",
     uploaded: "已上传 {n} 个文件",
     open: "打开",
+    settings: "设置",
+    editor_font_size: "字号",
+    auto_save: "自动保存",
+    off: "关闭",
   },
 };
 
@@ -980,15 +1046,28 @@ function initThemeSelect() {
 }
 
 // ══════════════════════════════════════════
-// PDF.js
+// Module loader: local vendor first, CDN fallback
 // ══════════════════════════════════════════
-const pdfjsLib = await import("https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.min.mjs");
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.9.155/build/pdf.worker.min.mjs";
-
-// ══════════════════════════════════════════
-// CodeMirror 6
-// ══════════════════════════════════════════
+const VENDOR = "/vendor/";
 const CDN = "https://cdn.jsdelivr.net/npm/";
+
+async function loadMod(localFile, cdnPath) {
+  try { return await import(VENDOR + localFile); }
+  catch { return await import(CDN + cdnPath); }
+}
+
+// ── PDF.js ──
+const pdfjsLib = await loadMod("pdfjs.js", "pdfjs-dist@4.9.155/build/pdf.min.mjs");
+{
+  let workerSrc = CDN + "pdfjs-dist@4.9.155/build/pdf.worker.min.mjs";
+  try {
+    const r = await fetch(VENDOR + "pdfjs-worker.js", { method: "HEAD" });
+    if (r.ok) workerSrc = VENDOR + "pdfjs-worker.js";
+  } catch {}
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+}
+
+// ── CodeMirror 6 ──
 const [
   { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection },
   { EditorState },
@@ -998,13 +1077,13 @@ const [
   { search, searchKeymap, highlightSelectionMatches },
   cmLaTeX,
 ] = await Promise.all([
-  import(CDN + "@codemirror/view@6/+esm"),
-  import(CDN + "@codemirror/state@6/+esm"),
-  import(CDN + "@codemirror/commands@6/+esm"),
-  import(CDN + "@codemirror/language@6/+esm"),
-  import(CDN + "@codemirror/autocomplete@6/+esm"),
-  import(CDN + "@codemirror/search@6/+esm"),
-  import(CDN + "codemirror-lang-latex@1/+esm").catch(() => null),
+  loadMod("cm-view.js", "@codemirror/view@6/+esm"),
+  loadMod("cm-state.js", "@codemirror/state@6/+esm"),
+  loadMod("cm-commands.js", "@codemirror/commands@6/+esm"),
+  loadMod("cm-language.js", "@codemirror/language@6/+esm"),
+  loadMod("cm-autocomplete.js", "@codemirror/autocomplete@6/+esm"),
+  loadMod("cm-search.js", "@codemirror/search@6/+esm"),
+  loadMod("cm-lang-latex.js", "codemirror-lang-latex/+esm").catch(() => null),
 ]);
 
 // ══════════════════════════════════════════
@@ -1021,6 +1100,7 @@ const S = {
   compiling: false,
   pdfDoc: null,
   autoSaveTimer: null,
+  autoSaveInterval: 2000,
   useDocker: false,
   dockerImage: "oaklight/texlive:latest",
 };
@@ -1086,7 +1166,7 @@ async function init() {
   setTimeout(() => overlay.remove(), 300);
 }
 
-// ── Settings popup (bottom-left) ──
+// ── Settings popup (centered modal) ──
 function setupSettingsPopup() {
   const btn = document.getElementById("btn-settings");
   const popup = document.getElementById("settings-popup");
@@ -1096,14 +1176,28 @@ function setupSettingsPopup() {
     popup.classList.toggle("open");
     closeContextMenu();
   };
-  document.addEventListener("click", (e) => {
-    if (!popup.contains(e.target) && e.target !== btn) {
-      popup.classList.remove("open");
-    }
-  });
-  popup.onclick = (e) => e.stopPropagation();
 
   document.getElementById("lang-select").onchange = (e) => setLang(e.target.value);
+
+  // Font size
+  const savedFontSize = localStorage.getItem("tinyleaf-fontsize") || "14";
+  document.getElementById("fontsize-select").value = savedFontSize;
+  document.getElementById("fontsize-select").onchange = (e) => {
+    const size = e.target.value;
+    localStorage.setItem("tinyleaf-fontsize", size);
+    document.querySelector("#editor-container").style.fontSize = size + "px";
+  };
+  document.querySelector("#editor-container").style.fontSize = savedFontSize + "px";
+
+  // Auto save interval
+  const savedAutoSave = localStorage.getItem("tinyleaf-autosave") || "2000";
+  document.getElementById("autosave-select").value = savedAutoSave;
+  S.autoSaveInterval = parseInt(savedAutoSave, 10);
+  document.getElementById("autosave-select").onchange = (e) => {
+    const val = e.target.value;
+    localStorage.setItem("tinyleaf-autosave", val);
+    S.autoSaveInterval = parseInt(val, 10);
+  };
 
   document.getElementById("docker-image-select").onchange = (e) => {
     S.dockerImage = e.target.value;
@@ -1111,6 +1205,41 @@ function setupSettingsPopup() {
       api("PUT", `/api/projects/${enc(S.projectName)}/config`, { docker_image: S.dockerImage });
     }
   };
+
+  // Vendor JS modules status + update
+  checkVendorStatus();
+  document.getElementById("btn-update-vendor").onclick = async () => {
+    const btn = document.getElementById("btn-update-vendor");
+    const status = document.getElementById("vendor-status");
+    const proxy = document.getElementById("proxy-input").value.trim();
+    btn.disabled = true;
+    status.textContent = t("downloading");
+    try {
+      await api("POST", "/api/vendor/update", { proxy });
+      status.textContent = t("vendor_local") + " \u2713";
+    } catch (e) {
+      status.textContent = "Error: " + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  };
+}
+
+async function checkVendorStatus() {
+  const el = document.getElementById("vendor-status");
+  try {
+    const data = await api("GET", "/api/vendor/status");
+    // Load saved proxy
+    if (data.proxy) document.getElementById("proxy-input").value = data.proxy;
+    if (data.ready) {
+      const d = data.manifest.updated_at?.slice(0, 10) || "";
+      el.textContent = t("vendor_local") + (d ? ` (${d})` : "");
+    } else {
+      el.textContent = t("vendor_cdn");
+    }
+  } catch {
+    el.textContent = "—";
+  }
 }
 
 async function loadDockerImages() {
@@ -1416,16 +1545,17 @@ async function showProjectList() {
 
 function showCreateProjectModal() {
   showModal(t("new_project_title"),
-    `<input id="inp-project-name" placeholder="${t("project_name")}" autofocus>`
-    + `<div class="dir-browser" id="create-dir-browser"></div>`,
+    `<div class="dir-browser" id="create-dir-browser"></div>`
+    + `<label style="font-size:12px;color:var(--text-dim);margin-bottom:4px;display:block">${t("project_name")}</label>`
+    + `<input id="inp-project-name" placeholder="${t("project_name")}">`,
     [
       { label: t("cancel"), action: closeModal },
       { label: t("create"), primary: true, action: async () => {
         const name = document.getElementById("inp-project-name").value.trim();
-        const path = document.querySelector("#create-dir-browser .dir-path")?.textContent || "";
-        if (!name) return;
-        if (!path) return;
-        await api("POST", "/api/projects", { name, path });
+        const parentPath = document.querySelector("#create-dir-browser .dir-path")?.textContent || "";
+        if (!name || !parentPath) return;
+        const fullPath = parentPath === "/" ? "/" + name : parentPath + "/" + name;
+        await api("POST", "/api/projects", { name, path: fullPath });
         closeModal();
         showProjectList();
       }},
@@ -1437,15 +1567,16 @@ function showCreateProjectModal() {
 function showOpenFolderModal() {
   showModal(t("open_folder_title"),
     `<div class="dir-browser" id="open-dir-browser"></div>`
-    + `<input id="inp-folder-name" placeholder="${t("project_name")} (optional)" style="margin-bottom:0">`,
+    + `<label style="font-size:12px;color:var(--text-dim);margin-bottom:4px;display:block">${t("project_name")}</label>`
+    + `<input id="inp-folder-name" style="margin-bottom:0" readonly>`,
     [
       { label: t("cancel"), action: closeModal },
       { label: t("select_this_folder"), primary: true, action: async () => {
         const path = document.querySelector("#open-dir-browser .dir-path")?.textContent || "";
         if (!path) return;
-        const customName = document.getElementById("inp-folder-name").value.trim();
+        const name = document.getElementById("inp-folder-name").value.trim();
         const body = { path };
-        if (customName) body.name = customName;
+        if (name) body.name = name;
         try {
           await api("POST", "/api/projects/register", body);
           closeModal();
@@ -1487,6 +1618,13 @@ function renderDirBrowser(containerId, currentPath, dirs) {
   const container = document.getElementById(containerId);
   container.innerHTML = `<div class="dir-path">${esc(currentPath)}</div><div class="dir-list"></div>`;
   const list = container.querySelector(".dir-list");
+
+  // Auto-fill project name from path basename (Open Folder modal only)
+  const nameInput = document.getElementById("inp-folder-name");
+  if (nameInput) {
+    const basename = currentPath.replace(/\/+$/, "").split("/").pop() || "";
+    nameInput.value = basename;
+  }
 
   // Parent directory entry
   const parentPath = currentPath.replace(/\/[^/]+\/?$/, "") || "/";
@@ -1685,8 +1823,9 @@ async function openFile(filePath) {
 }
 
 function scheduleAutoSave() {
+  if (S.autoSaveInterval <= 0) return;
   if (S.autoSaveTimer) clearTimeout(S.autoSaveTimer);
-  S.autoSaveTimer = setTimeout(() => saveCurrentFile(), 2000);
+  S.autoSaveTimer = setTimeout(() => saveCurrentFile(), S.autoSaveInterval);
 }
 
 async function saveCurrentFile() {
@@ -1915,13 +2054,23 @@ function setupKeybindings() {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); compile(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "C") { e.preventDefault(); doCommit(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "P") { e.preventDefault(); doPush(); }
-    if (e.key === "Escape") { closeModal(); closeContextMenu(); }
+    if (e.key === "Escape") { closeModal(); closeContextMenu(); document.getElementById("settings-popup").classList.remove("open"); }
   });
 }
 
 // ══════════════════════════════════════════
 // Wire up buttons
 // ══════════════════════════════════════════
+document.getElementById("btn-home").onclick = () => {
+  if (S.mode === "multi") {
+    if (S.currentFile && S.modified.has(S.currentFile)) saveCurrentFile();
+    S.projectName = null;
+    S.currentFile = null;
+    document.getElementById("project-name").textContent = "\u2014";
+    if (S.editorView) { S.editorView.destroy(); S.editorView = null; }
+    showProjectList();
+  }
+};
 document.getElementById("btn-compile").onclick = compile;
 document.getElementById("btn-clean").onclick = doClean;
 document.getElementById("btn-save").onclick = saveCurrentFile;
