@@ -682,6 +682,64 @@ select:focus { border-color: var(--accent); outline: none; }
 .settings-popup-item input[type="checkbox"] { cursor: pointer; margin-left: auto; }
 .settings-divider { border-top: 1px solid var(--border); margin: 6px 0; }
 
+/* ── Shortcuts popup ── */
+.shortcuts-popup {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.shortcuts-popup.open { display: flex; }
+.shortcuts-popup-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  min-width: 380px;
+  max-width: 480px;
+  padding: 24px;
+}
+.shortcuts-popup-panel h3 {
+  margin-bottom: 16px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.shortcut-group { margin-bottom: 14px; }
+.shortcut-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.shortcut-row .shortcut-desc { color: var(--text); }
+.shortcut-row kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-family: var(--mono);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  line-height: 1.4;
+  min-width: 20px;
+  text-align: center;
+}
+.shortcut-row .shortcut-keys { display: flex; gap: 3px; align-items: center; }
+.shortcut-row .shortcut-keys span { font-size: 10px; color: var(--text-dim); }
+
 /* ── Context menu ── */
 .context-menu {
   display: none;
@@ -903,6 +961,7 @@ select:focus { border-color: var(--accent); outline: none; }
     <span id="status-left" data-i18n="ready">Ready</span>
     <span id="status-right"></span>
     <span class="toolbar-sep"></span>
+    <button class="icon-btn" id="btn-shortcuts" title="Keyboard shortcuts" data-i18n-title="keyboard_shortcuts" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="8" x2="6" y2="8"/><line x1="10" y1="8" x2="10" y2="8"/><line x1="14" y1="8" x2="14" y2="8"/><line x1="18" y1="8" x2="18" y2="8"/><line x1="6" y1="12" x2="6" y2="12"/><line x1="10" y1="12" x2="10" y2="12"/><line x1="14" y1="12" x2="14" y2="12"/><line x1="18" y1="12" x2="18" y2="12"/><line x1="8" y1="16" x2="16" y2="16"/></svg></button>
     <button class="icon-btn" id="btn-settings" title="Settings" data-i18n-title="settings" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
   </div>
 </div>
@@ -979,6 +1038,14 @@ select:focus { border-color: var(--accent); outline: none; }
         <button id="btn-update-vendor" class="sm" style="font-size:11px;padding:2px 8px" data-i18n="update">Update</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- Keyboard shortcuts popup -->
+<div class="shortcuts-popup" id="shortcuts-popup" onclick="this.classList.remove('open')">
+  <div class="shortcuts-popup-panel" onclick="event.stopPropagation()">
+    <h3 data-i18n="keyboard_shortcuts">Keyboard Shortcuts</h3>
+    <div id="shortcuts-content"></div>
   </div>
 </div>
 
@@ -1110,6 +1177,20 @@ const I18N = {
     fit_width: "Fit width",
     toggle_hd: "Toggle HD/Fast",
     git_repo: "Git repository",
+    keyboard_shortcuts: "Keyboard Shortcuts",
+    shortcut_editing: "Editing",
+    shortcut_compile: "Compile & Build",
+    shortcut_git: "Git",
+    shortcut_navigation: "Navigation",
+    shortcut_general: "General",
+    sc_save: "Save file",
+    sc_compile: "Compile",
+    sc_files_tab: "Files tab",
+    sc_git_tab: "Git tab",
+    sc_commit: "Commit",
+    sc_push: "Push",
+    sc_close: "Close dialog / Escape",
+    sc_shortcuts: "Show shortcuts",
     search_files_title: "Search files",
     upload_file_title: "Upload file",
     locate_in_tree: "Locate in tree",
@@ -1235,6 +1316,20 @@ const I18N = {
     fit_width: "适应宽度",
     toggle_hd: "高清/快速切换",
     git_repo: "Git 仓库",
+    keyboard_shortcuts: "键盘快捷键",
+    shortcut_editing: "编辑",
+    shortcut_compile: "编译与构建",
+    shortcut_git: "Git",
+    shortcut_navigation: "导航",
+    shortcut_general: "通用",
+    sc_save: "保存文件",
+    sc_compile: "编译",
+    sc_files_tab: "文件标签",
+    sc_git_tab: "Git 标签",
+    sc_commit: "提交",
+    sc_push: "推送",
+    sc_close: "关闭对话框 / 退出",
+    sc_shortcuts: "显示快捷键",
     search_files_title: "搜索文件",
     upload_file_title: "上传文件",
     locate_in_tree: "在文件树中定位",
@@ -1588,6 +1683,11 @@ function setupSettingsPopup() {
     e.stopPropagation();
     popup.classList.toggle("open");
     closeContextMenu();
+  };
+
+  document.getElementById("btn-shortcuts").onclick = (e) => {
+    e.stopPropagation();
+    showShortcutsPopup();
   };
 
   document.getElementById("lang-select").onchange = (e) => setLang(e.target.value);
@@ -2905,6 +3005,48 @@ function closeModal() { document.getElementById("modal-overlay").style.display =
 // ══════════════════════════════════════════
 // Keyboard Shortcuts
 // ══════════════════════════════════════════
+
+const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+const MOD = isMac ? "⌘" : "Ctrl";
+
+function showShortcutsPopup() {
+  const groups = [
+    { title: t("shortcut_editing"), shortcuts: [
+      { keys: [MOD, "S"], desc: t("sc_save") },
+    ]},
+    { title: t("shortcut_compile"), shortcuts: [
+      { keys: [MOD, "Enter"], desc: t("sc_compile") },
+    ]},
+    { title: t("shortcut_navigation"), shortcuts: [
+      { keys: [MOD, "Shift", "E"], desc: t("sc_files_tab") },
+      { keys: [MOD, "Shift", "G"], desc: t("sc_git_tab") },
+    ]},
+    { title: t("shortcut_git"), shortcuts: [
+      { keys: [MOD, "Shift", "C"], desc: t("sc_commit") },
+      { keys: [MOD, "Shift", "P"], desc: t("sc_push") },
+    ]},
+    { title: t("shortcut_general"), shortcuts: [
+      { keys: [MOD, "/"], desc: t("sc_shortcuts") },
+      { keys: ["Esc"], desc: t("sc_close") },
+    ]},
+  ];
+
+  const container = document.getElementById("shortcuts-content");
+  container.innerHTML = groups.map(g => `
+    <div class="shortcut-group">
+      <div class="shortcut-group-title">${g.title}</div>
+      ${g.shortcuts.map(s => `
+        <div class="shortcut-row">
+          <span class="shortcut-desc">${s.desc}</span>
+          <span class="shortcut-keys">${s.keys.map(k => `<kbd>${k}</kbd>`).join('<span>+</span>')}</span>
+        </div>
+      `).join("")}
+    </div>
+  `).join("");
+
+  document.getElementById("shortcuts-popup").classList.add("open");
+}
+
 function setupKeybindings() {
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); saveCurrentFile(); }
@@ -2913,7 +3055,8 @@ function setupKeybindings() {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "G") { e.preventDefault(); switchSidebarTab("git"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "C") { e.preventDefault(); doCommit(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "P") { e.preventDefault(); doPush(); }
-    if (e.key === "Escape") { closeModal(); closeContextMenu(); document.getElementById("settings-popup").classList.remove("open"); }
+    if ((e.ctrlKey || e.metaKey) && e.key === "/") { e.preventDefault(); showShortcutsPopup(); }
+    if (e.key === "Escape") { closeModal(); closeContextMenu(); document.getElementById("settings-popup").classList.remove("open"); document.getElementById("shortcuts-popup").classList.remove("open"); }
   });
 }
 
