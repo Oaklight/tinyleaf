@@ -770,7 +770,19 @@ def _get_output(handler, name, file_path):
         handler.send_json({"error": "Access denied"}, status=403)
         return
 
-    content_type = "application/pdf" if file_path.endswith(".pdf") else "application/octet-stream"
+    _MIME_MAP = {
+        ".pdf": "application/pdf",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".svg": "image/svg+xml",
+        ".webp": "image/webp",
+        ".bmp": "image/bmp",
+        ".ico": "image/x-icon",
+    }
+    ext = os.path.splitext(file_path)[1].lower()
+    content_type = _MIME_MAP.get(ext, "application/octet-stream")
     handler.send_file(full_path, content_type=content_type)
 
 
