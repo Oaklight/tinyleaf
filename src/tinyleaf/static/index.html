@@ -1164,7 +1164,14 @@ async function init() {
   await loadDockerImages();
 
   if (S.mode === "multi") {
-    showProjectList();
+    const lastProject = localStorage.getItem("tinyleaf-project");
+    const projects = await api("GET", "/api/projects");
+    const names = projects.map(p => p.name);
+    if (lastProject && names.includes(lastProject)) {
+      await openProject(lastProject);
+    } else {
+      showProjectList();
+    }
   } else {
     const projects = await api("GET", "/api/projects");
     if (projects.length > 0) openProject(projects[0].name);
@@ -1546,6 +1553,7 @@ function showNewFolderInDirModal(dirPath) {
 // Project List (multi-project)
 // ══════════════════════════════════════════
 async function showProjectList() {
+  localStorage.removeItem("tinyleaf-project");
   document.getElementById("project-list-view").style.display = "block";
   document.getElementById("editor-view").style.display = "none";
 
@@ -1707,6 +1715,7 @@ async function navigateDir(containerId, path) {
 // ══════════════════════════════════════════
 async function openProject(name) {
   S.projectName = name;
+  localStorage.setItem("tinyleaf-project", name);
   document.getElementById("project-name").textContent = name;
   document.getElementById("project-list-view").style.display = "none";
   document.getElementById("editor-view").style.display = "flex";
