@@ -35,8 +35,9 @@ def main():
     )
     parser.add_argument(
         "--docker",
-        action="store_true",
-        help="Use Docker for compilation (default: local latexmk)",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Use Docker for compilation (default: enabled)",
     )
     parser.add_argument(
         "--image",

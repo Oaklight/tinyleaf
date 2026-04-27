@@ -682,6 +682,16 @@ select:focus { border-color: var(--accent); outline: none; }
 }
 .settings-popup-item input[type="checkbox"] { cursor: pointer; margin-left: auto; }
 .settings-divider { border-top: 1px solid var(--border); margin: 6px 0; }
+.settings-collapsible {
+  max-height: 50px;
+  overflow: hidden;
+  opacity: 1;
+  transition: max-height 0.2s ease, opacity 0.15s ease;
+}
+.settings-collapsible.collapsed {
+  max-height: 0;
+  opacity: 0;
+}
 
 /* ── Shortcuts popup ── */
 .shortcuts-popup {
@@ -1026,13 +1036,15 @@ select:focus { border-color: var(--accent); outline: none; }
       <label data-i18n="use_docker">Docker</label>
       <input type="checkbox" id="docker-toggle">
     </div>
-    <div class="settings-popup-item" id="docker-image-row">
+    <div class="settings-collapsible" id="docker-image-row">
+    <div class="settings-popup-item">
       <label data-i18n="docker_image">Image</label>
       <div style="display:flex;align-items:center;gap:4px;flex:1;min-width:0">
         <select id="docker-image-select" style="flex:1;min-width:0"></select>
         <button id="btn-docker-pull" class="sm" style="font-size:11px;padding:2px 6px" data-i18n="pull">Pull</button>
         <button id="btn-docker-rmi" class="sm danger" style="font-size:11px;padding:2px 6px" data-i18n="delete">Del</button>
       </div>
+    </div>
     </div>
     <div class="settings-popup-item" id="debian-toggle-row">
       <label data-i18n="show_debian">Show Debian</label>
@@ -1658,7 +1670,7 @@ async function init() {
 
   // Always load docker images list and sync toggle
   document.getElementById("docker-toggle").checked = S.useDocker;
-  document.getElementById("docker-image-row").style.display = S.useDocker ? "flex" : "none";
+  document.getElementById("docker-image-row").classList.toggle("collapsed", !S.useDocker);
 
   // Load global settings (show_debian, etc.)
   try {
@@ -1754,7 +1766,7 @@ function setupSettingsPopup() {
 
   document.getElementById("docker-toggle").onchange = (e) => {
     S.useDocker = e.target.checked;
-    document.getElementById("docker-image-row").style.display = S.useDocker ? "flex" : "none";
+    document.getElementById("docker-image-row").classList.toggle("collapsed", !S.useDocker);
     if (S.projectName) {
       api("PUT", `/api/projects/${enc(S.projectName)}/config`, { use_docker: S.useDocker });
     }
@@ -2379,7 +2391,7 @@ async function openProject(name) {
   if ("use_docker" in config) {
     S.useDocker = config.use_docker;
     document.getElementById("docker-toggle").checked = S.useDocker;
-    document.getElementById("docker-image-row").style.display = S.useDocker ? "flex" : "none";
+    document.getElementById("docker-image-row").classList.toggle("collapsed", !S.useDocker);
   }
   if (config.docker_image) {
     S.dockerImage = config.docker_image;
