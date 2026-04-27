@@ -693,6 +693,7 @@ select:focus { border-color: var(--accent); outline: none; }
             <div class="sidebar-header">
               <span data-i18n="files">Files</span>
               <div class="sidebar-actions">
+                <button class="icon-btn" id="btn-collapse-all" title="Collapse all"><svg viewBox="0 0 24 24"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                 <button class="icon-btn" id="btn-search-file" title="Search files"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
                 <button class="icon-btn" id="btn-upload-file" title="Upload file"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>
                 <button class="icon-btn" id="btn-new-folder" title="New folder"><svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/></svg></button>
@@ -915,8 +916,8 @@ const I18N = {
     editor_font_size: "Font size",
     auto_save: "Auto save",
     off: "Off",
+    collapse_all: "Collapse all",
   },
-  zh: {
     compile: "编译",
     compiling: "编译中...",
     clean: "清理",
@@ -995,8 +996,8 @@ const I18N = {
     editor_font_size: "字号",
     auto_save: "自动保存",
     off: "关闭",
+    collapse_all: "全部折叠",
   },
-};
 
 let currentLang = localStorage.getItem("tinyleaf-lang") || "en";
 
@@ -1802,8 +1803,13 @@ async function refreshFiles() {
   renderFileTree();
 }
 
-// Track which dirs are expanded (persisted in memory)
-const expandedDirs = new Set();
+// Track which dirs are expanded (persisted to localStorage)
+const expandedDirs = new Set(
+  JSON.parse(localStorage.getItem("tinyleaf-expanded-dirs") || "[]")
+);
+function saveExpandedDirs() {
+  localStorage.setItem("tinyleaf-expanded-dirs", JSON.stringify([...expandedDirs]));
+}
 
 function renderFileTree(searchFilter = "") {
   const container = document.getElementById("file-tree");
@@ -1844,6 +1850,7 @@ function renderTreeNodes(nodes, parent, depth) {
       header.onclick = () => {
         if (expandedDirs.has(node.path)) expandedDirs.delete(node.path);
         else expandedDirs.add(node.path);
+        saveExpandedDirs();
         renderFileTree();
       };
       header.oncontextmenu = (e) => fileContextMenu(e, node);
@@ -1877,6 +1884,7 @@ function locateInTree() {
   for (let i = 1; i < parts.length; i++) {
     expandedDirs.add(parts.slice(0, i).join("/"));
   }
+  saveExpandedDirs();
   renderFileTree();
   // Scroll the active item into view after DOM update
   setTimeout(() => {
@@ -2264,6 +2272,11 @@ document.getElementById("btn-new-folder").onclick = showNewFolderModal;
 document.getElementById("btn-search-file").onclick = toggleFileSearch;
 document.getElementById("btn-upload-file").onclick = () => triggerUpload("");
 document.getElementById("btn-locate-file").onclick = locateInTree;
+document.getElementById("btn-collapse-all").onclick = () => {
+  expandedDirs.clear();
+  saveExpandedDirs();
+  renderFileTree();
+};
 document.getElementById("log-header").onclick = toggleLog;
 document.getElementById("btn-pdf-refresh").onclick = () => {
   if (S.projectName) {
