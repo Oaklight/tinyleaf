@@ -1287,7 +1287,11 @@ async function api(method, path, body = null) {
 
 function enc(s) { return encodeURIComponent(s); }
 function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
-function setStatus(msg) { document.getElementById("status-left").textContent = msg; }
+function setStatus(msg, level = "info") {
+  const el = document.getElementById("status-left");
+  el.textContent = msg;
+  el.style.color = level === "error" ? "var(--red)" : level === "warning" ? "var(--orange)" : level === "success" ? "var(--green)" : "";
+}
 
 // ══════════════════════════════════════════
 // Init
@@ -1414,13 +1418,13 @@ function setupSettingsPopup() {
     try {
       const res = await api("POST", "/api/docker/pull", { image });
       if (res.success) {
-        setStatus(t("pull_success"));
+        setStatus(t("pull_success"), "success");
       } else {
-        setStatus(t("pull_failed") + ": " + res.message);
+        setStatus(t("pull_failed") + ": " + res.message, "error");
       }
       await loadDockerImages();
     } catch (e) {
-      setStatus(t("pull_failed") + ": " + e.message);
+      setStatus(t("pull_failed") + ": " + e.message, "error");
     } finally {
       btn.disabled = false;
       btn.textContent = t("pull");
@@ -1437,13 +1441,13 @@ function setupSettingsPopup() {
     try {
       const res = await api("POST", "/api/docker/rmi", { image });
       if (res.success) {
-        setStatus(t("image_removed"));
+        setStatus(t("image_removed"), "success");
       } else {
-        setStatus(t("remove_failed") + ": " + res.message);
+        setStatus(t("remove_failed") + ": " + res.message, "error");
       }
       await loadDockerImages();
     } catch (e) {
-      setStatus(t("remove_failed") + ": " + e.message);
+      setStatus(t("remove_failed") + ": " + e.message, "error");
     }
   };
 
@@ -1566,10 +1570,10 @@ function setupUpload() {
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "Upload failed");
-      setStatus(t("uploaded").replace("{n}", data.count));
+      setStatus(t("uploaded").replace("{n}", data.count), "success");
       await refreshFiles();
     } catch (err) {
-      setStatus(`Upload error: ${err.message}`);
+      setStatus(`Upload error: ${err.message}`, "error");
     }
     input.value = "";
     uploadTargetDir = "";
@@ -1667,14 +1671,14 @@ function showRenameModal(node) {
       try {
         await api("POST", `/api/projects/${enc(S.projectName)}/rename`, { old_path: node.path, new_path: newPath });
         closeModal();
-        setStatus(`${t("renamed")}: ${newName}`);
+        setStatus(`${t("renamed")}: ${newName}`, "success");
         await refreshFiles();
         if (S.currentFile === node.path) {
           S.currentFile = newPath;
           await openFile(newPath);
         }
       } catch (err) {
-        setStatus(`Rename error: ${err.message}`);
+        setStatus(`Rename error: ${err.message}`, "error");
       }
     }},
   ]);
@@ -1692,11 +1696,11 @@ function confirmDelete(node) {
       try {
         await api("DELETE", `/api/projects/${enc(S.projectName)}/files/${enc(node.path)}`);
         closeModal();
-        setStatus(`${t("deleted")}: ${node.name}`);
+        setStatus(`${t("deleted")}: ${node.name}`, "success");
         if (S.currentFile === node.path) S.currentFile = null;
         await refreshFiles();
       } catch (err) {
-        setStatus(`Delete error: ${err.message}`);
+        setStatus(`Delete error: ${err.message}`, "error");
       }
     }},
   ]);
@@ -1746,7 +1750,7 @@ function showNewFolderInDirModal(dirPath) {
         expandedDirs.add(fullPath);
         await refreshFiles();
       } catch (err) {
-        setStatus(`Error: ${err.message}`);
+        setStatus(`Error: ${err.message}`, "error");
       }
     }},
   ]);
@@ -1833,7 +1837,7 @@ function showOpenFolderModal() {
           closeModal();
           showProjectList();
         } catch (err) {
-          setStatus(`Error: ${err.message}`);
+          setStatus(`Error: ${err.message}`, "error");
         }
       }},
     ]);
@@ -1910,7 +1914,7 @@ async function navigateDir(containerId, path) {
     const data = await api("GET", `/api/fs/browse?path=${encodeURIComponent(path)}`);
     renderDirBrowser(containerId, data.path, data.dirs);
   } catch (err) {
-    setStatus(`Error: ${err.message}`);
+    setStatus(`Error: ${err.message}`, "error");
   }
 }
 
@@ -2094,7 +2098,7 @@ async function openFile(filePath) {
     ".mp3", ".mp4", ".avi", ".mov", ".wav", ".flac",
     ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"];
   if (binExts.some(e => filePath.toLowerCase().endsWith(e))) {
-    setStatus(t("binary_not_supported"));
+    setStatus(t("binary_not_supported"), "warning");
     return;
   }
 
@@ -2155,7 +2159,7 @@ async function saveCurrentFile() {
   await api("PUT", `/api/projects/${enc(S.projectName)}/files/${enc(S.currentFile)}`, { content });
   S.modified.delete(S.currentFile);
   renderFileTree();
-  setStatus(`${t("saved")} ${S.currentFile}`);
+  setStatus(`${t("saved")} ${S.currentFile}`, "success");
 }
 
 // ══════════════════════════════════════════
@@ -2254,10 +2258,10 @@ async function compile() {
       btnCompile.textContent = t("compile");
 
       if (d.status === "success") {
-        setStatus(t("compile_success"));
+        setStatus(t("compile_success"), "success");
         document.getElementById("log-status").innerHTML = `<span class="badge success">OK</span>`;
       } else {
-        setStatus(t("compile_failed"));
+        setStatus(t("compile_failed"), "error");
         document.getElementById("log-status").innerHTML = `<span class="badge error">FAILED</span>`;
       }
       if (d.pdf_url) loadPDF(d.pdf_url);
@@ -2270,13 +2274,13 @@ async function compile() {
       S.compiling = false;
       btnCompile.disabled = false;
       btnCompile.textContent = t("compile");
-      setStatus(t("connection_lost"));
+      setStatus(t("connection_lost"), "error");
     };
   } catch (err) {
     S.compiling = false;
     btnCompile.disabled = false;
     btnCompile.textContent = t("compile");
-    setStatus(`${t("compile_error")}: ${err.message}`);
+    setStatus(`${t("compile_error")}: ${err.message}`, "error");
   }
 }
 
@@ -2287,10 +2291,10 @@ async function doClean() {
   if (!S.projectName) return;
   try {
     const r = await api("POST", `/api/projects/${enc(S.projectName)}/clean`);
-    setStatus(t("cleaned").replace("{n}", r.count));
+    setStatus(t("cleaned").replace("{n}", r.count), "success");
     await refreshFiles();
   } catch (err) {
-    setStatus(`Clean error: ${err.message}`);
+    setStatus(`Clean error: ${err.message}`, "error");
   }
 }
 
@@ -2391,7 +2395,7 @@ async function doCommit() {
       if (S.modified.has(S.currentFile)) await saveCurrentFile();
       const r = await api("POST", `/api/projects/${enc(S.projectName)}/git/commit`, { message: msg });
       closeModal();
-      setStatus(r.success ? t("committed") : r.message);
+      setStatus(r.success ? t("committed") : r.message, r.success ? "success" : "error");
       refreshGit();
     }},
   ]);
@@ -2401,7 +2405,7 @@ async function doCommit() {
 async function doPush() {
   setStatus(t("pushing"));
   const r = await api("POST", `/api/projects/${enc(S.projectName)}/git/push`);
-  setStatus(r.success ? t("pushed") : r.message);
+  setStatus(r.success ? t("pushed") : r.message, r.success ? "success" : "error");
   refreshGit();
 }
 
