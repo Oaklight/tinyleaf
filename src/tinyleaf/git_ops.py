@@ -92,8 +92,8 @@ def diff(project_dir, file_path=None):
                 with open(full, encoding="utf-8", errors="replace") as f:
                     content = f.read()
                 lines = content.split("\n")
-                diff_lines = [f"--- /dev/null", f"+++ b/{file_path}", f"@@ -0,0 +1,{len(lines)} @@"]
-                diff_lines.extend(f"+{l}" for l in lines)
+                diff_lines = ["--- /dev/null", f"+++ b/{file_path}", f"@@ -0,0 +1,{len(lines)} @@"]
+                diff_lines.extend(f"+{line}" for line in lines)
                 return "\n".join(diff_lines)
             except OSError:
                 pass
