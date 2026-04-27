@@ -3022,8 +3022,8 @@ function showShortcutsPopup() {
       { keys: [MOD, "Shift", "G"], desc: t("sc_git_tab") },
     ]},
     { title: t("shortcut_git"), shortcuts: [
-      { keys: [MOD, "Shift", "C"], desc: t("sc_commit") },
-      { keys: [MOD, "Shift", "P"], desc: t("sc_push") },
+      { keys: [MOD, "Shift", "Alt", "C"], desc: t("sc_commit") },
+      { keys: [MOD, "Shift", "Alt", "P"], desc: t("sc_push") },
     ]},
     { title: t("shortcut_general"), shortcuts: [
       { keys: [MOD, "/"], desc: t("sc_shortcuts") },
@@ -3053,8 +3053,8 @@ function setupKeybindings() {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); compile(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "E") { e.preventDefault(); switchSidebarTab("files"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "G") { e.preventDefault(); switchSidebarTab("git"); }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "C") { e.preventDefault(); doCommit(); }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "P") { e.preventDefault(); doPush(); }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.key === "C") { e.preventDefault(); doCommit(); }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.key === "P") { e.preventDefault(); doPush(); }
     if ((e.ctrlKey || e.metaKey) && e.key === "/") { e.preventDefault(); showShortcutsPopup(); }
     if (e.key === "Escape") { closeModal(); closeContextMenu(); document.getElementById("settings-popup").classList.remove("open"); document.getElementById("shortcuts-popup").classList.remove("open"); }
   });
