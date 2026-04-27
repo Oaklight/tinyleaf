@@ -181,6 +181,8 @@ class TexliveHandler(BaseHTTPRequestHandler):
             self._handle_api("git_push", name=name)
         elif sub == "git/pull":
             self._handle_api("git_pull", name=name)
+        elif sub == "rename-project":
+            self._handle_api("rename_project", name=name)
         else:
             self._send_error(404, "Not found")
 

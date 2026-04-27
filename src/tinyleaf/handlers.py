@@ -24,6 +24,7 @@ def handle_request(handler, action, **kwargs):
         "create_project": _create_project,
         "register_project": _register_project,
         "delete_project": _delete_project,
+        "rename_project": _rename_project,
         "browse_filesystem": _browse_filesystem,
         "vendor_status": _vendor_status,
         "update_vendor": _update_vendor,
@@ -335,6 +336,30 @@ def _delete_project(handler, name):
         return
 
     handler.send_json({"deleted": name, "files_deleted": delete_files})
+
+
+def _rename_project(handler, name):
+    config = handler.config
+    if config["mode"] == "single":
+        handler.send_json({"error": "Cannot rename project in single mode"}, status=400)
+        return
+
+    body = handler.read_json_body()
+    new_name = body.get("new_name", "").strip()
+    if not new_name:
+        handler.send_json({"error": "new_name is required"}, status=400)
+        return
+
+    try:
+        registry.rename_project(config["config_dir"], name, new_name)
+    except KeyError:
+        handler.send_json({"error": f"Project not found: {name}"}, status=404)
+        return
+    except ValueError as e:
+        handler.send_json({"error": str(e)}, status=400)
+        return
+
+    handler.send_json({"old_name": name, "new_name": new_name})
 
 
 def _browse_filesystem(handler):

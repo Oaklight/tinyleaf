@@ -12,8 +12,16 @@ import uuid
 class CompileJob:
     """Tracks a single compilation run."""
 
-    def __init__(self, compile_id, project_dir, main_file, engine, use_docker, docker_image,
-                 registry_mirror=None):
+    def __init__(
+        self,
+        compile_id,
+        project_dir,
+        main_file,
+        engine,
+        use_docker,
+        docker_image,
+        registry_mirror=None,
+    ):
         self.compile_id = compile_id
         self.project_dir = project_dir
         self.main_file = main_file
@@ -107,8 +115,15 @@ def start_compile(
         compile_id string.
     """
     compile_id = uuid.uuid4().hex[:12]
-    job = CompileJob(compile_id, project_dir, main_file, engine, use_docker, docker_image,
-                     registry_mirror=registry_mirror)
+    job = CompileJob(
+        compile_id,
+        project_dir,
+        main_file,
+        engine,
+        use_docker,
+        docker_image,
+        registry_mirror=registry_mirror,
+    )
 
     with _jobs_lock:
         _jobs[compile_id] = job
@@ -137,10 +152,31 @@ def _build_latexmk_args(engine, main_file):
     ]
 
 
+def _build_multipass_cmds(engine, main_file):
+    """Build multi-pass compile commands for direct engine use.
+
+    Flow: engine → bibtex → engine → engine (3 passes with bibliography).
+    """
+    base = os.path.splitext(main_file)[0]
+    common_flags = ["-synctex=1", "-interaction=nonstopmode", "-file-line-error"]
+    engine_cmd = [engine] + common_flags + [main_file]
+    bibtex_cmd = ["bibtex", base]
+    return [engine_cmd, bibtex_cmd, engine_cmd, engine_cmd]
+
+
 def _run_compile(job: CompileJob):
     """Run the compilation in a background thread."""
     try:
-        latexmk_args = _build_latexmk_args(job.engine, job.main_file)
+        if job.engine == "latexmk":
+            # latexmk auto-detects engine from .latexmkrc or defaults to pdflatex
+            cmds = [_build_latexmk_args("pdflatex", job.main_file)]
+        elif job.engine in ("pdflatex", "lualatex", "xelatex"):
+            if _has_latexmk(job):
+                cmds = [_build_latexmk_args(job.engine, job.main_file)]
+            else:
+                cmds = _build_multipass_cmds(job.engine, job.main_file)
+        else:
+            cmds = [_build_latexmk_args("pdflatex", job.main_file)]
 
         if job.use_docker:
             # Auto-pull image if not available locally
@@ -148,12 +184,12 @@ def _run_compile(job: CompileJob):
                 if job.is_cancelled:
                     return
                 if not _docker_pull(job, job.docker_image, job.registry_mirror):
-                    return  # pull failed, job already finished with error
+                    return
 
             if job.is_cancelled:
                 return
 
-            cmd = [
+            docker_prefix = [
                 "docker",
                 "run",
                 "--rm",
@@ -162,47 +198,55 @@ def _run_compile(job: CompileJob):
                 "-w",
                 "/workspace",
                 job.docker_image,
-            ] + latexmk_args
-        else:
-            cmd = latexmk_args
+            ]
+            cmds = [docker_prefix + c for c in cmds]
 
-        job.append_log(f"$ {' '.join(cmd)}", level="info")
-
-        proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            cwd=job.project_dir if not job.use_docker else None,
-            text=True,
-            bufsize=1,
-        )
-        job.proc = proc
-
-        for line in proc.stdout:
+        for cmd_idx, cmd in enumerate(cmds):
             if job.is_cancelled:
+                return
+
+            job.append_log(f"$ {' '.join(cmd)}", level="info")
+
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=job.project_dir if not job.use_docker else None,
+                text=True,
+                bufsize=1,
+            )
+            job.proc = proc
+
+            for line in proc.stdout:
+                if job.is_cancelled:
+                    break
+                line = line.rstrip("\n")
+                level = _classify_log_line(line)
+                job.append_log(line, level=level)
+
+            proc.wait()
+
+            if job.is_cancelled:
+                return
+
+            # bibtex may fail if no .bib — that's okay, continue
+            is_bibtex = cmd[-1].endswith((".aux",)) or "bibtex" in cmd
+            if proc.returncode != 0 and not is_bibtex:
                 break
-            line = line.rstrip("\n")
-            level = _classify_log_line(line)
-            job.append_log(line, level=level)
-
-        proc.wait()
-
-        if job.is_cancelled:
-            return
 
         # Find output PDF
         base = os.path.splitext(job.main_file)[0]
         pdf_name = base + ".pdf"
         pdf_full = os.path.join(job.project_dir, pdf_name)
 
-        if proc.returncode == 0 and os.path.exists(pdf_full):
+        last_rc = proc.returncode
+        if last_rc == 0 and os.path.exists(pdf_full):
             job.finish("success", pdf_path=pdf_name)
         else:
             job.append_log(
-                f"Compilation failed (exit code {proc.returncode})",
+                f"Compilation failed (exit code {last_rc})",
                 level="error",
             )
-            # Still report PDF if it was partially generated
             if os.path.exists(pdf_full):
                 job.finish("error", pdf_path=pdf_name)
             else:
@@ -224,12 +268,29 @@ def _classify_log_line(line):
     return "info"
 
 
+def _has_latexmk(job):
+    """Check if latexmk is available (in Docker or locally)."""
+    try:
+        if job.use_docker:
+            r = subprocess.run(
+                ["docker", "run", "--rm", job.docker_image, "which", "latexmk"],
+                capture_output=True,
+                timeout=15,
+            )
+        else:
+            r = subprocess.run(["which", "latexmk"], capture_output=True, timeout=5)
+        return r.returncode == 0
+    except Exception:
+        return False
+
+
 def _docker_image_exists(image):
     """Check if a Docker image exists locally."""
     try:
         result = subprocess.run(
             ["docker", "image", "inspect", image],
-            capture_output=True, timeout=10,
+            capture_output=True,
+            timeout=10,
         )
         return result.returncode == 0
     except Exception:
@@ -248,7 +309,9 @@ def _docker_pull(job, image, registry_mirror=None):
     if registry_mirror:
         # e.g. "oaklight/texlive:tag" -> "docker.1ms.run/oaklight/texlive:tag"
         pull_image = f"{registry_mirror}/{image}"
-        job.append_log(f"Image '{image}' not found locally, pulling from mirror {registry_mirror}...")
+        job.append_log(
+            f"Image '{image}' not found locally, pulling from mirror {registry_mirror}..."
+        )
     else:
         pull_image = image
         job.append_log(f"Image '{image}' not found locally, pulling...")
@@ -256,8 +319,10 @@ def _docker_pull(job, image, registry_mirror=None):
     try:
         proc = subprocess.Popen(
             ["docker", "pull", pull_image],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-            text=True, bufsize=1,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
         )
         job.proc = proc
 
@@ -310,7 +375,8 @@ def docker_pull_image(image, registry_mirror=None):
     try:
         proc = subprocess.Popen(
             ["docker", "pull", pull_image],
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
         )
         with _pull_procs_lock:
@@ -374,7 +440,9 @@ def docker_remove_image(image):
     try:
         result = subprocess.run(
             ["docker", "rmi", image],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if result.returncode == 0:
             return True, "OK"

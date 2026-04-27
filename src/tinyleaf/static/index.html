@@ -529,7 +529,7 @@ select:focus { border-color: var(--accent); outline: none; }
   outline: none;
 }
 .modal textarea { resize: vertical; min-height: 60px; font-family: var(--mono); }
-.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 
 /* ── Project List (multi-project mode) ── */
 #project-list-view {
@@ -538,7 +538,16 @@ select:focus { border-color: var(--accent); outline: none; }
   padding: 48px;
   overflow-y: auto;
 }
-#project-list-view h1 { margin-bottom: 24px; font-size: 24px; }
+.project-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.project-header h1 { font-size: 24px; margin: 0; }
+.project-toolbar { display: flex; align-items: center; gap: 8px; }
+#project-search {
+  padding: 6px 12px; border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: 13px; width: 200px; background: var(--bg); color: var(--text);
+}
+#project-search:focus { border-color: var(--accent); outline: none; }
+.view-toggle { font-size: 16px; padding: 4px 8px; border-radius: 4px; background: none; border: 1px solid transparent; cursor: pointer; color: var(--text-dim); }
+.view-toggle.active { color: var(--accent); background: var(--bg-hover); border-color: var(--border); }
 
 .project-grid {
   display: grid;
@@ -557,7 +566,7 @@ select:focus { border-color: var(--accent); outline: none; }
 .project-card:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 .project-card h3 { font-size: 16px; margin-bottom: 6px; }
 .project-card .meta { font-size: 12px; color: var(--text-dim); }
-.project-card .project-path { font-size: 11px; color: var(--text-dim); font-family: var(--mono); word-break: break-all; margin-top: 4px; }
+.project-card .project-path { font-size: 12px; color: var(--text-dim); font-family: var(--mono); word-break: break-all; margin-top: 4px; }
 .project-card.stale { opacity: 0.5; border-style: dashed; }
 .project-card.stale .project-path::after { content: " (missing)"; color: var(--red); font-family: var(--font); }
 .project-card .remove-btn {
@@ -566,18 +575,30 @@ select:focus { border-color: var(--accent); outline: none; }
   padding: 4px; border-radius: 4px; display: none; line-height: 0;
 }
 .project-card .remove-btn:hover { color: var(--red); background: var(--bg-hover); }
-.project-card:hover .remove-btn { display: block; }
-.project-card.create-new {
-  border-style: dashed;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-dim);
-  font-size: 14px;
-  gap: 8px;
+.project-card .rename-btn {
+  position: absolute; top: 8px; right: 32px;
+  background: none; border: none; cursor: pointer; color: var(--text-dim);
+  padding: 4px; border-radius: 4px; display: none; line-height: 0;
 }
-.project-card.create-new:hover { color: var(--accent); border-color: var(--accent); }
-.project-card.create-new svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; }
+.project-card .rename-btn:hover { color: var(--accent); background: var(--bg-hover); }
+.project-card:hover .remove-btn, .project-card:hover .rename-btn { display: block; }
+.project-card .project-time { display: none; font-size: 12px; color: var(--text-dim); }
+.project-card .git-badge { color: var(--text-dim); line-height: 0; }
+.project-card:hover .git-badge { color: var(--accent); }
+
+/* List view */
+.project-grid.list-view { grid-template-columns: 1fr; gap: 2px; }
+.project-grid.list-view .project-card {
+  padding: 10px 16px; display: flex; align-items: center; gap: 12px;
+  border-radius: 4px; border-color: transparent; background: none;
+}
+.project-grid.list-view .project-card:hover { background: var(--bg-hover); border-color: transparent; box-shadow: none; }
+.project-grid.list-view .project-card h3 { margin-bottom: 0; font-size: 14px; min-width: 160px; flex-shrink: 0; }
+.project-grid.list-view .project-card .project-path { margin-top: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-grid.list-view .project-card .project-time { display: inline; flex-shrink: 0; text-align: right; }
+.project-grid.list-view .project-card .git-badge { flex-shrink: 0; }
+.project-grid.list-view .project-card .rename-btn { top: 50%; right: 28px; transform: translateY(-50%); }
+.project-grid.list-view .project-card .remove-btn { top: 50%; transform: translateY(-50%); }
 
 /* ── Directory Browser ── */
 .dir-browser { margin-bottom: 14px; }
@@ -639,15 +660,15 @@ select:focus { border-color: var(--accent); outline: none; }
   font-size: 13px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
 }
 .settings-popup-item label {
   font-size: 12px;
   color: var(--text-dim);
   white-space: nowrap;
+  min-width: 80px;
 }
-.settings-popup-item select, .settings-popup-item input {
+.settings-popup-item select, .settings-popup-item input[type="text"] {
   flex: 1;
   min-width: 0;
   padding: 4px 8px;
@@ -658,6 +679,8 @@ select:focus { border-color: var(--accent); outline: none; }
   border-radius: 4px;
   font-family: var(--mono);
 }
+.settings-popup-item input[type="checkbox"] { cursor: pointer; margin-left: auto; }
+.settings-divider { border-top: 1px solid var(--border); margin: 6px 0; }
 
 /* ── Context menu ── */
 .context-menu {
@@ -739,12 +762,16 @@ select:focus { border-color: var(--accent); outline: none; }
   <!-- Toolbar -->
   <div id="toolbar">
     <span class="toolbar-brand" id="btn-home" style="cursor:pointer">Tinyleaf</span>
+    <span id="toolbar-project-name" style="display:none;align-items:center;gap:8px">
     <span class="toolbar-sep"></span>
     <span id="project-name" style="font-size: 13px; color: var(--text-dim);">&mdash;</span>
+    </span>
     <span style="flex:1"></span>
 
+    <span id="toolbar-project" style="display:none;align-items:center;gap:8px">
     <select id="main-file-select" title="Main file" data-i18n-title="main_file"></select>
     <select id="engine-select" title="Engine" data-i18n-title="engine">
+      <option value="latexmk" selected>latexmk</option>
       <option value="pdflatex">pdflatex</option>
       <option value="lualatex">lualatex</option>
       <option value="xelatex">xelatex</option>
@@ -762,12 +789,22 @@ select:focus { border-color: var(--accent); outline: none; }
     <button id="btn-push" class="sm" data-i18n="push">Push</button>
     <span class="toolbar-sep"></span>
     <button class="icon-btn" id="btn-log-toggle" title="Toggle log" data-i18n-title="toggle_log"><svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
+    </span>
   </div>
 
   <div id="main">
     <!-- Project List View -->
     <div id="project-list-view">
-      <h1 data-i18n="projects">Projects</h1>
+      <div class="project-header">
+        <h1 data-i18n="projects">Projects</h1>
+        <div class="project-toolbar">
+          <input type="text" id="project-search" data-i18n-placeholder="search_projects" placeholder="Search projects...">
+          <button class="sm" id="btn-open-folder" style="font-size:12px"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2" style="vertical-align:-2px"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg> <span data-i18n="open_folder">Open Folder</span></button>
+          <button class="sm primary" id="btn-new-project" style="font-size:12px"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2" style="vertical-align:-2px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> <span data-i18n="new_project">New Project</span></button>
+          <button class="view-toggle active" id="btn-view-grid" title="Grid"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+          <button class="view-toggle" id="btn-view-list" title="List"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+        </div>
+      </div>
       <div id="project-grid" class="project-grid"></div>
     </div>
 
@@ -874,6 +911,7 @@ select:focus { border-color: var(--accent); outline: none; }
 <div class="settings-popup" id="settings-popup" onclick="this.classList.remove('open')">
   <div class="settings-popup-panel" onclick="event.stopPropagation()">
     <h3 data-i18n="settings">Settings</h3>
+    <!-- Appearance -->
     <div class="settings-popup-item">
       <label data-i18n="theme">Theme</label>
       <select id="theme-select"></select>
@@ -906,36 +944,40 @@ select:focus { border-color: var(--accent); outline: none; }
         <option value="0" data-i18n="off">Off</option>
       </select>
     </div>
+    <div class="settings-divider"></div>
+    <!-- Docker -->
     <div class="settings-popup-item">
       <label data-i18n="use_docker">Docker</label>
-      <input type="checkbox" id="docker-toggle" style="cursor:pointer">
+      <input type="checkbox" id="docker-toggle">
     </div>
     <div class="settings-popup-item" id="docker-image-row">
       <label data-i18n="docker_image">Image</label>
-      <div style="display:flex;align-items:center;gap:4px">
-        <select id="docker-image-select" style="flex:1"></select>
+      <div style="display:flex;align-items:center;gap:4px;flex:1;min-width:0">
+        <select id="docker-image-select" style="flex:1;min-width:0"></select>
         <button id="btn-docker-pull" class="sm" style="font-size:11px;padding:2px 6px" data-i18n="pull">Pull</button>
         <button id="btn-docker-rmi" class="sm danger" style="font-size:11px;padding:2px 6px" data-i18n="delete">Del</button>
       </div>
     </div>
     <div class="settings-popup-item" id="debian-toggle-row">
       <label data-i18n="show_debian">Show Debian</label>
-      <input type="checkbox" id="show-debian-toggle" style="cursor:pointer">
+      <input type="checkbox" id="show-debian-toggle">
     </div>
     <div class="settings-popup-item">
       <label data-i18n="registry_mirror">Registry Mirror</label>
-      <input id="registry-mirror-input" type="text" placeholder="docker.1ms.run" style="font-size:13px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);width:180px">
+      <input id="registry-mirror-input" type="text" placeholder="docker.1ms.run">
+    </div>
+    <div class="settings-divider"></div>
+    <!-- Advanced -->
+    <div class="settings-popup-item">
+      <label data-i18n="http_proxy">HTTP Proxy</label>
+      <input id="proxy-input" type="text" placeholder="http://localhost:7890">
     </div>
     <div class="settings-popup-item">
       <label data-i18n="js_modules">JS Modules</label>
-      <div style="display:flex;align-items:center;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
         <span id="vendor-status" style="font-size:12px;color:var(--text-dim)">—</span>
-        <button id="btn-update-vendor" style="font-size:12px;padding:2px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);cursor:pointer" data-i18n="update">Update</button>
+        <button id="btn-update-vendor" class="sm" style="font-size:11px;padding:2px 8px" data-i18n="update">Update</button>
       </div>
-    </div>
-    <div class="settings-popup-item">
-      <label data-i18n="http_proxy">HTTP Proxy</label>
-      <input id="proxy-input" type="text" placeholder="http://localhost:7890" style="font-size:13px;padding:3px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);width:180px">
     </div>
   </div>
 </div>
@@ -1000,6 +1042,8 @@ const I18N = {
     open_folder: "Open Folder",
     open_folder_title: "Open Folder",
     select_this_folder: "Select This Folder",
+    rename_project: "Rename",
+    rename_project_title: "Rename Project",
     remove_project: "Remove Project",
     remove_project_title: "Remove Project",
     remove_project_confirm: "Remove \"{name}\" from the project list?",
@@ -1033,6 +1077,7 @@ const I18N = {
     pdf_error: "Failed to load PDF",
     pages: "page(s)",
     search_files: "Search files...",
+    search_projects: "Search projects...",
     rename: "Rename",
     delete: "Delete",
     new_file_here: "New file here",
@@ -1114,6 +1159,8 @@ const I18N = {
     open_folder: "打开文件夹",
     open_folder_title: "打开文件夹",
     select_this_folder: "选择此文件夹",
+    rename_project: "重命名",
+    rename_project_title: "重命名项目",
     remove_project: "移除项目",
     remove_project_title: "移除项目",
     remove_project_confirm: "从项目列表中移除 \"{name}\"？",
@@ -1147,6 +1194,7 @@ const I18N = {
     pdf_error: "PDF 加载失败",
     pages: "页",
     search_files: "搜索文件...",
+    search_projects: "搜索项目...",
     rename: "重命名",
     delete: "删除",
     new_file_here: "在此新建文件",
@@ -1472,6 +1520,17 @@ async function init() {
     document.getElementById("show-debian-toggle").checked = !!globalSettings.show_debian;
     if (globalSettings.registry_mirror) {
       document.getElementById("registry-mirror-input").value = globalSettings.registry_mirror;
+    } else {
+      // Auto-detect China region and suggest registry mirror
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+      const isCN = tz.startsWith("Asia/Shanghai") || tz.startsWith("Asia/Chongqing")
+        || tz.startsWith("Asia/Harbin") || tz.startsWith("Asia/Urumqi")
+        || navigator.language?.startsWith("zh");
+      if (isCN) {
+        const mirror = "docker.1ms.run";
+        document.getElementById("registry-mirror-input").value = mirror;
+        api("PUT", "/api/settings", { registry_mirror: mirror });
+      }
     }
   } catch {}
   await loadDockerImages();
@@ -1933,6 +1992,8 @@ async function showProjectList() {
   localStorage.removeItem("tinyleaf-project");
   document.getElementById("project-list-view").style.display = "block";
   document.getElementById("editor-view").style.display = "none";
+  document.getElementById("toolbar-project").style.display = "none";
+  document.getElementById("toolbar-project-name").style.display = "none";
 
   const projects = await api("GET", "/api/projects");
   const grid = document.getElementById("project-grid");
@@ -1941,37 +2002,60 @@ async function showProjectList() {
   for (const p of projects) {
     const card = document.createElement("div");
     card.className = "project-card" + (p.exists === false ? " stale" : "");
+    const timeStr = p.added_at ? new Date(p.added_at).toLocaleString() : "";
+    const gitBadge = p.git ? `<span class="git-badge" title="Git repository"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></span>` : "";
     card.innerHTML = `<h3>${esc(p.name)}</h3>`
       + `<div class="project-path">${esc(p.path || "")}</div>`
-      + `<div class="meta">${p.git ? "git" : ""}</div>`
+      + `<div class="project-time">${esc(timeStr)}</div>`
+      + gitBadge
+      + `<button class="rename-btn" title="${t("rename_project")}"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>`
       + `<button class="remove-btn" title="${t("remove_project")}"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
     if (p.exists !== false) {
-      card.onclick = (e) => { if (!e.target.closest(".remove-btn")) openProject(p.name); };
+      card.onclick = (e) => { if (!e.target.closest(".remove-btn") && !e.target.closest(".rename-btn")) openProject(p.name); };
     }
+    card.querySelector(".rename-btn").onclick = (e) => { e.stopPropagation(); showRenameProjectModal(p.name); };
     card.querySelector(".remove-btn").onclick = (e) => { e.stopPropagation(); showRemoveProjectModal(p.name); };
     grid.appendChild(card);
   }
 
-  // "Open Folder" card
-  const openCard = document.createElement("div");
-  openCard.className = "project-card create-new";
-  openCard.innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>${t("open_folder")}`;
-  openCard.onclick = showOpenFolderModal;
-  grid.appendChild(openCard);
+  // Restore view mode
+  applyViewMode(localStorage.getItem("tinyleaf-view-mode") || "grid");
 
-  // "New Project" card
-  const newCard = document.createElement("div");
-  newCard.className = "project-card create-new";
-  newCard.innerHTML = `<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${t("new_project")}`;
-  newCard.onclick = showCreateProjectModal;
-  grid.appendChild(newCard);
+  // Clear search
+  const searchInput = document.getElementById("project-search");
+  if (searchInput) searchInput.value = "";
 }
+
+function applyViewMode(mode) {
+  const grid = document.getElementById("project-grid");
+  if (mode === "list") {
+    grid.classList.add("list-view");
+  } else {
+    grid.classList.remove("list-view");
+  }
+  document.getElementById("btn-view-grid").classList.toggle("active", mode !== "list");
+  document.getElementById("btn-view-list").classList.toggle("active", mode === "list");
+  localStorage.setItem("tinyleaf-view-mode", mode);
+}
+
+document.getElementById("btn-view-grid").onclick = () => applyViewMode("grid");
+document.getElementById("btn-view-list").onclick = () => applyViewMode("list");
+document.getElementById("btn-open-folder").onclick = showOpenFolderModal;
+document.getElementById("btn-new-project").onclick = showCreateProjectModal;
+document.getElementById("project-search").oninput = (e) => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll("#project-grid .project-card:not(.create-new)").forEach(card => {
+    const name = card.querySelector("h3")?.textContent.toLowerCase() || "";
+    const path = card.querySelector(".project-path")?.textContent.toLowerCase() || "";
+    card.style.display = (name.includes(q) || path.includes(q)) ? "" : "none";
+  });
+};
 
 function showCreateProjectModal() {
   showModal(t("new_project_title"),
     `<div class="dir-browser" id="create-dir-browser"></div>`
     + `<label style="font-size:12px;color:var(--text-dim);margin-bottom:4px;display:block">${t("project_name")}</label>`
-    + `<input id="inp-project-name" placeholder="${t("project_name")}">`,
+    + `<input type="text" id="inp-project-name" placeholder="${t("project_name")}">`,
     [
       { label: t("cancel"), action: closeModal },
       { label: t("create"), primary: true, action: async () => {
@@ -1992,7 +2076,7 @@ function showOpenFolderModal() {
   showModal(t("open_folder_title"),
     `<div class="dir-browser" id="open-dir-browser"></div>`
     + `<label style="font-size:12px;color:var(--text-dim);margin-bottom:4px;display:block">${t("project_name")}</label>`
-    + `<input id="inp-folder-name" style="margin-bottom:0" readonly>`,
+    + `<input type="text" id="inp-folder-name" style="margin-bottom:0" readonly>`,
     [
       { label: t("cancel"), action: closeModal },
       { label: t("select_this_folder"), primary: true, action: async () => {
@@ -2011,6 +2095,30 @@ function showOpenFolderModal() {
       }},
     ]);
   loadDirBrowser("open-dir-browser");
+}
+
+function showRenameProjectModal(name) {
+  showModal(t("rename_project_title"),
+    `<input type="text" id="inp-rename-project" value="${esc(name)}" placeholder="${t("project_name")}" autofocus>`,
+    [
+      { label: t("cancel"), action: closeModal },
+      { label: t("rename"), primary: true, action: async () => {
+        const newName = document.getElementById("inp-rename-project").value.trim();
+        if (!newName || newName === name) { closeModal(); return; }
+        try {
+          await api("POST", `/api/projects/${enc(name)}/rename-project`, { new_name: newName });
+          closeModal();
+          setStatus(`${t("renamed")}: ${newName}`, "success");
+          showProjectList();
+        } catch (e) {
+          setStatus(e.message || "Rename failed", "error");
+        }
+      }},
+    ]);
+  setTimeout(() => {
+    const inp = document.getElementById("inp-rename-project");
+    if (inp) { inp.focus(); inp.select(); }
+  }, 50);
 }
 
 function showRemoveProjectModal(name) {
@@ -2096,6 +2204,8 @@ async function openProject(name) {
   document.getElementById("project-name").textContent = name;
   document.getElementById("project-list-view").style.display = "none";
   document.getElementById("editor-view").style.display = "flex";
+  document.getElementById("toolbar-project").style.display = "flex";
+  document.getElementById("toolbar-project-name").style.display = "flex";
 
   // Clear previous project state
   S.pdfDoc = null;
@@ -2104,7 +2214,7 @@ async function openProject(name) {
   document.getElementById("pdf-status").textContent = t("no_pdf");
 
   const config = await api("GET", `/api/projects/${enc(name)}/config`);
-  document.getElementById("engine-select").value = config.engine || "pdflatex";
+  document.getElementById("engine-select").value = config.engine || "latexmk";
 
   // Sync auto-compile toggle with project config
   S.autoCompile = config.auto_compile !== false; // default true

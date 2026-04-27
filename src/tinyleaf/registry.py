@@ -131,3 +131,28 @@ def unregister_project(config_dir, name, delete_files=False):
 
     if delete_files and os.path.isdir(project_path):
         shutil.rmtree(project_path)
+
+
+def rename_project(config_dir, old_name, new_name):
+    """Rename a project in the registry.
+
+    Args:
+        config_dir: Config directory containing the registry.
+        old_name: Current project name.
+        new_name: New project name.
+
+    Raises:
+        KeyError: If old_name is not found.
+        ValueError: If new_name is invalid or already taken.
+    """
+    if not new_name or "/" in new_name or new_name.startswith("."):
+        raise ValueError(f"Invalid project name: {new_name}")
+
+    data = load_registry(config_dir)
+    if old_name not in data["projects"]:
+        raise KeyError(f"Project not found: {old_name}")
+    if new_name in data["projects"]:
+        raise ValueError(f"Project name already exists: {new_name}")
+
+    data["projects"][new_name] = data["projects"].pop(old_name)
+    save_registry(config_dir, data)
