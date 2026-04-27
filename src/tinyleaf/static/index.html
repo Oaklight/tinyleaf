@@ -217,6 +217,12 @@ select {
   cursor: pointer;
 }
 select:focus { border-color: var(--accent); outline: none; }
+#main-file-select {
+  max-width: 200px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
 
 /* ── Sidebar ── */
 .sidebar-section {
@@ -777,6 +783,8 @@ select:focus { border-color: var(--accent); outline: none; }
         <div id="log-header">
           <span data-i18n="compile_log">Compile Log</span>
           <span id="log-status"></span>
+          <span style="flex:1"></span>
+          <button id="btn-log-copy" class="icon-btn" style="padding:1px 4px;font-size:11px" title="Copy log" data-i18n-title="copy_log" onclick="event.stopPropagation(); copyLog()">&#x2398;</button>
         </div>
         <div id="log-content"></div>
       </div>
@@ -909,6 +917,8 @@ const I18N = {
     refresh: "Refresh",
     compile_to_preview: "Compile to see PDF preview",
     compile_log: "Compile Log",
+    copy_log: "Copy log",
+    log_copied: "Log copied to clipboard",
     ready: "Ready",
     projects: "Projects",
     new_project: "New Project",
@@ -1013,6 +1023,8 @@ const I18N = {
     refresh: "刷新",
     compile_to_preview: "编译后预览 PDF",
     compile_log: "编译日志",
+    copy_log: "复制日志",
+    log_copied: "日志已复制到剪贴板",
     ready: "就绪",
     projects: "项目",
     new_project: "新建项目",
@@ -1232,26 +1244,46 @@ const LANG_MAP = {
   ".bib": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
   ".sty": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
   ".cls": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
+  ".dtx": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
   ".md":  { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6/+esm", fn: "markdown" },
   ".markdown": { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6/+esm", fn: "markdown" },
   ".mmd": { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6/+esm", fn: "markdown" },
   ".mermaid": { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6/+esm", fn: "markdown" },
   ".py":  { mod: "cm-lang-python.js", cdn: "@codemirror/lang-python@6/+esm", fn: "python" },
+  ".pyw": { mod: "cm-lang-python.js", cdn: "@codemirror/lang-python@6/+esm", fn: "python" },
   ".js":  { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6/+esm", fn: "javascript" },
   ".mjs": { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6/+esm", fn: "javascript" },
+  ".jsx": { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6/+esm", fn: "javascript" },
   ".ts":  { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6/+esm", fn: "javascript" },
+  ".tsx": { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6/+esm", fn: "javascript" },
   ".json": { mod: "cm-lang-json.js", cdn: "@codemirror/lang-json@6/+esm", fn: "json" },
+  ".jsonc": { mod: "cm-lang-json.js", cdn: "@codemirror/lang-json@6/+esm", fn: "json" },
   ".css": { mod: "cm-lang-css.js", cdn: "@codemirror/lang-css@6/+esm", fn: "css" },
+  ".scss": { mod: "cm-lang-css.js", cdn: "@codemirror/lang-css@6/+esm", fn: "css" },
+  ".less": { mod: "cm-lang-css.js", cdn: "@codemirror/lang-css@6/+esm", fn: "css" },
   ".html": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6/+esm", fn: "html" },
   ".htm": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6/+esm", fn: "html" },
   ".xml": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6/+esm", fn: "html" },
+  ".svg": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6/+esm", fn: "html" },
   ".yaml": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
   ".yml": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
+  ".toml": { mod: "cm-lang-json.js", cdn: "@codemirror/lang-json@6/+esm", fn: "json" },
+  ".ini": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
+  ".cfg": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
+  ".conf": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
+};
+// Filename-based language mappings (no extension)
+const LANG_NAME_MAP = {
+  "Makefile": { mod: "cm-lang-python.js", cdn: "@codemirror/lang-python@6/+esm", fn: "python" },
+  "Dockerfile": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
+  ".gitignore": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
+  ".dockerignore": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
 };
 const _langCache = {};
 async function getLangExtension(filePath) {
+  const fileName = filePath.split("/").pop();
   const ext = filePath.includes(".") ? "." + filePath.split(".").pop().toLowerCase() : "";
-  const spec = LANG_MAP[ext];
+  const spec = LANG_MAP[ext] || LANG_NAME_MAP[fileName];
   if (!spec) return null;
   const key = spec.mod;
   if (!_langCache[key]) {
@@ -2446,6 +2478,11 @@ function appendLog(line, level = "info") {
   div.textContent = line;
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
+}
+function copyLog() {
+  const el = document.getElementById("log-content");
+  const text = [...el.querySelectorAll(".log-line")].map((l) => l.textContent).join("\n");
+  navigator.clipboard.writeText(text).then(() => setStatus(t("log_copied"), "success"));
 }
 
 // ══════════════════════════════════════════
