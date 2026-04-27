@@ -1173,7 +1173,6 @@ const [
   { syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldGutter, foldKeymap },
   { closeBrackets, closeBracketsKeymap, autocompletion },
   { search, searchKeymap, highlightSelectionMatches },
-  cmLaTeX,
 ] = await Promise.all([
   loadMod("cm-view.js", "@codemirror/view@6/+esm"),
   loadMod("cm-state.js", "@codemirror/state@6/+esm"),
@@ -1181,8 +1180,43 @@ const [
   loadMod("cm-language.js", "@codemirror/language@6/+esm"),
   loadMod("cm-autocomplete.js", "@codemirror/autocomplete@6/+esm"),
   loadMod("cm-search.js", "@codemirror/search@6/+esm"),
-  loadMod("cm-lang-latex.js", "codemirror-lang-latex/+esm").catch(() => null),
 ]);
+
+// ── Language extensions (loaded on demand) ──
+const LANG_MAP = {
+  ".tex": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
+  ".bib": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
+  ".sty": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
+  ".cls": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
+  ".md":  { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6/+esm", fn: "markdown" },
+  ".markdown": { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6/+esm", fn: "markdown" },
+  ".mmd": { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6/+esm", fn: "markdown" },
+  ".mermaid": { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6/+esm", fn: "markdown" },
+  ".py":  { mod: "cm-lang-python.js", cdn: "@codemirror/lang-python@6/+esm", fn: "python" },
+  ".js":  { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6/+esm", fn: "javascript" },
+  ".mjs": { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6/+esm", fn: "javascript" },
+  ".ts":  { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6/+esm", fn: "javascript" },
+  ".json": { mod: "cm-lang-json.js", cdn: "@codemirror/lang-json@6/+esm", fn: "json" },
+  ".css": { mod: "cm-lang-css.js", cdn: "@codemirror/lang-css@6/+esm", fn: "css" },
+  ".html": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6/+esm", fn: "html" },
+  ".htm": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6/+esm", fn: "html" },
+  ".xml": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6/+esm", fn: "html" },
+  ".yaml": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
+  ".yml": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
+};
+const _langCache = {};
+async function getLangExtension(filePath) {
+  const ext = filePath.includes(".") ? "." + filePath.split(".").pop().toLowerCase() : "";
+  const spec = LANG_MAP[ext];
+  if (!spec) return null;
+  const key = spec.mod;
+  if (!_langCache[key]) {
+    try { _langCache[key] = await loadMod(spec.mod, spec.cdn); }
+    catch { _langCache[key] = null; }
+  }
+  const mod = _langCache[key];
+  return mod?.[spec.fn]?.() || null;
+}
 
 // ══════════════════════════════════════════
 // Application State
@@ -1998,7 +2032,8 @@ async function openFile(filePath) {
     }),
     EditorView.lineWrapping,
   ];
-  if (cmLaTeX?.latex) extensions.push(cmLaTeX.latex());
+  const langExt = await getLangExtension(S.currentFile);
+  if (langExt) extensions.push(langExt);
 
   S.editorView = new EditorView({
     state: EditorState.create({ doc: data.content, extensions }),

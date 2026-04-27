@@ -24,6 +24,13 @@ VENDOR_PACKAGES = [
     ("@codemirror/autocomplete@6", "cm-autocomplete.js"),
     ("@codemirror/search@6", "cm-search.js"),
     ("codemirror-lang-latex", "cm-lang-latex.js"),
+    ("@codemirror/lang-markdown@6", "cm-lang-markdown.js"),
+    ("@codemirror/lang-javascript@6", "cm-lang-javascript.js"),
+    ("@codemirror/lang-python@6", "cm-lang-python.js"),
+    ("@codemirror/lang-json@6", "cm-lang-json.js"),
+    ("@codemirror/lang-css@6", "cm-lang-css.js"),
+    ("@codemirror/lang-html@6", "cm-lang-html.js"),
+    ("@codemirror/lang-yaml@6", "cm-lang-yaml.js"),
 ]
 
 # PDF.js files (self-contained, no import rewriting needed)
