@@ -52,7 +52,8 @@ def status(project_dir):
     # File status
     rc, out, _ = _run_git(project_dir, "status", "--porcelain", "-u")
     if rc == 0:
-        for line in out.strip().split("\n"):
+        for line in out.split("\n"):
+            line = line.rstrip()
             if not line:
                 continue
             status_code = line[:2].strip()

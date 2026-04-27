@@ -468,9 +468,7 @@ def _build_file_tree(base_dir, current_dir):
     files_list = []
 
     for item in items:
-        if item.startswith(".") and item != CONFIG_FILE:
-            continue
-        if item == "__pycache__":
+        if item in (".git", "__pycache__"):
             continue
 
         full = os.path.join(current_dir, item)

@@ -90,7 +90,7 @@ def start_compile(
     main_file="main.tex",
     engine="pdflatex",
     use_docker=False,
-    docker_image="oaklight/texlive:latest",
+    docker_image="oaklight/texlive:alpine-science-cn",
     registry_mirror=None,
 ):
     """Start a compilation and return the compile_id.

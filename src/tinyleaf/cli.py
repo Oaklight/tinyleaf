@@ -40,8 +40,8 @@ def main():
     )
     parser.add_argument(
         "--image",
-        default="oaklight/texlive:latest",
-        help="Docker image to use (default: oaklight/texlive:latest)",
+        default="oaklight/texlive:alpine-science-cn",
+        help="Docker image to use (default: oaklight/texlive:alpine-science-cn)",
     )
     parser.add_argument(
         "--port",

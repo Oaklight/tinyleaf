@@ -334,36 +334,45 @@ select:focus { border-color: var(--accent); outline: none; }
   font-style: italic;
 }
 
-/* ── Git panel ── */
-#git-panel {
-  max-height: 180px;
-  overflow-y: auto;
-  flex-shrink: 0;
+/* ── Sidebar tabs ── */
+.sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sidebar-tab {
+  flex: 1; padding: 7px 0; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.5px; background: none; border: none; border-bottom: 2px solid transparent;
+  cursor: pointer; color: var(--text-dim); transition: color 0.15s;
 }
+.sidebar-tab:hover { color: var(--text); }
+.sidebar-tab.active { color: var(--text); border-bottom-color: var(--accent); }
 
+#sidebar-files { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+#sidebar-git { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+
+/* ── Git panel ── */
 .git-file {
-  padding: 3px 14px 3px 18px;
+  padding: 3px 10px 3px 10px;
   font-size: 12px;
   color: var(--text-dim);
   font-family: var(--mono);
+  cursor: pointer; display: flex; align-items: center; gap: 4px;
 }
 .git-status {
-  display: inline-block;
-  width: 22px;
+  min-width: 26px;
+  padding-right: 4px;
   font-weight: 700;
   font-size: 11px;
+  flex-shrink: 0;
+  text-align: center;
 }
 .git-status.M { color: var(--orange); }
-.git-status.A, .git-status.new { color: var(--green); }
+.git-status.A, .git-status.U { color: var(--green); }
 .git-status.D { color: var(--red); }
-.git-file { cursor: pointer; display: flex; align-items: center; gap: 4px; }
 .git-file:hover { background: var(--bg-hover); }
 .git-file.active { background: var(--bg-hover); }
 .git-file input[type="checkbox"] { margin: 0; cursor: pointer; flex-shrink: 0; }
-.git-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#git-actions { display: flex; padding: 4px 10px; gap: 4px; }
+.git-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+#git-files { flex: 1; overflow-y: auto; }
 #git-diff-view {
-  max-height: 200px;
+  flex: 1; min-height: 0;
   overflow: auto;
   border-top: 1px solid var(--border);
   font-family: var(--mono);
@@ -376,6 +385,19 @@ select:focus { border-color: var(--accent); outline: none; }
 .diff-add { color: var(--green); }
 .diff-del { color: var(--red); }
 .diff-hunk { color: var(--accent); font-weight: 500; }
+#git-commit-area {
+  flex-shrink: 0; border-top: 1px solid var(--border); padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+#git-commit-msg {
+  width: 100%; resize: vertical; min-height: 40px; max-height: 120px;
+  padding: 6px 8px; font-size: 12px; font-family: var(--font);
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 4px; outline: none; box-sizing: border-box;
+}
+#git-commit-msg:focus { border-color: var(--accent); }
+#git-commit-btns { display: flex; gap: 6px; }
+#git-commit-btns button { flex: 1; }
 
 /* ── Editor ── */
 #editor-container { flex: 1; overflow: hidden; }
@@ -490,7 +512,7 @@ select:focus { border-color: var(--accent); outline: none; }
   box-shadow: 0 8px 24px rgba(0,0,0,0.2);
 }
 .modal h3 { margin-bottom: 16px; font-size: 16px; }
-.modal input, .modal textarea {
+.modal input[type="text"], .modal input[type="number"], .modal textarea {
   width: 100%;
   padding: 8px 12px;
   background: var(--bg);
@@ -501,7 +523,7 @@ select:focus { border-color: var(--accent); outline: none; }
   font-size: 14px;
   margin-bottom: 14px;
 }
-.modal input:focus, .modal textarea:focus {
+.modal input[type="text"]:focus, .modal input[type="number"]:focus, .modal textarea:focus {
   border-color: var(--accent);
   outline: none;
 }
@@ -753,6 +775,11 @@ select:focus { border-color: var(--accent); outline: none; }
       <div style="display: flex; flex: 1; overflow: hidden;">
         <!-- Sidebar -->
         <div id="sidebar">
+          <div class="sidebar-tabs">
+            <button class="sidebar-tab active" data-tab="files" data-i18n="files" id="tab-files">Files</button>
+            <button class="sidebar-tab" data-tab="git" id="tab-git">Git</button>
+          </div>
+          <div id="sidebar-files">
           <div class="sidebar-section">
             <div class="sidebar-header">
               <span data-i18n="files">Files</span>
@@ -769,17 +796,22 @@ select:focus { border-color: var(--accent); outline: none; }
             </div>
             <div id="file-tree"></div>
           </div>
-          <div class="sidebar-section" id="git-panel">
+          </div>
+          <div id="sidebar-git">
             <div class="sidebar-header">
               <span id="git-branch">Git</span>
               <span style="flex:1"></span>
-              <button class="sm" id="btn-git-refresh" style="font-size:10px;padding:1px 6px" title="Refresh" onclick="refreshGit()">&#x21bb;</button>
+              <button class="sm" id="btn-git-refresh" style="font-size:10px;padding:1px 6px" title="Refresh">&#x21bb;</button>
             </div>
             <div id="git-files"></div>
-            <div id="git-actions" style="display:none;padding:4px 10px;gap:4px;display:none">
-              <button class="sm primary" id="btn-git-commit-selected" style="font-size:11px;padding:2px 8px" data-i18n="commit_selected">Commit Selected</button>
-            </div>
             <div id="git-diff-view" style="display:none"></div>
+            <div id="git-commit-area">
+              <textarea id="git-commit-msg" placeholder="Commit message..." data-i18n-placeholder="commit_message" rows="2"></textarea>
+              <div id="git-commit-btns">
+                <button class="sm primary" id="btn-git-commit-selected" data-i18n="commit">Commit</button>
+                <button class="sm" id="btn-git-push" data-i18n="push">Push</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1148,7 +1180,7 @@ const I18N = {
   },
 };
 
-let currentLang = localStorage.getItem("tinyleaf-lang") || "en";
+let currentLang = localStorage.getItem("tinyleaf-lang") || (navigator.language?.startsWith("zh") ? "zh" : "en");
 
 function t(key) { return I18N[currentLang]?.[key] || I18N.en[key] || key; }
 
@@ -1161,6 +1193,9 @@ function applyI18n() {
   });
   document.querySelectorAll("[data-i18n-title]").forEach((el) => {
     el.title = t(el.getAttribute("data-i18n-title"));
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+    el.placeholder = t(el.getAttribute("data-i18n-placeholder"));
   });
 }
 
@@ -1371,8 +1406,8 @@ const S = {
   autoSaveTimer: null,
   autoSaveInterval: 2000,
   fileMtime: 0,
-  useDocker: false,
-  dockerImage: "oaklight/texlive:latest",
+  useDocker: true,
+  dockerImage: "oaklight/texlive:alpine-science-cn",
 };
 
 // ── API ──
@@ -1412,7 +1447,7 @@ async function init() {
   const info = await api("GET", "/api/mode");
   S.mode = info.mode;
   S.useDocker = info.docker;
-  S.dockerImage = info.image || "oaklight/texlive:latest";
+  S.dockerImage = info.image || "oaklight/texlive:alpine-science-cn";
 
   // Always load docker images list and sync toggle
   document.getElementById("docker-toggle").checked = S.useDocker;
@@ -2049,6 +2084,12 @@ async function openProject(name) {
   document.getElementById("project-list-view").style.display = "none";
   document.getElementById("editor-view").style.display = "flex";
 
+  // Clear previous project state
+  S.pdfDoc = null;
+  const pdfContainer = document.getElementById("pdf-container");
+  pdfContainer.innerHTML = `<div class="pdf-placeholder" data-i18n="compile_to_preview">${t("compile_to_preview")}</div>`;
+  document.getElementById("pdf-status").textContent = t("no_pdf");
+
   const config = await api("GET", `/api/projects/${enc(name)}/config`);
   document.getElementById("engine-select").value = config.engine || "pdflatex";
 
@@ -2545,13 +2586,22 @@ function copyLog() {
 }
 
 // ══════════════════════════════════════════
+// Sidebar Tab Switching
+// ══════════════════════════════════════════
+function switchSidebarTab(tabName) {
+  document.querySelectorAll(".sidebar-tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === tabName));
+  document.getElementById("sidebar-files").style.display = tabName === "files" ? "flex" : "none";
+  document.getElementById("sidebar-git").style.display = tabName === "git" ? "flex" : "none";
+  if (tabName === "git") refreshGit();
+}
+
+// ══════════════════════════════════════════
 // Git
 // ══════════════════════════════════════════
 async function refreshGit() {
   try {
     const st = await api("GET", `/api/projects/${enc(S.projectName)}/git/status`);
-    if (!st.git) { document.getElementById("git-panel").style.display = "none"; return; }
-    document.getElementById("git-panel").style.display = "";
+    if (!st.git) { return; }
     document.getElementById("git-branch").textContent =
       `${st.branch || "???"}` +
       (st.ahead ? ` \u2191${st.ahead}` : "") +
@@ -2560,20 +2610,17 @@ async function refreshGit() {
     S.gitFiles = st.files || [];
     const fd = document.getElementById("git-files");
     const diffView = document.getElementById("git-diff-view");
-    const actionsEl = document.getElementById("git-actions");
     fd.innerHTML = "";
     diffView.style.display = "none";
     diffView.innerHTML = "";
 
     if (S.gitFiles.length === 0) {
-      actionsEl.style.display = "none";
       fd.innerHTML = `<div style="padding:6px 14px;font-size:12px;color:var(--text-dim)">${t("no_changes")}</div>`;
       return;
     }
-    actionsEl.style.display = "flex";
 
     for (const f of S.gitFiles) {
-      const cls = f.status === "??" ? "new" : f.status.includes("D") ? "D" : "M";
+      const cls = f.status === "??" ? "U" : f.status.includes("D") ? "D" : f.status.includes("A") ? "A" : "M";
       const div = document.createElement("div");
       div.className = "git-file";
       const cb = document.createElement("input");
@@ -2583,7 +2630,7 @@ async function refreshGit() {
       div.appendChild(cb);
       const statusSpan = document.createElement("span");
       statusSpan.className = `git-status ${cls}`;
-      statusSpan.textContent = f.status;
+      statusSpan.textContent = cls;
       div.appendChild(statusSpan);
       const nameSpan = document.createElement("span");
       nameSpan.className = "git-file-name";
@@ -2593,7 +2640,7 @@ async function refreshGit() {
       nameSpan.onclick = () => showGitDiff(f.path, div);
       fd.appendChild(div);
     }
-  } catch { document.getElementById("git-panel").style.display = "none"; }
+  } catch { /* git not available */ }
 }
 
 async function showGitDiff(filePath, activeEl) {
@@ -2635,23 +2682,24 @@ async function doCommit() {
     return;
   }
 
-  showModal(t("git_commit_title"), `<textarea id="inp-commit" placeholder="${t("commit_message")}" rows="3"></textarea>
-    ${selectedFiles.length ? `<div style="font-size:12px;color:var(--text-dim);margin-top:6px">${selectedFiles.length} ${t("files_selected")}</div>` : ""}`, [
-    { label: t("cancel"), action: closeModal },
-    { label: t("commit"), primary: true, action: async () => {
-      const msg = document.getElementById("inp-commit").value.trim();
-      if (!msg) return;
-      if (S.modified.has(S.currentFile)) await saveCurrentFile();
-      const r = await api("POST", `/api/projects/${enc(S.projectName)}/git/commit`, {
-        message: msg,
-        files: selectedFiles.length ? selectedFiles : null,
-      });
-      closeModal();
-      setStatus(r.success ? t("committed") : r.message, r.success ? "success" : "error");
-      refreshGit();
-    }},
-  ]);
-  setTimeout(() => document.getElementById("inp-commit")?.focus(), 50);
+  const msgEl = document.getElementById("git-commit-msg");
+  const msg = msgEl ? msgEl.value.trim() : "";
+  if (!msg) {
+    // Switch to git tab and focus the textarea
+    switchSidebarTab("git");
+    setTimeout(() => { msgEl?.focus(); }, 50);
+    setStatus(t("commit_message"), "warning");
+    return;
+  }
+
+  if (S.modified.has(S.currentFile)) await saveCurrentFile();
+  const r = await api("POST", `/api/projects/${enc(S.projectName)}/git/commit`, {
+    message: msg,
+    files: selectedFiles.length ? selectedFiles : null,
+  });
+  setStatus(r.success ? t("committed") : r.message, r.success ? "success" : "error");
+  if (r.success && msgEl) msgEl.value = "";
+  refreshGit();
 }
 
 async function doPush() {
@@ -2701,6 +2749,8 @@ function setupKeybindings() {
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); saveCurrentFile(); }
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); compile(); }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "E") { e.preventDefault(); switchSidebarTab("files"); }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "G") { e.preventDefault(); switchSidebarTab("git"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "C") { e.preventDefault(); doCommit(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "P") { e.preventDefault(); doPush(); }
     if (e.key === "Escape") { closeModal(); closeContextMenu(); document.getElementById("settings-popup").classList.remove("open"); }
@@ -2733,6 +2783,10 @@ document.getElementById("auto-compile-toggle").onchange = (e) => {
 };
 document.getElementById("btn-commit").onclick = doCommit;
 document.getElementById("btn-git-commit-selected").onclick = doCommit;
+document.getElementById("btn-git-push").onclick = doPush;
+document.getElementById("btn-git-refresh").onclick = refreshGit;
+document.getElementById("tab-files").onclick = () => switchSidebarTab("files");
+document.getElementById("tab-git").onclick = () => switchSidebarTab("git");
 document.getElementById("btn-push").onclick = doPush;
 document.getElementById("btn-log-toggle").onclick = toggleLog;
 document.getElementById("btn-new-file").onclick = showNewFileModal;
