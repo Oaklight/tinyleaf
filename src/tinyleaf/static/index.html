@@ -1832,6 +1832,13 @@ function renderTreeNodes(nodes, parent, depth) {
 async function openFile(filePath) {
   if (S.currentFile && S.modified.has(S.currentFile)) await saveCurrentFile();
 
+  // PDF files: load in preview panel instead of editor
+  if (filePath.endsWith(".pdf")) {
+    const url = `/api/projects/${enc(S.projectName)}/output/${enc(filePath)}`;
+    loadPDF(url);
+    return;
+  }
+
   const data = await api("GET", `/api/projects/${enc(S.projectName)}/files/${enc(filePath)}`);
   S.currentFile = filePath;
 
