@@ -63,6 +63,7 @@ body {
   flex-shrink: 0;
   overflow: hidden;
 }
+#sidebar.collapsed { width: 0; border-right: none; overflow: hidden; }
 
 #workspace { flex: 1; display: flex; overflow: hidden; }
 
@@ -105,6 +106,34 @@ body {
   border-left: 1px solid var(--border);
   min-width: 0;
 }
+#pdf-pane.collapsed { flex: 0 0 0px !important; min-width: 0; overflow: hidden; border-left: none; }
+
+.resize-handle {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
+  transition: background 0.15s;
+}
+.resize-handle:hover, .resize-handle.active { background: var(--accent); }
+
+.panel-toggle {
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: var(--bg-card);
+  border: none;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  font-size: 10px;
+  padding: 0;
+  transition: background 0.15s;
+}
+.panel-toggle:hover { background: var(--bg-hover); color: var(--text); }
 
 #statusbar {
   display: flex;
@@ -713,6 +742,8 @@ select:focus { border-color: var(--accent); outline: none; }
           </div>
         </div>
 
+        <div class="resize-handle" id="resize-sidebar"></div>
+
         <!-- Workspace -->
         <div id="workspace">
           <div id="editor-pane">
@@ -722,6 +753,7 @@ select:focus { border-color: var(--accent); outline: none; }
             </div>
             <div id="editor-container"></div>
           </div>
+          <div class="resize-handle" id="resize-pdf"></div>
           <div id="pdf-pane">
             <div id="pdf-toolbar">
               <span id="pdf-status" data-i18n="no_pdf">No PDF</span>
@@ -923,7 +955,10 @@ const I18N = {
     search_files_title: "Search files",
     upload_file_title: "Upload file",
     locate_in_tree: "Locate in tree",
+    toggle_sidebar: "Toggle sidebar",
+    toggle_pdf: "Toggle PDF panel",
   },
+  zh: {
     compile: "编译",
     compiling: "编译中...",
     clean: "清理",
@@ -1009,6 +1044,8 @@ const I18N = {
     search_files_title: "搜索文件",
     upload_file_title: "上传文件",
     locate_in_tree: "在文件树中定位",
+    toggle_sidebar: "切换侧边栏",
+    toggle_pdf: "切换 PDF 面板",
   },
 
 let currentLang = localStorage.getItem("tinyleaf-lang") || "en";
@@ -2307,6 +2344,71 @@ window.addEventListener("focus", () => {
     refreshGit();
   }
 });
+
+// ── Panel resize & collapse ──
+(function initPanels() {
+  const sidebar = document.getElementById("sidebar");
+  const pdfPane = document.getElementById("pdf-pane");
+  const resizeSidebar = document.getElementById("resize-sidebar");
+  const resizePdf = document.getElementById("resize-pdf");
+
+  // Restore saved widths
+  const savedSidebarW = localStorage.getItem("tinyleaf-sidebar-width");
+  if (savedSidebarW) sidebar.style.width = savedSidebarW + "px";
+
+  const savedPdfW = localStorage.getItem("tinyleaf-pdf-width");
+  if (savedPdfW) pdfPane.style.flex = "0 0 " + savedPdfW + "px";
+
+  // Restore collapsed states
+  if (localStorage.getItem("tinyleaf-sidebar-collapsed") === "1") sidebar.classList.add("collapsed");
+  if (localStorage.getItem("tinyleaf-pdf-collapsed") === "1") pdfPane.classList.add("collapsed");
+
+  function setupResize(handle, target, applySizeFn, storageKey, min, max, invert) {
+    handle.addEventListener("mousedown", function (e) {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startSize = target.getBoundingClientRect().width;
+      handle.classList.add("active");
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      function onMove(e2) {
+        const delta = invert ? (startX - e2.clientX) : (e2.clientX - startX);
+        let newSize = Math.max(min, Math.min(max, startSize + delta));
+        applySizeFn(newSize);
+        target.classList.remove("collapsed");
+        localStorage.setItem(storageKey.replace("-width", "-collapsed"), "0");
+        localStorage.setItem(storageKey, Math.round(newSize));
+      }
+      function onUp() {
+        handle.classList.remove("active");
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      }
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
+    // Double-click to toggle collapse
+    handle.addEventListener("dblclick", () => {
+      target.classList.toggle("collapsed");
+      const key = storageKey.replace("-width", "-collapsed");
+      localStorage.setItem(key, target.classList.contains("collapsed") ? "1" : "0");
+    });
+  }
+
+  setupResize(
+    resizeSidebar, sidebar,
+    (w) => { sidebar.style.width = w + "px"; },
+    "tinyleaf-sidebar-width", 150, 500, false
+  );
+
+  setupResize(
+    resizePdf, pdfPane,
+    (w) => { pdfPane.style.flex = "0 0 " + w + "px"; },
+    "tinyleaf-pdf-width", 200, window.innerWidth * 0.7, true
+  );
+})();
 
 // ── Start ──
 init();
