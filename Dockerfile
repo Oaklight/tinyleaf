@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir .
 
 EXPOSE 8080
 
-ENTRYPOINT ["texlive-web"]
+ENTRYPOINT ["tinyleaf"]

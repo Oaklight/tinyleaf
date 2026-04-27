@@ -142,12 +142,15 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 button.sm { padding: 3px 8px; font-size: 12px; }
 button.danger { color: var(--red); }
 button.icon-btn {
-  padding: 4px 8px;
+  padding: 4px 6px;
   background: transparent;
   border: none;
-  font-size: 16px;
   color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
+button.icon-btn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 button.icon-btn:hover { color: var(--accent); background: var(--bg-hover); border-radius: var(--radius); }
 
 select {
@@ -179,6 +182,35 @@ select:focus { border-color: var(--accent); outline: none; }
   color: var(--text-dim);
 }
 
+.sidebar-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.sidebar-actions button.icon-btn {
+  padding: 2px 4px;
+}
+.sidebar-actions button.icon-btn svg { width: 14px; height: 14px; }
+
+/* ── File search ── */
+#file-search-box {
+  padding: 4px 10px;
+  display: none;
+}
+#file-search-box.open { display: block; }
+#file-search-input {
+  width: 100%;
+  padding: 4px 8px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: var(--font);
+  outline: none;
+}
+#file-search-input:focus { border-color: var(--accent); }
+
 #file-tree {
   flex: 1;
   overflow-y: auto;
@@ -201,12 +233,13 @@ select:focus { border-color: var(--accent); outline: none; }
 }
 .tree-dir-header:hover { background: var(--bg-hover); }
 .tree-dir-header .arrow {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   width: 14px;
-  font-size: 10px;
   color: var(--text-dim);
   transition: transform 0.15s;
 }
+.tree-dir-header .arrow svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .tree-dir-header .arrow.open { transform: rotate(90deg); }
 .tree-dir-children {
   display: none;
@@ -370,7 +403,7 @@ select:focus { border-color: var(--accent); outline: none; }
   border-radius: 12px;
   padding: 24px;
   min-width: 380px;
-  max-width: 500px;
+  max-width: 540px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.2);
 }
 .modal h3 { margin-bottom: 16px; font-size: 16px; }
@@ -413,10 +446,21 @@ select:focus { border-color: var(--accent); outline: none; }
   padding: 20px;
   cursor: pointer;
   transition: all 0.15s;
+  position: relative;
 }
 .project-card:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
 .project-card h3 { font-size: 16px; margin-bottom: 6px; }
 .project-card .meta { font-size: 12px; color: var(--text-dim); }
+.project-card .project-path { font-size: 11px; color: var(--text-dim); font-family: var(--mono); word-break: break-all; margin-top: 4px; }
+.project-card.stale { opacity: 0.5; border-style: dashed; }
+.project-card.stale .project-path::after { content: " (missing)"; color: var(--red); font-family: var(--font); }
+.project-card .remove-btn {
+  position: absolute; top: 8px; right: 8px;
+  background: none; border: none; cursor: pointer; color: var(--text-dim);
+  padding: 4px; border-radius: 4px; display: none; line-height: 0;
+}
+.project-card .remove-btn:hover { color: var(--red); background: var(--bg-hover); }
+.project-card:hover .remove-btn { display: block; }
 .project-card.create-new {
   border-style: dashed;
   display: flex;
@@ -424,8 +468,32 @@ select:focus { border-color: var(--accent); outline: none; }
   justify-content: center;
   color: var(--text-dim);
   font-size: 14px;
+  gap: 8px;
 }
 .project-card.create-new:hover { color: var(--accent); border-color: var(--accent); }
+.project-card.create-new svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 2; }
+
+/* ── Directory Browser ── */
+.dir-browser { margin-bottom: 14px; }
+.dir-browser .dir-path {
+  font-family: var(--mono); font-size: 12px; color: var(--text-dim);
+  padding: 6px 10px; background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0; word-break: break-all;
+}
+.dir-browser .dir-list {
+  max-height: 240px; overflow-y: auto;
+  border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+.dir-browser .dir-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; cursor: pointer; font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.dir-browser .dir-item:last-child { border-bottom: none; }
+.dir-browser .dir-item:hover { background: var(--bg-hover); }
+.dir-browser .dir-item svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0; }
+.dir-browser .dir-item.parent-dir { font-weight: 600; color: var(--text-dim); }
 
 /* ── Editor View ── */
 #editor-view {
@@ -435,26 +503,22 @@ select:focus { border-color: var(--accent); outline: none; }
   overflow: hidden;
 }
 
-/* ── Settings dropdown ── */
-.dropdown {
-  position: relative;
-}
-.dropdown-menu {
+/* ── Settings popup (bottom-left) ── */
+.settings-popup {
   display: none;
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: 4px;
+  position: fixed;
+  bottom: calc(var(--statusbar-height) + 8px);
+  left: 8px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
   min-width: 260px;
-  z-index: 100;
+  z-index: 200;
   padding: 8px;
 }
-.dropdown-menu.open { display: block; }
-.dropdown-item {
+.settings-popup.open { display: block; }
+.settings-popup-item {
   padding: 8px 12px;
   font-size: 13px;
   display: flex;
@@ -462,12 +526,12 @@ select:focus { border-color: var(--accent); outline: none; }
   justify-content: space-between;
   gap: 8px;
 }
-.dropdown-item label {
+.settings-popup-item label {
   font-size: 12px;
   color: var(--text-dim);
   white-space: nowrap;
 }
-.dropdown-item select, .dropdown-item input {
+.settings-popup-item select, .settings-popup-item input {
   flex: 1;
   min-width: 0;
   padding: 4px 8px;
@@ -477,6 +541,34 @@ select:focus { border-color: var(--accent); outline: none; }
   border: 1px solid var(--border);
   border-radius: 4px;
   font-family: var(--mono);
+}
+
+/* ── Context menu ── */
+.context-menu {
+  display: none;
+  position: fixed;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  min-width: 160px;
+  z-index: 300;
+  padding: 4px 0;
+}
+.context-menu.open { display: block; }
+.context-menu-item {
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.1s;
+}
+.context-menu-item:hover { background: var(--bg-hover); }
+.context-menu-item.danger { color: var(--red); }
+.context-menu-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
 }
 
 /* ── Badge ── */
@@ -513,6 +605,9 @@ select:focus { border-color: var(--accent); outline: none; }
 #app { visibility: hidden; }
 #app.ready { visibility: visible; }
 
+/* ── Hidden file upload input ── */
+#file-upload-input { display: none; }
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -527,6 +622,9 @@ select:focus { border-color: var(--accent); outline: none; }
 <div id="app">
   <!-- Toolbar -->
   <div id="toolbar">
+    <!-- Settings gear (top-left) -->
+    <button class="icon-btn" id="btn-settings" title="Settings"><svg viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    <span class="toolbar-sep"></span>
     <span class="toolbar-brand">TeXlive Web</span>
     <span class="toolbar-sep"></span>
     <span id="project-name" style="font-size: 13px; color: var(--text-dim);">&mdash;</span>
@@ -544,29 +642,7 @@ select:focus { border-color: var(--accent); outline: none; }
     <button id="btn-commit" class="sm" data-i18n="commit">Commit</button>
     <button id="btn-push" class="sm" data-i18n="push">Push</button>
     <span class="toolbar-sep"></span>
-
-    <!-- Settings dropdown -->
-    <div class="dropdown" id="settings-dropdown">
-      <button class="icon-btn" id="btn-settings" title="Settings">&#9881;</button>
-      <div class="dropdown-menu" id="settings-menu">
-        <div class="dropdown-item">
-          <label data-i18n="theme">Theme</label>
-          <select id="theme-select"></select>
-        </div>
-        <div class="dropdown-item">
-          <label data-i18n="language">Language</label>
-          <select id="lang-select">
-            <option value="en">English</option>
-            <option value="zh">中文</option>
-          </select>
-        </div>
-        <div class="dropdown-item" id="docker-image-row" style="display:none">
-          <label data-i18n="docker_image">Image</label>
-          <select id="docker-image-select"></select>
-        </div>
-      </div>
-    </div>
-    <button class="icon-btn" id="btn-log-toggle" title="Toggle log">&#9776;</button>
+    <button class="icon-btn" id="btn-log-toggle" title="Toggle log"><svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
   </div>
 
   <div id="main">
@@ -584,7 +660,15 @@ select:focus { border-color: var(--accent); outline: none; }
           <div class="sidebar-section">
             <div class="sidebar-header">
               <span data-i18n="files">Files</span>
-              <button class="sm" id="btn-new-file" title="New file">+</button>
+              <div class="sidebar-actions">
+                <button class="icon-btn" id="btn-search-file" title="Search files"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
+                <button class="icon-btn" id="btn-upload-file" title="Upload file"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>
+                <button class="icon-btn" id="btn-new-folder" title="New folder"><svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/></svg></button>
+                <button class="icon-btn" id="btn-new-file" title="New file"><svg viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg></button>
+              </div>
+            </div>
+            <div id="file-search-box">
+              <input type="text" id="file-search-input" placeholder="Search files..." data-i18n="search_files">
             </div>
             <div id="file-tree"></div>
           </div>
@@ -632,6 +716,31 @@ select:focus { border-color: var(--accent); outline: none; }
   </div>
 </div>
 
+<!-- Settings popup (bottom-left) -->
+<div class="settings-popup" id="settings-popup">
+  <div class="settings-popup-item">
+    <label data-i18n="theme">Theme</label>
+    <select id="theme-select"></select>
+  </div>
+  <div class="settings-popup-item">
+    <label data-i18n="language">Language</label>
+    <select id="lang-select">
+      <option value="en">English</option>
+      <option value="zh">中文</option>
+    </select>
+  </div>
+  <div class="settings-popup-item" id="docker-image-row" style="display:none">
+    <label data-i18n="docker_image">Image</label>
+    <select id="docker-image-select"></select>
+  </div>
+</div>
+
+<!-- Context menu -->
+<div class="context-menu" id="context-menu"></div>
+
+<!-- Hidden file upload input -->
+<input type="file" id="file-upload-input" multiple>
+
 <!-- Modal -->
 <div id="modal-overlay" class="modal-overlay" style="display:none">
   <div class="modal" onclick="event.stopPropagation()">
@@ -664,13 +773,25 @@ const I18N = {
     compile_log: "Compile Log",
     ready: "Ready",
     projects: "Projects",
-    new_project: "+ New Project",
+    new_project: "New Project",
     new_project_title: "New Project",
     project_name: "Project name",
+    project_path: "Project path",
+    open_folder: "Open Folder",
+    open_folder_title: "Open Folder",
+    select_this_folder: "Select This Folder",
+    remove_project: "Remove Project",
+    remove_project_title: "Remove Project",
+    remove_project_confirm: "Remove \"{name}\" from the project list?",
+    delete_files_too: "Also delete project files from disk",
+    remove: "Remove",
+    parent_dir: "Parent directory",
     create: "Create",
     cancel: "Cancel",
     new_file_title: "New File",
+    new_folder_title: "New Folder",
     filename: "filename.tex",
+    foldername: "folder-name",
     git_commit_title: "Git Commit",
     commit_message: "Commit message",
     saved: "Saved",
@@ -684,6 +805,20 @@ const I18N = {
     loading_pdf: "Loading PDF...",
     pdf_error: "Failed to load PDF",
     pages: "page(s)",
+    search_files: "Search files...",
+    rename: "Rename",
+    delete: "Delete",
+    new_file_here: "New file here",
+    new_folder_here: "New folder here",
+    upload_here: "Upload here",
+    download: "Download",
+    rename_title: "Rename",
+    new_name: "New name",
+    confirm_delete: "Delete \"{name}\"?",
+    deleted: "Deleted",
+    renamed: "Renamed",
+    uploaded: "Uploaded {n} file(s)",
+    open: "Open",
   },
   zh: {
     compile: "编译",
@@ -703,13 +838,25 @@ const I18N = {
     compile_log: "编译日志",
     ready: "就绪",
     projects: "项目",
-    new_project: "+ 新建项目",
+    new_project: "新建项目",
     new_project_title: "新建项目",
     project_name: "项目名称",
+    project_path: "项目路径",
+    open_folder: "打开文件夹",
+    open_folder_title: "打开文件夹",
+    select_this_folder: "选择此文件夹",
+    remove_project: "移除项目",
+    remove_project_title: "移除项目",
+    remove_project_confirm: "从项目列表中移除 \"{name}\"？",
+    delete_files_too: "同时从磁盘删除项目文件",
+    remove: "移除",
+    parent_dir: "上级目录",
     create: "创建",
     cancel: "取消",
     new_file_title: "新建文件",
+    new_folder_title: "新建文件夹",
     filename: "文件名.tex",
+    foldername: "文件夹名称",
     git_commit_title: "Git 提交",
     commit_message: "提交信息",
     saved: "已保存",
@@ -723,10 +870,24 @@ const I18N = {
     loading_pdf: "加载 PDF...",
     pdf_error: "PDF 加载失败",
     pages: "页",
+    search_files: "搜索文件...",
+    rename: "重命名",
+    delete: "删除",
+    new_file_here: "在此新建文件",
+    new_folder_here: "在此新建文件夹",
+    upload_here: "上传到此处",
+    download: "下载",
+    rename_title: "重命名",
+    new_name: "新名称",
+    confirm_delete: "删除 \"{name}\"？",
+    deleted: "已删除",
+    renamed: "已重命名",
+    uploaded: "已上传 {n} 个文件",
+    open: "打开",
   },
 };
 
-let currentLang = localStorage.getItem("texlive-web-lang") || "en";
+let currentLang = localStorage.getItem("tinyleaf-lang") || "en";
 
 function t(key) { return I18N[currentLang]?.[key] || I18N.en[key] || key; }
 
@@ -741,7 +902,7 @@ function applyI18n() {
 
 function setLang(lang) {
   currentLang = lang;
-  localStorage.setItem("texlive-web-lang", lang);
+  localStorage.setItem("tinyleaf-lang", lang);
   document.getElementById("lang-select").value = lang;
   applyI18n();
 }
@@ -794,7 +955,7 @@ const THEMES = {
   },
 };
 
-let currentTheme = localStorage.getItem("texlive-web-theme") || "light";
+let currentTheme = localStorage.getItem("tinyleaf-theme") || "light";
 
 function setTheme(name) {
   const vars = THEMES[name];
@@ -802,7 +963,7 @@ function setTheme(name) {
   const root = document.documentElement;
   for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
   currentTheme = name;
-  localStorage.setItem("texlive-web-theme", name);
+  localStorage.setItem("tinyleaf-theme", name);
   document.getElementById("theme-select").value = name;
 }
 
@@ -854,6 +1015,7 @@ const S = {
   projectName: null,
   currentFile: null,
   files: [],
+  fileTree: [],
   modified: new Set(),
   editorView: null,
   compiling: false,
@@ -912,7 +1074,9 @@ async function init() {
   }
 
   setupKeybindings();
-  setupSettingsDropdown();
+  setupSettingsPopup();
+  setupFileSearch();
+  setupUpload();
   setStatus(t("ready"));
 
   // Reveal UI
@@ -922,17 +1086,22 @@ async function init() {
   setTimeout(() => overlay.remove(), 300);
 }
 
-// ── Settings dropdown ──
-function setupSettingsDropdown() {
+// ── Settings popup (bottom-left) ──
+function setupSettingsPopup() {
   const btn = document.getElementById("btn-settings");
-  const menu = document.getElementById("settings-menu");
+  const popup = document.getElementById("settings-popup");
 
   btn.onclick = (e) => {
     e.stopPropagation();
-    menu.classList.toggle("open");
+    popup.classList.toggle("open");
+    closeContextMenu();
   };
-  document.addEventListener("click", () => menu.classList.remove("open"));
-  menu.onclick = (e) => e.stopPropagation();
+  document.addEventListener("click", (e) => {
+    if (!popup.contains(e.target) && e.target !== btn) {
+      popup.classList.remove("open");
+    }
+  });
+  popup.onclick = (e) => e.stopPropagation();
 
   document.getElementById("lang-select").onchange = (e) => setLang(e.target.value);
 
@@ -955,7 +1124,6 @@ async function loadDockerImages() {
       opt.textContent = img.replace("oaklight/texlive:", "");
       sel.appendChild(opt);
     }
-    // Select current image or first available
     if (images.includes(S.dockerImage)) {
       sel.value = S.dockerImage;
     } else if (images.length > 0) {
@@ -971,6 +1139,242 @@ async function loadDockerImages() {
 }
 
 // ══════════════════════════════════════════
+// File Search
+// ══════════════════════════════════════════
+function setupFileSearch() {
+  const input = document.getElementById("file-search-input");
+  input.addEventListener("input", () => {
+    renderFileTree(input.value.trim().toLowerCase());
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      input.value = "";
+      document.getElementById("file-search-box").classList.remove("open");
+      renderFileTree();
+    }
+  });
+}
+
+function toggleFileSearch() {
+  const box = document.getElementById("file-search-box");
+  const input = document.getElementById("file-search-input");
+  box.classList.toggle("open");
+  if (box.classList.contains("open")) {
+    input.focus();
+  } else {
+    input.value = "";
+    renderFileTree();
+  }
+}
+
+// ══════════════════════════════════════════
+// File Upload
+// ══════════════════════════════════════════
+let uploadTargetDir = "";
+
+function setupUpload() {
+  const input = document.getElementById("file-upload-input");
+  input.addEventListener("change", async () => {
+    if (!input.files.length || !S.projectName) return;
+    const formData = new FormData();
+    if (uploadTargetDir) formData.append("target_dir", uploadTargetDir);
+    for (const file of input.files) formData.append("file", file);
+
+    try {
+      const resp = await fetch(`/api/projects/${enc(S.projectName)}/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Upload failed");
+      setStatus(t("uploaded").replace("{n}", data.count));
+      await refreshFiles();
+    } catch (err) {
+      setStatus(`Upload error: ${err.message}`);
+    }
+    input.value = "";
+    uploadTargetDir = "";
+  });
+}
+
+function triggerUpload(targetDir = "") {
+  uploadTargetDir = targetDir;
+  document.getElementById("file-upload-input").click();
+}
+
+// ══════════════════════════════════════════
+// Context Menu
+// ══════════════════════════════════════════
+function closeContextMenu() {
+  document.getElementById("context-menu").classList.remove("open");
+}
+
+function showContextMenu(e, items) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const menu = document.getElementById("context-menu");
+  menu.innerHTML = "";
+  for (const item of items) {
+    if (item === "sep") {
+      const sep = document.createElement("div");
+      sep.className = "context-menu-sep";
+      menu.appendChild(sep);
+      continue;
+    }
+    const div = document.createElement("div");
+    div.className = "context-menu-item" + (item.danger ? " danger" : "");
+    div.textContent = item.label;
+    div.onclick = () => { closeContextMenu(); item.action(); };
+    menu.appendChild(div);
+  }
+
+  // Position the menu
+  menu.style.left = e.clientX + "px";
+  menu.style.top = e.clientY + "px";
+  menu.classList.add("open");
+
+  // Adjust if overflows
+  requestAnimationFrame(() => {
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) menu.style.left = (window.innerWidth - rect.width - 4) + "px";
+    if (rect.bottom > window.innerHeight) menu.style.top = (window.innerHeight - rect.height - 4) + "px";
+  });
+}
+
+document.addEventListener("click", closeContextMenu);
+document.addEventListener("contextmenu", (e) => {
+  // Close any open context menu when right-clicking elsewhere
+  const menu = document.getElementById("context-menu");
+  if (menu.classList.contains("open") && !menu.contains(e.target)) {
+    closeContextMenu();
+  }
+});
+
+function fileContextMenu(e, node) {
+  const items = [];
+  if (node.type === "file") {
+    items.push({ label: t("open"), action: () => openFile(node.path) });
+    items.push("sep");
+  }
+  items.push({ label: t("rename"), action: () => showRenameModal(node) });
+
+  if (node.type === "dir") {
+    items.push("sep");
+    items.push({ label: t("new_file_here"), action: () => showNewFileInDirModal(node.path) });
+    items.push({ label: t("new_folder_here"), action: () => showNewFolderInDirModal(node.path) });
+    items.push({ label: t("upload_here"), action: () => triggerUpload(node.path) });
+  }
+
+  if (node.type === "file") {
+    items.push({ label: t("download"), action: () => downloadFile(node.path) });
+  }
+
+  items.push("sep");
+  items.push({ label: t("delete"), danger: true, action: () => confirmDelete(node) });
+
+  showContextMenu(e, items);
+}
+
+function showRenameModal(node) {
+  const oldName = node.name;
+  showModal(t("rename_title"), `<input id="inp-rename" value="${esc(oldName)}" autofocus>`, [
+    { label: t("cancel"), action: closeModal },
+    { label: t("rename"), primary: true, action: async () => {
+      const newName = document.getElementById("inp-rename").value.trim();
+      if (!newName || newName === oldName) { closeModal(); return; }
+      const parentDir = node.path.includes("/") ? node.path.substring(0, node.path.lastIndexOf("/")) : "";
+      const newPath = parentDir ? parentDir + "/" + newName : newName;
+      try {
+        await api("POST", `/api/projects/${enc(S.projectName)}/rename`, { old_path: node.path, new_path: newPath });
+        closeModal();
+        setStatus(`${t("renamed")}: ${newName}`);
+        await refreshFiles();
+        if (S.currentFile === node.path) {
+          S.currentFile = newPath;
+          await openFile(newPath);
+        }
+      } catch (err) {
+        setStatus(`Rename error: ${err.message}`);
+      }
+    }},
+  ]);
+  setTimeout(() => {
+    const inp = document.getElementById("inp-rename");
+    if (inp) { inp.focus(); inp.select(); }
+  }, 50);
+}
+
+function confirmDelete(node) {
+  const msg = t("confirm_delete").replace("{name}", node.name);
+  showModal(t("delete"), `<p style="margin-bottom:14px">${esc(msg)}</p>`, [
+    { label: t("cancel"), action: closeModal },
+    { label: t("delete"), primary: true, action: async () => {
+      try {
+        await api("DELETE", `/api/projects/${enc(S.projectName)}/files/${enc(node.path)}`);
+        closeModal();
+        setStatus(`${t("deleted")}: ${node.name}`);
+        if (S.currentFile === node.path) S.currentFile = null;
+        await refreshFiles();
+      } catch (err) {
+        setStatus(`Delete error: ${err.message}`);
+      }
+    }},
+  ]);
+}
+
+function downloadFile(filePath) {
+  const url = `/api/projects/${enc(S.projectName)}/files/${enc(filePath)}`;
+  // Read and download via blob
+  fetch(url).then(r => r.json()).then(data => {
+    const blob = new Blob([data.content], { type: "text/plain;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filePath.split("/").pop();
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+}
+
+function showNewFileInDirModal(dirPath) {
+  showModal(t("new_file_title"), `<input id="inp-newfile" placeholder="${t("filename")}" autofocus>`, [
+    { label: t("cancel"), action: closeModal },
+    { label: t("create"), primary: true, action: async () => {
+      const fname = document.getElementById("inp-newfile").value.trim();
+      if (!fname) return;
+      const fullPath = dirPath ? dirPath + "/" + fname : fname;
+      await api("PUT", `/api/projects/${enc(S.projectName)}/files/${enc(fullPath)}`, { content: "" });
+      closeModal();
+      expandedDirs.add(dirPath);
+      await refreshFiles();
+      await openFile(fullPath);
+    }},
+  ]);
+  setTimeout(() => document.getElementById("inp-newfile")?.focus(), 50);
+}
+
+function showNewFolderInDirModal(dirPath) {
+  showModal(t("new_folder_title"), `<input id="inp-newfolder" placeholder="${t("foldername")}" autofocus>`, [
+    { label: t("cancel"), action: closeModal },
+    { label: t("create"), primary: true, action: async () => {
+      const fname = document.getElementById("inp-newfolder").value.trim();
+      if (!fname) return;
+      const fullPath = dirPath ? dirPath + "/" + fname : fname;
+      try {
+        await api("POST", `/api/projects/${enc(S.projectName)}/mkdir`, { path: fullPath });
+        closeModal();
+        expandedDirs.add(dirPath);
+        expandedDirs.add(fullPath);
+        await refreshFiles();
+      } catch (err) {
+        setStatus(`Error: ${err.message}`);
+      }
+    }},
+  ]);
+  setTimeout(() => document.getElementById("inp-newfolder")?.focus(), 50);
+}
+
+// ══════════════════════════════════════════
 // Project List (multi-project)
 // ══════════════════════════════════════════
 async function showProjectList() {
@@ -983,31 +1387,142 @@ async function showProjectList() {
 
   for (const p of projects) {
     const card = document.createElement("div");
-    card.className = "project-card";
-    card.innerHTML = `<h3>${esc(p.name)}</h3><div class="meta">${p.git ? "git" : ""}</div>`;
-    card.onclick = () => openProject(p.name);
+    card.className = "project-card" + (p.exists === false ? " stale" : "");
+    card.innerHTML = `<h3>${esc(p.name)}</h3>`
+      + `<div class="project-path">${esc(p.path || "")}</div>`
+      + `<div class="meta">${p.git ? "git" : ""}</div>`
+      + `<button class="remove-btn" title="${t("remove_project")}"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+    if (p.exists !== false) {
+      card.onclick = (e) => { if (!e.target.closest(".remove-btn")) openProject(p.name); };
+    }
+    card.querySelector(".remove-btn").onclick = (e) => { e.stopPropagation(); showRemoveProjectModal(p.name); };
     grid.appendChild(card);
   }
 
+  // "Open Folder" card
+  const openCard = document.createElement("div");
+  openCard.className = "project-card create-new";
+  openCard.innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>${t("open_folder")}`;
+  openCard.onclick = showOpenFolderModal;
+  grid.appendChild(openCard);
+
+  // "New Project" card
   const newCard = document.createElement("div");
   newCard.className = "project-card create-new";
-  newCard.textContent = t("new_project");
+  newCard.innerHTML = `<svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>${t("new_project")}`;
   newCard.onclick = showCreateProjectModal;
   grid.appendChild(newCard);
 }
 
 function showCreateProjectModal() {
-  showModal(t("new_project_title"), `<input id="inp-project" placeholder="${t("project_name")}" autofocus>`, [
-    { label: t("cancel"), action: closeModal },
-    { label: t("create"), primary: true, action: async () => {
-      const name = document.getElementById("inp-project").value.trim();
-      if (!name) return;
-      await api("POST", "/api/projects", { name });
-      closeModal();
-      showProjectList();
-    }},
-  ]);
-  setTimeout(() => document.getElementById("inp-project")?.focus(), 50);
+  showModal(t("new_project_title"),
+    `<input id="inp-project-name" placeholder="${t("project_name")}" autofocus>`
+    + `<div class="dir-browser" id="create-dir-browser"></div>`,
+    [
+      { label: t("cancel"), action: closeModal },
+      { label: t("create"), primary: true, action: async () => {
+        const name = document.getElementById("inp-project-name").value.trim();
+        const path = document.querySelector("#create-dir-browser .dir-path")?.textContent || "";
+        if (!name) return;
+        if (!path) return;
+        await api("POST", "/api/projects", { name, path });
+        closeModal();
+        showProjectList();
+      }},
+    ]);
+  loadDirBrowser("create-dir-browser");
+  setTimeout(() => document.getElementById("inp-project-name")?.focus(), 50);
+}
+
+function showOpenFolderModal() {
+  showModal(t("open_folder_title"),
+    `<div class="dir-browser" id="open-dir-browser"></div>`
+    + `<input id="inp-folder-name" placeholder="${t("project_name")} (optional)" style="margin-bottom:0">`,
+    [
+      { label: t("cancel"), action: closeModal },
+      { label: t("select_this_folder"), primary: true, action: async () => {
+        const path = document.querySelector("#open-dir-browser .dir-path")?.textContent || "";
+        if (!path) return;
+        const customName = document.getElementById("inp-folder-name").value.trim();
+        const body = { path };
+        if (customName) body.name = customName;
+        try {
+          await api("POST", "/api/projects/register", body);
+          closeModal();
+          showProjectList();
+        } catch (err) {
+          setStatus(`Error: ${err.message}`);
+        }
+      }},
+    ]);
+  loadDirBrowser("open-dir-browser");
+}
+
+function showRemoveProjectModal(name) {
+  const msg = t("remove_project_confirm").replace("{name}", name);
+  showModal(t("remove_project_title"),
+    `<p style="margin-bottom:14px">${esc(msg)}</p>`
+    + `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">`
+    + `<input type="checkbox" id="chk-delete-files"> ${t("delete_files_too")}</label>`,
+    [
+      { label: t("cancel"), action: closeModal },
+      { label: t("remove"), primary: true, action: async () => {
+        const deleteFiles = document.getElementById("chk-delete-files").checked;
+        await api("DELETE", `/api/projects/${enc(name)}`, { delete_files: deleteFiles });
+        closeModal();
+        showProjectList();
+      }},
+    ]);
+}
+
+// ── Directory Browser ──
+async function loadDirBrowser(containerId, startPath) {
+  const container = document.getElementById(containerId);
+  const path = startPath || "~";
+  const data = await api("GET", `/api/fs/browse?path=${encodeURIComponent(path)}`);
+  renderDirBrowser(containerId, data.path, data.dirs);
+}
+
+function renderDirBrowser(containerId, currentPath, dirs) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = `<div class="dir-path">${esc(currentPath)}</div><div class="dir-list"></div>`;
+  const list = container.querySelector(".dir-list");
+
+  // Parent directory entry
+  const parentPath = currentPath.replace(/\/[^/]+\/?$/, "") || "/";
+  if (currentPath !== "/") {
+    const parentItem = document.createElement("div");
+    parentItem.className = "dir-item parent-dir";
+    parentItem.innerHTML = `<svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg> ..`;
+    parentItem.onclick = () => navigateDir(containerId, parentPath);
+    list.appendChild(parentItem);
+  }
+
+  for (const d of dirs) {
+    const item = document.createElement("div");
+    item.className = "dir-item";
+    item.innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>${esc(d)}`;
+    const fullPath = currentPath === "/" ? "/" + d : currentPath + "/" + d;
+    item.onclick = () => navigateDir(containerId, fullPath);
+    list.appendChild(item);
+  }
+
+  if (dirs.length === 0 && currentPath === "/") {
+    const empty = document.createElement("div");
+    empty.className = "dir-item";
+    empty.style.color = "var(--text-dim)";
+    empty.textContent = "(empty)";
+    list.appendChild(empty);
+  }
+}
+
+async function navigateDir(containerId, path) {
+  try {
+    const data = await api("GET", `/api/fs/browse?path=${encodeURIComponent(path)}`);
+    renderDirBrowser(containerId, data.path, data.dirs);
+  } catch (err) {
+    setStatus(`Error: ${err.message}`);
+  }
 }
 
 // ══════════════════════════════════════════
@@ -1058,15 +1573,31 @@ async function refreshFiles() {
 // Track which dirs are expanded (persisted in memory)
 const expandedDirs = new Set();
 
-function renderFileTree() {
+function renderFileTree(searchFilter = "") {
   const container = document.getElementById("file-tree");
   container.innerHTML = "";
-  renderTreeNodes(S.fileTree || [], container, 0);
+  if (searchFilter) {
+    renderFilteredFiles(searchFilter, container);
+  } else {
+    renderTreeNodes(S.fileTree || [], container, 0);
+  }
+}
+
+function renderFilteredFiles(query, parent) {
+  for (const filePath of S.files) {
+    if (!filePath.toLowerCase().includes(query)) continue;
+    const div = document.createElement("div");
+    div.className = "file-item" + (filePath === S.currentFile ? " active" : "");
+    div.textContent = filePath;
+    div.title = filePath;
+    div.onclick = () => openFile(filePath);
+    parent.appendChild(div);
+  }
 }
 
 function renderTreeNodes(nodes, parent, depth) {
   for (const node of nodes) {
-    if (node.name === ".texlive-web.json") continue;
+    if (node.name === ".tinyleaf.json") continue;
 
     if (node.type === "dir") {
       const dirEl = document.createElement("div");
@@ -1077,12 +1608,13 @@ function renderTreeNodes(nodes, parent, depth) {
       header.style.paddingLeft = (14 + depth * 16) + "px";
 
       const isOpen = expandedDirs.has(node.path);
-      header.innerHTML = `<span class="arrow ${isOpen ? "open" : ""}">&#9654;</span> ${esc(node.name)}`;
+      header.innerHTML = `<span class="arrow ${isOpen ? "open" : ""}"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></span> ${esc(node.name)}`;
       header.onclick = () => {
         if (expandedDirs.has(node.path)) expandedDirs.delete(node.path);
         else expandedDirs.add(node.path);
         renderFileTree();
       };
+      header.oncontextmenu = (e) => fileContextMenu(e, node);
       dirEl.appendChild(header);
 
       const childrenEl = document.createElement("div");
@@ -1100,6 +1632,7 @@ function renderTreeNodes(nodes, parent, depth) {
       div.textContent = node.name;
       div.title = node.path;
       div.onclick = () => openFile(node.path);
+      div.oncontextmenu = (e) => fileContextMenu(e, node);
       parent.appendChild(div);
     }
   }
@@ -1184,7 +1717,6 @@ async function compile() {
 
   try {
     const body = { engine };
-    // Pass docker image override if changed
     if (S.useDocker) body.docker_image = S.dockerImage;
 
     const result = await api("POST", `/api/projects/${enc(S.projectName)}/compile`, body);
@@ -1303,7 +1835,7 @@ async function refreshGit() {
     document.getElementById("git-panel").style.display = "";
     document.getElementById("git-branch").textContent =
       `${st.branch || "???"}` +
-      (st.ahead ? ` \u21915${st.ahead}` : "") +
+      (st.ahead ? ` \u2191${st.ahead}` : "") +
       (st.behind ? ` \u2193${st.behind}` : "");
 
     const fd = document.getElementById("git-files");
@@ -1342,21 +1874,14 @@ async function doPush() {
 }
 
 // ══════════════════════════════════════════
-// New File
+// New File / Folder (root level)
 // ══════════════════════════════════════════
 function showNewFileModal() {
-  showModal(t("new_file_title"), `<input id="inp-newfile" placeholder="${t("filename")}" autofocus>`, [
-    { label: t("cancel"), action: closeModal },
-    { label: t("create"), primary: true, action: async () => {
-      const fname = document.getElementById("inp-newfile").value.trim();
-      if (!fname) return;
-      await api("PUT", `/api/projects/${enc(S.projectName)}/files/${enc(fname)}`, { content: "" });
-      closeModal();
-      await refreshFiles();
-      await openFile(fname);
-    }},
-  ]);
-  setTimeout(() => document.getElementById("inp-newfile")?.focus(), 50);
+  showNewFileInDirModal("");
+}
+
+function showNewFolderModal() {
+  showNewFolderInDirModal("");
 }
 
 // ══════════════════════════════════════════
@@ -1390,7 +1915,7 @@ function setupKeybindings() {
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); compile(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "C") { e.preventDefault(); doCommit(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "P") { e.preventDefault(); doPush(); }
-    if (e.key === "Escape") closeModal();
+    if (e.key === "Escape") { closeModal(); closeContextMenu(); }
   });
 }
 
@@ -1404,6 +1929,9 @@ document.getElementById("btn-commit").onclick = doCommit;
 document.getElementById("btn-push").onclick = doPush;
 document.getElementById("btn-log-toggle").onclick = toggleLog;
 document.getElementById("btn-new-file").onclick = showNewFileModal;
+document.getElementById("btn-new-folder").onclick = showNewFolderModal;
+document.getElementById("btn-search-file").onclick = toggleFileSearch;
+document.getElementById("btn-upload-file").onclick = () => triggerUpload("");
 document.getElementById("log-header").onclick = toggleLog;
 document.getElementById("btn-pdf-refresh").onclick = () => {
   if (S.projectName) {

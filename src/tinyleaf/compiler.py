@@ -1,4 +1,4 @@
-"""Compilation backend for texlive-web.
+"""Compilation backend for tinyleaf.
 
 Supports local latexmk and Docker-based compilation.
 """

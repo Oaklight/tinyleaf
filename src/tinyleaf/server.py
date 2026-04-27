@@ -1,4 +1,4 @@
-"""HTTP server wrapper for texlive-web."""
+"""HTTP server wrapper for tinyleaf."""
 
 import json
 import os
@@ -32,6 +32,8 @@ class TexliveHandler(BaseHTTPRequestHandler):
             self._handle_api("list_docker_images")
         elif path == "/api/projects":
             self._handle_api("list_projects")
+        elif path.startswith("/api/fs/browse"):
+            self._handle_api("browse_filesystem")
         elif path.startswith("/api/projects/"):
             self._route_project_get(path, parsed.query)
         else:
@@ -42,6 +44,8 @@ class TexliveHandler(BaseHTTPRequestHandler):
 
         if path == "/api/projects":
             self._handle_api("create_project")
+        elif path == "/api/projects/register":
+            self._handle_api("register_project")
         elif path.startswith("/api/projects/"):
             self._route_project_post(path)
         else:
@@ -118,6 +122,12 @@ class TexliveHandler(BaseHTTPRequestHandler):
             self._handle_api("compile", name=name)
         elif sub == "clean":
             self._handle_api("clean", name=name)
+        elif sub == "mkdir":
+            self._handle_api("mkdir", name=name)
+        elif sub == "rename":
+            self._handle_api("rename_path", name=name)
+        elif sub == "upload":
+            self._handle_api("upload", name=name)
         elif sub == "git/commit":
             self._handle_api("git_commit", name=name)
         elif sub == "git/push":
@@ -152,7 +162,7 @@ class TexliveHandler(BaseHTTPRequestHandler):
     # ── Dispatch to handlers ──
 
     def _handle_api(self, action, **kwargs):
-        from texlive_web.handlers import handle_request
+        from tinyleaf.handlers import handle_request
 
         handle_request(self, action, **kwargs)
 

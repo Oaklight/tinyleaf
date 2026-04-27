@@ -1,4 +1,4 @@
-"""CLI entry point for texlive-web."""
+"""CLI entry point for tinyleaf."""
 
 import argparse
 import os
@@ -6,12 +6,15 @@ import shutil
 import sys
 import webbrowser
 
-from texlive_web.server import run_server
+from tinyleaf import registry
+from tinyleaf.server import run_server
+
+DEFAULT_CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", "tinyleaf")
 
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="texlive-web",
+        prog="tinyleaf",
         description="Lightweight web-based LaTeX editor",
     )
     parser.add_argument(
@@ -22,7 +25,13 @@ def main():
     parser.add_argument(
         "--projects-dir",
         metavar="DIR",
-        help="Multi-project mode: directory containing project folders",
+        help="Legacy: migrate subdirs into registry, then use registry mode",
+    )
+    parser.add_argument(
+        "--config-dir",
+        metavar="DIR",
+        default=DEFAULT_CONFIG_DIR,
+        help=f"Config directory for project registry (default: {DEFAULT_CONFIG_DIR})",
     )
     parser.add_argument(
         "--docker",
@@ -53,11 +62,9 @@ def main():
 
     args = parser.parse_args()
 
-    # Validate: must specify exactly one of project_path or --projects-dir
+    # Validate
     if args.project_path and args.projects_dir:
         parser.error("Cannot specify both project_path and --projects-dir")
-    if not args.project_path and not args.projects_dir:
-        parser.error("Must specify either project_path or --projects-dir")
 
     # Determine mode
     if args.project_path:
@@ -66,12 +73,20 @@ def main():
         if not os.path.isdir(project_path):
             print(f"Error: '{project_path}' is not a directory", file=sys.stderr)
             sys.exit(1)
-        projects_dir = None
+        config_dir = None
     else:
         mode = "multi"
-        projects_dir = os.path.abspath(args.projects_dir)
-        os.makedirs(projects_dir, exist_ok=True)
+        config_dir = os.path.abspath(args.config_dir)
+        registry.ensure_config_dir(config_dir)
         project_path = None
+
+        # Backward compat: migrate --projects-dir subdirs into registry
+        if args.projects_dir:
+            projects_dir = os.path.abspath(args.projects_dir)
+            if os.path.isdir(projects_dir):
+                count = _migrate_projects_dir(config_dir, projects_dir)
+                if count:
+                    print(f"  Migrated {count} project(s) from {projects_dir}")
 
     # Check compilation backend
     use_docker = args.docker
@@ -89,7 +104,7 @@ def main():
     config = {
         "mode": mode,
         "project_path": project_path,
-        "projects_dir": projects_dir,
+        "config_dir": config_dir,
         "use_docker": use_docker,
         "docker_image": args.image,
         "host": args.host,
@@ -97,7 +112,7 @@ def main():
     }
 
     url = f"http://{args.host}:{args.port}"
-    print(f"Starting texlive-web ({mode} mode)")
+    print(f"Starting tinyleaf ({mode} mode)")
     if use_docker:
         print(f"  Compiler: Docker ({args.image})")
     else:
@@ -105,13 +120,28 @@ def main():
     if mode == "single":
         print(f"  Project:  {project_path}")
     else:
-        print(f"  Projects: {projects_dir}")
+        print(f"  Config:   {config_dir}")
     print(f"  URL:      {url}")
 
     if not args.no_browser:
         webbrowser.open(url)
 
     run_server(config)
+
+
+def _migrate_projects_dir(config_dir, projects_dir):
+    """Migrate subdirectories of a projects dir into the registry."""
+    count = 0
+    for entry in sorted(os.listdir(projects_dir)):
+        full = os.path.join(projects_dir, entry)
+        if not os.path.isdir(full) or entry.startswith("."):
+            continue
+        try:
+            registry.register_project(config_dir, entry, full)
+            count += 1
+        except ValueError:
+            pass  # name collision, skip
+    return count
 
 
 if __name__ == "__main__":

@@ -1,14 +1,14 @@
-"""API request handlers for texlive-web."""
+"""API request handlers for tinyleaf."""
 
 import json
 import os
 import subprocess
 import time
 
-from texlive_web import compiler, git_ops
+from tinyleaf import compiler, git_ops, registry
 
 # Project config file name
-CONFIG_FILE = ".texlive-web.json"
+CONFIG_FILE = ".tinyleaf.json"
 
 
 def handle_request(handler, action, **kwargs):
@@ -18,11 +18,16 @@ def handle_request(handler, action, **kwargs):
         "list_docker_images": _list_docker_images,
         "list_projects": _list_projects,
         "create_project": _create_project,
+        "register_project": _register_project,
         "delete_project": _delete_project,
+        "browse_filesystem": _browse_filesystem,
         "list_files": _list_files,
         "read_file": _read_file,
         "write_file": _write_file,
         "delete_file": _delete_file,
+        "mkdir": _mkdir,
+        "rename_path": _rename_path,
+        "upload": _upload,
         "get_config": _get_config,
         "put_config": _put_config,
         "compile": _compile,
@@ -57,16 +62,19 @@ def _get_project_dir(handler, name):
     if config["mode"] == "single":
         return config["project_path"]
 
-    # Multi-project mode
-    project_dir = os.path.join(config["projects_dir"], name)
-    if not os.path.isdir(project_dir):
+    # Multi-project mode: look up in registry
+    project_dir = registry.get_project_path(config["config_dir"], name)
+    if not project_dir:
         handler.send_json({"error": f"Project not found: {name}"}, status=404)
+        return None
+    if not os.path.isdir(project_dir):
+        handler.send_json({"error": f"Project directory missing: {project_dir}"}, status=404)
         return None
     return project_dir
 
 
 def _read_project_config(project_dir):
-    """Read .texlive-web.json from a project directory."""
+    """Read .tinyleaf.json from a project directory."""
     config_path = os.path.join(project_dir, CONFIG_FILE)
     if os.path.exists(config_path):
         with open(config_path) as f:
@@ -75,7 +83,7 @@ def _read_project_config(project_dir):
 
 
 def _write_project_config(project_dir, config_data):
-    """Write .texlive-web.json to a project directory."""
+    """Write .tinyleaf.json to a project directory."""
     config_path = os.path.join(project_dir, CONFIG_FILE)
     with open(config_path, "w") as f:
         json.dump(config_data, f, indent=2, ensure_ascii=False)
@@ -158,23 +166,16 @@ def _list_projects(handler):
                 {
                     "name": name,
                     "path": config["project_path"],
+                    "exists": True,
                     "git": git_ops.has_git(config["project_path"]),
                 }
             ]
         )
         return
 
-    projects_dir = config["projects_dir"]
-    projects = []
-    for entry in sorted(os.listdir(projects_dir)):
-        full = os.path.join(projects_dir, entry)
-        if os.path.isdir(full) and not entry.startswith("."):
-            projects.append(
-                {
-                    "name": entry,
-                    "git": git_ops.has_git(full),
-                }
-            )
+    projects = registry.list_projects(config["config_dir"])
+    for p in projects:
+        p["git"] = git_ops.has_git(p["path"]) if p["exists"] else False
     handler.send_json(projects)
 
 
@@ -186,24 +187,62 @@ def _create_project(handler):
 
     body = handler.read_json_body()
     name = body.get("name", "").strip()
+    path = body.get("path", "").strip()
+
     if not name or "/" in name or name.startswith("."):
         handler.send_json({"error": "Invalid project name"}, status=400)
         return
-
-    project_dir = os.path.join(config["projects_dir"], name)
-    if os.path.exists(project_dir):
-        handler.send_json({"error": "Project already exists"}, status=409)
+    if not path:
+        handler.send_json({"error": "Project path required"}, status=400)
         return
 
-    os.makedirs(project_dir)
+    path = os.path.abspath(path)
+    full_dir = os.path.join(path, name)
+
+    if os.path.exists(full_dir):
+        handler.send_json({"error": "Directory already exists"}, status=409)
+        return
+
+    os.makedirs(full_dir)
     # Create a default main.tex
-    main_tex = os.path.join(project_dir, "main.tex")
+    main_tex = os.path.join(full_dir, "main.tex")
     with open(main_tex, "w") as f:
         f.write(
             "\\documentclass{article}\n\n\\begin{document}\n\nHello, World!\n\n\\end{document}\n"
         )
 
-    handler.send_json({"name": name}, status=201)
+    try:
+        registry.register_project(config["config_dir"], name, full_dir)
+    except ValueError as e:
+        handler.send_json({"error": str(e)}, status=400)
+        return
+
+    handler.send_json({"name": name, "path": full_dir}, status=201)
+
+
+def _register_project(handler):
+    """Register an existing directory as a project."""
+    config = handler.config
+    if config["mode"] == "single":
+        handler.send_json({"error": "Cannot register projects in single mode"}, status=400)
+        return
+
+    body = handler.read_json_body()
+    path = body.get("path", "").strip()
+    if not path:
+        handler.send_json({"error": "Path required"}, status=400)
+        return
+
+    path = os.path.abspath(path)
+    name = body.get("name", "").strip() or os.path.basename(path)
+
+    try:
+        entry = registry.register_project(config["config_dir"], name, path)
+    except ValueError as e:
+        handler.send_json({"error": str(e)}, status=400)
+        return
+
+    handler.send_json({"name": name, "path": path, "added_at": entry["added_at"]}, status=201)
 
 
 def _delete_project(handler, name):
@@ -212,15 +251,43 @@ def _delete_project(handler, name):
         handler.send_json({"error": "Cannot delete project in single mode"}, status=400)
         return
 
-    project_dir = os.path.join(config["projects_dir"], name)
-    if not os.path.isdir(project_dir):
-        handler.send_json({"error": "Project not found"}, status=404)
+    body = handler.read_json_body()
+    delete_files = body.get("delete_files", False)
+
+    try:
+        registry.unregister_project(config["config_dir"], name, delete_files=delete_files)
+    except KeyError:
+        handler.send_json({"error": f"Project not found: {name}"}, status=404)
         return
 
-    import shutil
+    handler.send_json({"deleted": name, "files_deleted": delete_files})
 
-    shutil.rmtree(project_dir)
-    handler.send_json({"deleted": name})
+
+def _browse_filesystem(handler):
+    """List subdirectories of a given path for the folder picker."""
+    import urllib.parse
+
+    parsed = urllib.parse.urlparse(handler.path)
+    params = urllib.parse.parse_qs(parsed.query)
+    path = params.get("path", [os.path.expanduser("~")])[0]
+
+    if not os.path.isdir(path):
+        handler.send_json({"error": f"Not a directory: {path}"}, status=400)
+        return
+
+    entries = []
+    try:
+        for item in sorted(os.listdir(path)):
+            if item.startswith("."):
+                continue
+            full = os.path.join(path, item)
+            if os.path.isdir(full):
+                entries.append(item)
+    except PermissionError:
+        handler.send_json({"error": "Permission denied"}, status=403)
+        return
+
+    handler.send_json({"path": path, "dirs": entries})
 
 
 # ── Files ──
@@ -326,8 +393,153 @@ def _delete_file(handler, name, file_path):
         handler.send_json({"error": "File not found"}, status=404)
         return
 
-    os.remove(full_path)
+    import shutil
+
+    if os.path.isdir(full_path):
+        shutil.rmtree(full_path)
+    else:
+        os.remove(full_path)
     handler.send_json({"path": file_path, "deleted": True})
+
+
+def _mkdir(handler, name):
+    """Create a directory inside a project."""
+    project_dir = _get_project_dir(handler, name)
+    if not project_dir:
+        return
+
+    body = handler.read_json_body()
+    dir_path = body.get("path", "").strip()
+    if not dir_path:
+        handler.send_json({"error": "Directory path required"}, status=400)
+        return
+
+    full_path = os.path.join(project_dir, dir_path)
+    if not os.path.abspath(full_path).startswith(os.path.abspath(project_dir)):
+        handler.send_json({"error": "Access denied"}, status=403)
+        return
+
+    if os.path.exists(full_path):
+        handler.send_json({"error": "Path already exists"}, status=409)
+        return
+
+    os.makedirs(full_path, exist_ok=True)
+    handler.send_json({"path": dir_path, "created": True})
+
+
+def _rename_path(handler, name):
+    """Rename a file or directory inside a project."""
+    project_dir = _get_project_dir(handler, name)
+    if not project_dir:
+        return
+
+    body = handler.read_json_body()
+    old_path = body.get("old_path", "").strip()
+    new_path = body.get("new_path", "").strip()
+    if not old_path or not new_path:
+        handler.send_json({"error": "old_path and new_path required"}, status=400)
+        return
+
+    old_full = os.path.join(project_dir, old_path)
+    new_full = os.path.join(project_dir, new_path)
+    abs_project = os.path.abspath(project_dir)
+    if not os.path.abspath(old_full).startswith(abs_project) or not os.path.abspath(
+        new_full
+    ).startswith(abs_project):
+        handler.send_json({"error": "Access denied"}, status=403)
+        return
+
+    if not os.path.exists(old_full):
+        handler.send_json({"error": "Source not found"}, status=404)
+        return
+
+    if os.path.exists(new_full):
+        handler.send_json({"error": "Destination already exists"}, status=409)
+        return
+
+    os.makedirs(os.path.dirname(new_full), exist_ok=True)
+    os.rename(old_full, new_full)
+    handler.send_json({"old_path": old_path, "new_path": new_path, "renamed": True})
+
+
+def _upload(handler, name):
+    """Handle multipart file upload."""
+    project_dir = _get_project_dir(handler, name)
+    if not project_dir:
+        return
+
+    content_type = handler.headers.get("Content-Type", "")
+    if "multipart/form-data" not in content_type:
+        handler.send_json({"error": "Expected multipart/form-data"}, status=400)
+        return
+
+    # Parse boundary from content-type
+    boundary = None
+    for part in content_type.split(";"):
+        part = part.strip()
+        if part.startswith("boundary="):
+            boundary = part[9:].strip('"')
+            break
+
+    if not boundary:
+        handler.send_json({"error": "Missing boundary"}, status=400)
+        return
+
+    content_length = int(handler.headers.get("Content-Length", 0))
+    body = handler.rfile.read(content_length)
+
+    boundary_bytes = ("--" + boundary).encode()
+    parts = body.split(boundary_bytes)
+
+    uploaded = []
+    # Get target directory from query or default to root
+    target_dir = ""
+
+    for part in parts:
+        if not part or part == b"--\r\n" or part == b"--":
+            continue
+        if b"Content-Disposition:" not in part:
+            continue
+
+        # Parse headers and content
+        header_end = part.find(b"\r\n\r\n")
+        if header_end < 0:
+            continue
+        headers_raw = part[:header_end].decode("utf-8", errors="replace")
+        file_data = part[header_end + 4 :]
+        # Strip trailing \r\n
+        if file_data.endswith(b"\r\n"):
+            file_data = file_data[:-2]
+
+        # Check for target_dir field
+        if 'name="target_dir"' in headers_raw:
+            target_dir = file_data.decode("utf-8", errors="replace").strip()
+            continue
+
+        # Extract filename
+        filename = None
+        for line in headers_raw.split("\r\n"):
+            if "filename=" in line:
+                idx = line.index("filename=")
+                fname_raw = line[idx + 9 :].split(";")[0].strip('" ')
+                if fname_raw:
+                    filename = os.path.basename(fname_raw)
+                break
+
+        if not filename:
+            continue
+
+        rel_path = os.path.join(target_dir, filename) if target_dir else filename
+        full_path = os.path.join(project_dir, rel_path)
+        if not os.path.abspath(full_path).startswith(os.path.abspath(project_dir)):
+            continue
+
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "wb") as f:
+            f.write(file_data)
+        uploaded.append(rel_path)
+
+    handler.send_json({"uploaded": uploaded, "count": len(uploaded)})
 
 
 # ── Config ──

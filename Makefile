@@ -1,4 +1,4 @@
-IMAGE_NAME = oaklight/texlive-web
+IMAGE_NAME = oaklight/tinyleaf
 REGISTRY_MIRROR ?= docker.io
 
 BUILD_ARGS = --build-arg REGISTRY_MIRROR=$(REGISTRY_MIRROR)

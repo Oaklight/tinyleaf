@@ -1,4 +1,4 @@
-# texlive-web
+# tinyleaf
 
 [English Version](./README.md)
 
@@ -6,7 +6,7 @@
 
 ## 功能
 
-* **CLI 优先** — `pip install texlive-web && texlive-web /path` 即可开始编辑
+* **CLI 优先** — `pip install tinyleaf && tinyleaf /path` 即可开始编辑
 * **两种模式** — 单项目或多项目（类 Overleaf）
 * **两种编译后端** — 本地 `latexmk`（默认）或 Docker
 * **CodeMirror 6** 编辑器 + LaTeX 语法高亮
@@ -19,22 +19,22 @@
 ## 快速开始
 
 ```bash
-pip install texlive-web
+pip install tinyleaf
 
 # 单项目模式（本地编译）
-texlive-web /path/to/my-thesis
+tinyleaf /path/to/my-thesis
 
 # 单项目模式（Docker 编译）
-texlive-web /path/to/my-thesis --docker
+tinyleaf /path/to/my-thesis --docker
 
 # 多项目模式
-texlive-web --projects-dir /path/to/projects
+tinyleaf --projects-dir /path/to/projects
 ```
 
 ## 使用方法
 
 ```
-用法: texlive-web [-h] [--projects-dir DIR] [--docker] [--image IMAGE]
+用法: tinyleaf [-h] [--projects-dir DIR] [--docker] [--image IMAGE]
                   [--port PORT] [--host HOST] [--no-browser] [project_path]
 
 位置参数:

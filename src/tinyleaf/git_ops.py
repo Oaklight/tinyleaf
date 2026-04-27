@@ -1,4 +1,4 @@
-"""Git operations via subprocess for texlive-web."""
+"""Git operations via subprocess for tinyleaf."""
 
 import os
 import subprocess

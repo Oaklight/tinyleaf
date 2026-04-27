@@ -1,4 +1,4 @@
-# texlive-web
+# tinyleaf
 
 [中文版](./README_zh.md)
 
@@ -6,7 +6,7 @@ Lightweight web-based LaTeX editor powered by [TeX Live Docker images](https://g
 
 ## Features
 
-* **CLI-first** — `pip install texlive-web && texlive-web /path` to start editing
+* **CLI-first** — `pip install tinyleaf && tinyleaf /path` to start editing
 * **Two modes** — Single project or multi-project (Overleaf-like)
 * **Two compilation backends** — Local `latexmk` (default) or Docker
 * **CodeMirror 6** editor with LaTeX syntax highlighting
@@ -19,22 +19,22 @@ Lightweight web-based LaTeX editor powered by [TeX Live Docker images](https://g
 ## Quick Start
 
 ```bash
-pip install texlive-web
+pip install tinyleaf
 
 # Single project mode (local compilation)
-texlive-web /path/to/my-thesis
+tinyleaf /path/to/my-thesis
 
 # Single project mode (Docker compilation)
-texlive-web /path/to/my-thesis --docker
+tinyleaf /path/to/my-thesis --docker
 
 # Multi-project mode
-texlive-web --projects-dir /path/to/projects
+tinyleaf --projects-dir /path/to/projects
 ```
 
 ## Usage
 
 ```
-usage: texlive-web [-h] [--projects-dir DIR] [--docker] [--image IMAGE]
+usage: tinyleaf [-h] [--projects-dir DIR] [--docker] [--image IMAGE]
                    [--port PORT] [--host HOST] [--no-browser] [project_path]
 
 positional arguments:
