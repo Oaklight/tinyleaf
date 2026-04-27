@@ -28,6 +28,7 @@ def handle_request(handler, action, **kwargs):
         "put_settings": _put_settings,
         "list_files": _list_files,
         "read_file": _read_file,
+        "check_file": _check_file,
         "write_file": _write_file,
         "delete_file": _delete_file,
         "mkdir": _mkdir,
@@ -432,7 +433,9 @@ def _build_file_tree(base_dir, current_dir):
             children = _build_file_tree(base_dir, full)
             dirs_list.append({"name": item, "path": rel, "type": "dir", "children": children})
         else:
-            files_list.append({"name": item, "path": rel, "type": "file"})
+            files_list.append(
+                {"name": item, "path": rel, "type": "file", "mtime": os.path.getmtime(full)}
+            )
 
     return dirs_list + files_list
 
@@ -455,9 +458,29 @@ def _read_file(handler, name, file_path):
     try:
         with open(full_path, encoding="utf-8") as f:
             content = f.read()
-        handler.send_json({"path": file_path, "content": content})
+        handler.send_json(
+            {"path": file_path, "content": content, "mtime": os.path.getmtime(full_path)}
+        )
     except UnicodeDecodeError:
         handler.send_json({"error": "Binary file, cannot read as text"}, status=400)
+
+
+def _check_file(handler, name, file_path):
+    """Return mtime of a file without reading its content."""
+    project_dir = _get_project_dir(handler, name)
+    if not project_dir:
+        return
+
+    full_path = os.path.join(project_dir, file_path)
+    if not os.path.abspath(full_path).startswith(os.path.abspath(project_dir)):
+        handler.send_json({"error": "Access denied"}, status=403)
+        return
+
+    if not os.path.exists(full_path):
+        handler.send_json({"exists": False})
+        return
+
+    handler.send_json({"path": file_path, "mtime": os.path.getmtime(full_path)})
 
 
 def _write_file(handler, name, file_path):

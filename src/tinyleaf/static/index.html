@@ -822,6 +822,9 @@ const I18N = {
     docker_image: "Image",
     use_docker: "Docker",
     show_debian: "Show Debian",
+    file_changed_externally: "File changed externally",
+    reload: "Reload",
+    dismiss: "Dismiss",
     js_modules: "JS Modules",
     update: "Update",
     downloading: "Downloading...",
@@ -899,6 +902,9 @@ const I18N = {
     docker_image: "镜像",
     use_docker: "Docker",
     show_debian: "显示 Debian",
+    file_changed_externally: "文件已被外部修改",
+    reload: "重新加载",
+    dismiss: "忽略",
     js_modules: "JS 模块",
     update: "更新",
     downloading: "下载中...",
@@ -1113,6 +1119,7 @@ const S = {
   pdfDoc: null,
   autoSaveTimer: null,
   autoSaveInterval: 2000,
+  fileMtime: 0,
   useDocker: false,
   dockerImage: "oaklight/texlive:latest",
 };
@@ -1181,6 +1188,7 @@ async function init() {
   setupSettingsPopup();
   setupFileSearch();
   setupUpload();
+  startFileWatcher();
   setStatus(t("ready"));
 
   // Reveal UI
@@ -1850,6 +1858,8 @@ async function openFile(filePath) {
 
   const data = await api("GET", `/api/projects/${enc(S.projectName)}/files/${enc(filePath)}`);
   S.currentFile = filePath;
+  S.fileMtime = data.mtime || 0;
+  document.getElementById("reload-bar")?.remove();
 
   if (S.editorView) S.editorView.destroy();
 
@@ -1902,6 +1912,62 @@ async function saveCurrentFile() {
   renderFileTree();
   setStatus(`${t("saved")} ${S.currentFile}`);
 }
+
+// ══════════════════════════════════════════
+// File Change Detection
+// ══════════════════════════════════════════
+let _checkTimer = null;
+
+async function checkFileChanges() {
+  if (!S.projectName || !S.currentFile) return;
+  // Check current file mtime
+  try {
+    const info = await api("GET",
+      `/api/projects/${enc(S.projectName)}/check/${enc(S.currentFile)}`);
+    if (info.exists === false) return;
+    if (S.fileMtime && info.mtime > S.fileMtime) {
+      if (S.modified.has(S.currentFile)) {
+        showReloadPrompt();
+      } else {
+        await openFile(S.currentFile);
+      }
+    }
+  } catch {}
+  // Refresh file tree for new/deleted files
+  try {
+    await refreshFiles();
+    renderFileTree();
+  } catch {}
+}
+
+function showReloadPrompt() {
+  if (document.getElementById("reload-bar")) return;
+  const bar = document.createElement("div");
+  bar.id = "reload-bar";
+  bar.style.cssText = "background:var(--accent);color:#fff;padding:6px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px;border-radius:0";
+  bar.innerHTML = `<span>${t("file_changed_externally")}</span>
+    <span style="display:flex;gap:8px">
+      <button onclick="reloadCurrentFile()" style="cursor:pointer;background:rgba(255,255,255,0.2);border:none;color:#fff;padding:3px 10px;border-radius:4px">${t("reload")}</button>
+      <button onclick="this.closest('#reload-bar').remove()" style="cursor:pointer;background:rgba(255,255,255,0.2);border:none;color:#fff;padding:3px 10px;border-radius:4px">${t("dismiss")}</button>
+    </span>`;
+  const container = document.getElementById("editor-container");
+  container.parentElement.insertBefore(bar, container);
+}
+
+async function reloadCurrentFile() {
+  document.getElementById("reload-bar")?.remove();
+  S.modified.delete(S.currentFile);
+  await openFile(S.currentFile);
+}
+
+function startFileWatcher() {
+  if (_checkTimer) clearInterval(_checkTimer);
+  _checkTimer = setInterval(checkFileChanges, 3000);
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) checkFileChanges();
+});
 
 // ══════════════════════════════════════════
 // Compile

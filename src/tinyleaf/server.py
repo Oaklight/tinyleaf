@@ -130,6 +130,9 @@ class TexliveHandler(BaseHTTPRequestHandler):
         elif sub.startswith("files/"):
             file_path = urllib.parse.unquote(sub[6:])
             self._handle_api("read_file", name=name, file_path=file_path)
+        elif sub.startswith("check/"):
+            file_path = urllib.parse.unquote(sub[6:])
+            self._handle_api("check_file", name=name, file_path=file_path)
         elif sub == "config":
             self._handle_api("get_config", name=name)
         elif sub.startswith("compile/") and sub.endswith("/stream"):
