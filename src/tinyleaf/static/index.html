@@ -431,6 +431,7 @@ select:focus { border-color: var(--accent); outline: none; }
   gap: 16px;
 }
 #pdf-container canvas { box-shadow: 0 2px 12px rgba(0,0,0,0.15); border-radius: 2px; }
+#btn-pdf-hd.active { background: var(--accent); color: #fff; }
 
 #pdf-toolbar {
   display: flex;
@@ -831,6 +832,13 @@ select:focus { border-color: var(--accent); outline: none; }
             <div id="pdf-toolbar">
               <span id="pdf-status" data-i18n="no_pdf">No PDF</span>
               <span style="flex:1"></span>
+              <button class="sm" id="btn-pdf-zoom-out" title="Zoom out">−</button>
+              <span id="pdf-zoom-level" style="min-width:40px;text-align:center;font-size:11px">100%</span>
+              <button class="sm" id="btn-pdf-zoom-in" title="Zoom in">+</button>
+              <button class="sm" id="btn-pdf-zoom-fit" title="Fit width" data-i18n="fit">Fit</button>
+              <span class="toolbar-sep"></span>
+              <button class="sm" id="btn-pdf-hd" title="Toggle HD/Fast rendering">HD</button>
+              <span class="toolbar-sep"></span>
               <button class="sm" id="btn-pdf-refresh" data-i18n="refresh">Refresh</button>
             </div>
             <div id="pdf-container">
@@ -977,6 +985,7 @@ const I18N = {
     files: "Files",
     no_pdf: "No PDF",
     refresh: "Refresh",
+    fit: "Fit",
     compile_to_preview: "Compile to see PDF preview",
     compile_log: "Compile Log",
     copy_log: "Copy log",
@@ -1090,6 +1099,7 @@ const I18N = {
     files: "文件",
     no_pdf: "无 PDF",
     refresh: "刷新",
+    fit: "适宽",
     compile_to_preview: "编译后预览 PDF",
     compile_log: "编译日志",
     copy_log: "复制日志",
@@ -1403,6 +1413,9 @@ const S = {
   autoCompile: true,
   autoCompileTimer: null,
   pdfDoc: null,
+  pdfUrl: null,
+  pdfZoom: 1.0,
+  pdfRenderHD: true,
   autoSaveTimer: null,
   autoSaveInterval: 2000,
   fileMtime: 0,
@@ -2524,27 +2537,48 @@ async function loadPDF(url) {
   const container = document.getElementById("pdf-container");
   container.innerHTML = "";
   document.getElementById("pdf-status").textContent = t("loading_pdf");
+  S.pdfUrl = url;
 
   try {
     const pdfUrl = url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();
     const doc = await pdfjsLib.getDocument(pdfUrl).promise;
     S.pdfDoc = doc;
-    document.getElementById("pdf-status").textContent = `${doc.numPages} ${t("pages")}`;
-
-    for (let i = 1; i <= doc.numPages; i++) {
-      const page = await doc.getPage(i);
-      const scale = (container.clientWidth - 40) / page.getViewport({ scale: 1 }).width;
-      const viewport = page.getViewport({ scale: Math.min(scale, 2) });
-      const canvas = document.createElement("canvas");
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      container.appendChild(canvas);
-      await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
-    }
+    S.pdfZoom = 1.0;
+    updateZoomLabel();
+    await renderPDF();
   } catch (err) {
     container.innerHTML = `<div class="pdf-placeholder">${t("pdf_error")}: ${esc(err.message)}</div>`;
     document.getElementById("pdf-status").textContent = t("pdf_error");
   }
+}
+
+async function renderPDF() {
+  if (!S.pdfDoc) return;
+  const container = document.getElementById("pdf-container");
+  container.innerHTML = "";
+  const doc = S.pdfDoc;
+  document.getElementById("pdf-status").textContent = `${doc.numPages} ${t("pages")}`;
+  const dpr = S.pdfRenderHD ? (window.devicePixelRatio || 2) : 1;
+
+  for (let i = 1; i <= doc.numPages; i++) {
+    const page = await doc.getPage(i);
+    const baseScale = (container.clientWidth - 40) / page.getViewport({ scale: 1 }).width;
+    const scale = baseScale * S.pdfZoom;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width * dpr;
+    canvas.height = viewport.height * dpr;
+    canvas.style.width = viewport.width + "px";
+    canvas.style.height = viewport.height + "px";
+    container.appendChild(canvas);
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+    await page.render({ canvasContext: ctx, viewport }).promise;
+  }
+}
+
+function updateZoomLabel() {
+  document.getElementById("pdf-zoom-level").textContent = Math.round(S.pdfZoom * 100) + "%";
 }
 
 function showImagePreview(url, filePath) {
@@ -2806,6 +2840,18 @@ document.getElementById("btn-pdf-refresh").onclick = () => {
     loadPDF(`/api/projects/${enc(S.projectName)}/output/${enc(base)}`);
   }
 };
+document.getElementById("btn-pdf-zoom-in").onclick = () => { S.pdfZoom = Math.min(S.pdfZoom + 0.25, 5); updateZoomLabel(); renderPDF(); };
+document.getElementById("btn-pdf-zoom-out").onclick = () => { S.pdfZoom = Math.max(S.pdfZoom - 0.25, 0.25); updateZoomLabel(); renderPDF(); };
+document.getElementById("btn-pdf-zoom-fit").onclick = () => { S.pdfZoom = 1.0; updateZoomLabel(); renderPDF(); };
+document.getElementById("btn-pdf-hd").onclick = () => {
+  S.pdfRenderHD = !S.pdfRenderHD;
+  document.getElementById("btn-pdf-hd").classList.toggle("active", S.pdfRenderHD);
+  localStorage.setItem("tinyleaf-pdf-hd", S.pdfRenderHD ? "1" : "0");
+  renderPDF();
+};
+// Init HD button state
+S.pdfRenderHD = localStorage.getItem("tinyleaf-pdf-hd") !== "0";
+document.getElementById("btn-pdf-hd").classList.toggle("active", S.pdfRenderHD);
 
 // ── Auto-refresh on window focus ──
 window.addEventListener("focus", () => {
