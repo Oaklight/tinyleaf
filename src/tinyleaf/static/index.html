@@ -73,6 +73,29 @@ body {
   overflow: hidden;
   min-width: 0;
 }
+#editor-breadcrumb {
+  display: flex;
+  align-items: center;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  gap: 6px;
+  min-height: 24px;
+}
+#editor-breadcrumb #breadcrumb-path {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#editor-breadcrumb .icon-btn {
+  width: 18px;
+  height: 18px;
+  padding: 2px;
+}
 
 #pdf-pane {
   flex: 1;
@@ -692,6 +715,10 @@ select:focus { border-color: var(--accent); outline: none; }
         <!-- Workspace -->
         <div id="workspace">
           <div id="editor-pane">
+            <div id="editor-breadcrumb">
+              <span id="breadcrumb-path">—</span>
+              <button class="icon-btn" id="btn-locate-file" title="Locate in tree"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="2"/><line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="2"/><line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" stroke-width="2"/><line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="2"/></svg></button>
+            </div>
             <div id="editor-container"></div>
           </div>
           <div id="pdf-pane">
@@ -1843,6 +1870,26 @@ function renderTreeNodes(nodes, parent, depth) {
   }
 }
 
+function locateInTree() {
+  if (!S.currentFile) return;
+  // Expand all parent directories of the current file
+  const parts = S.currentFile.split("/");
+  for (let i = 1; i < parts.length; i++) {
+    expandedDirs.add(parts.slice(0, i).join("/"));
+  }
+  renderFileTree();
+  // Scroll the active item into view after DOM update
+  setTimeout(() => {
+    const active = document.querySelector("#file-tree .file-item.active");
+    if (active) {
+      active.scrollIntoView({ block: "center", behavior: "smooth" });
+      // Brief flash effect
+      active.style.outline = "2px solid var(--accent)";
+      setTimeout(() => { active.style.outline = ""; }, 1000);
+    }
+  }, 50);
+}
+
 // ══════════════════════════════════════════
 // Editor
 // ══════════════════════════════════════════
@@ -1859,6 +1906,8 @@ async function openFile(filePath) {
   const data = await api("GET", `/api/projects/${enc(S.projectName)}/files/${enc(filePath)}`);
   S.currentFile = filePath;
   S.fileMtime = data.mtime || 0;
+  document.getElementById("breadcrumb-path").textContent = filePath;
+  document.getElementById("breadcrumb-path").title = filePath;
   document.getElementById("reload-bar")?.remove();
 
   if (S.editorView) S.editorView.destroy();
@@ -1959,6 +2008,7 @@ async function reloadCurrentFile() {
   S.modified.delete(S.currentFile);
   await openFile(S.currentFile);
 }
+window.reloadCurrentFile = reloadCurrentFile;
 
 function startFileWatcher() {
   if (_checkTimer) clearInterval(_checkTimer);
@@ -2213,6 +2263,7 @@ document.getElementById("btn-new-file").onclick = showNewFileModal;
 document.getElementById("btn-new-folder").onclick = showNewFolderModal;
 document.getElementById("btn-search-file").onclick = toggleFileSearch;
 document.getElementById("btn-upload-file").onclick = () => triggerUpload("");
+document.getElementById("btn-locate-file").onclick = locateInTree;
 document.getElementById("log-header").onclick = toggleLog;
 document.getElementById("btn-pdf-refresh").onclick = () => {
   if (S.projectName) {
