@@ -34,6 +34,8 @@ class TexliveHandler(BaseHTTPRequestHandler):
             self._handle_api("list_docker_images")
         elif path == "/api/vendor/status":
             self._handle_api("vendor_status")
+        elif path == "/api/settings":
+            self._handle_api("get_settings")
         elif path == "/api/projects":
             self._handle_api("list_projects")
         elif path.startswith("/api/fs/browse"):
@@ -60,7 +62,9 @@ class TexliveHandler(BaseHTTPRequestHandler):
     def do_PUT(self):
         path = urllib.parse.urlparse(self.path).path.rstrip("/")
 
-        if path.startswith("/api/projects/"):
+        if path == "/api/settings":
+            self._handle_api("put_settings")
+        elif path.startswith("/api/projects/"):
             self._route_project_put(path)
         else:
             self._send_error(404, "Not found")

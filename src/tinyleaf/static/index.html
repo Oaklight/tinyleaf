@@ -771,6 +771,10 @@ select:focus { border-color: var(--accent); outline: none; }
       <label data-i18n="docker_image">Image</label>
       <select id="docker-image-select"></select>
     </div>
+    <div class="settings-popup-item" id="debian-toggle-row">
+      <label data-i18n="show_debian">Show Debian</label>
+      <input type="checkbox" id="show-debian-toggle" style="cursor:pointer">
+    </div>
     <div class="settings-popup-item">
       <label data-i18n="js_modules">JS Modules</label>
       <div style="display:flex;align-items:center;gap:8px">
@@ -817,6 +821,7 @@ const I18N = {
     language: "Language",
     docker_image: "Image",
     use_docker: "Docker",
+    show_debian: "Show Debian",
     js_modules: "JS Modules",
     update: "Update",
     downloading: "Downloading...",
@@ -893,6 +898,7 @@ const I18N = {
     language: "语言",
     docker_image: "镜像",
     use_docker: "Docker",
+    show_debian: "显示 Debian",
     js_modules: "JS 模块",
     update: "更新",
     downloading: "下载中...",
@@ -1149,6 +1155,12 @@ async function init() {
   // Always load docker images list and sync toggle
   document.getElementById("docker-toggle").checked = S.useDocker;
   document.getElementById("docker-image-row").style.display = S.useDocker ? "flex" : "none";
+
+  // Load global settings (show_debian, etc.)
+  try {
+    const globalSettings = await api("GET", "/api/settings");
+    document.getElementById("show-debian-toggle").checked = !!globalSettings.show_debian;
+  } catch {}
   await loadDockerImages();
 
   if (S.mode === "multi") {
@@ -1219,6 +1231,11 @@ function setupSettingsPopup() {
     }
   };
 
+  document.getElementById("show-debian-toggle").onchange = (e) => {
+    api("PUT", "/api/settings", { show_debian: e.target.checked });
+    loadDockerImages(true);
+  };
+
   // Vendor JS modules status + update
   checkVendorStatus();
   document.getElementById("btn-update-vendor").onclick = async () => {
@@ -1255,22 +1272,31 @@ async function checkVendorStatus() {
   }
 }
 
-async function loadDockerImages() {
+let _allDockerImages = [];
+
+async function loadDockerImages(filterOnly) {
   const sel = document.getElementById("docker-image-select");
   sel.innerHTML = "";
   try {
-    const images = await api("GET", "/api/docker/images");
+    if (!filterOnly || !_allDockerImages.length) {
+      _allDockerImages = await api("GET", "/api/docker/images");
+    }
+    const showDebian = document.getElementById("show-debian-toggle")?.checked;
+    const images = _allDockerImages.filter(img =>
+      showDebian || !img.name.startsWith("debian")
+    );
     for (const img of images) {
       const opt = document.createElement("option");
-      opt.value = img;
-      opt.textContent = img.replace("oaklight/texlive:", "");
+      opt.value = img.tag;
+      opt.textContent = img.local ? `${img.name} ✓` : img.name;
       sel.appendChild(opt);
     }
-    if (images.includes(S.dockerImage)) {
-      sel.value = S.dockerImage;
+    const match = images.find(i => i.tag === S.dockerImage);
+    if (match) {
+      sel.value = match.tag;
     } else if (images.length > 0) {
-      sel.value = images[0];
-      S.dockerImage = images[0];
+      sel.value = images[0].tag;
+      S.dockerImage = images[0].tag;
     }
   } catch {
     const opt = document.createElement("option");

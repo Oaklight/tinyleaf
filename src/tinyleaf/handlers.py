@@ -9,6 +9,7 @@ from tinyleaf import compiler, git_ops, registry, vendor
 
 # Project config file name
 CONFIG_FILE = ".tinyleaf.json"
+SETTINGS_FILE = "settings.json"
 
 
 def handle_request(handler, action, **kwargs):
@@ -23,6 +24,8 @@ def handle_request(handler, action, **kwargs):
         "browse_filesystem": _browse_filesystem,
         "vendor_status": _vendor_status,
         "update_vendor": _update_vendor,
+        "get_settings": _get_settings,
+        "put_settings": _put_settings,
         "list_files": _list_files,
         "read_file": _read_file,
         "write_file": _write_file,
@@ -130,9 +133,31 @@ def _get_mode(handler):
 # Docker image name prefix for filtering
 _DOCKER_IMAGE_PREFIX = "oaklight/texlive"
 
+# Known tags (stable list — update manually when new tags are added)
+_KNOWN_TAGS = [
+    "latest",
+    "alpine-science",
+    "alpine-science-cn",
+    "alpine-science-jp",
+    "alpine-science-kr",
+    "alpine-base",
+    "alpine-base-cn",
+    "alpine-base-jp",
+    "alpine-base-kr",
+    "debian-science",
+    "debian-science-cn",
+    "debian-science-jp",
+    "debian-science-kr",
+    "debian-base",
+    "debian-base-cn",
+    "debian-base-jp",
+    "debian-base-kr",
+]
+
 
 def _list_docker_images(handler):
-    """List locally available oaklight/texlive Docker images."""
+    """List known oaklight/texlive tags with local availability status."""
+    local_tags = set()
     try:
         result = subprocess.run(
             ["docker", "images", "--format", "{{.Repository}}:{{.Tag}}", _DOCKER_IMAGE_PREFIX],
@@ -140,20 +165,19 @@ def _list_docker_images(handler):
             text=True,
             timeout=10,
         )
-        if result.returncode != 0:
-            handler.send_json([])
-            return
-
-        tags = []
-        for line in result.stdout.strip().split("\n"):
-            line = line.strip()
-            if line and "<none>" not in line:
-                tags.append(line)
-        # Sort: latest first, then alphabetical
-        tags.sort(key=lambda t: (0 if t.endswith(":latest") else 1, t))
-        handler.send_json(tags)
+        if result.returncode == 0:
+            for line in result.stdout.strip().split("\n"):
+                line = line.strip()
+                if line and "<none>" not in line:
+                    local_tags.add(line)
     except Exception:
-        handler.send_json([])
+        pass
+
+    all_tags = []
+    for name in _KNOWN_TAGS:
+        full = f"{_DOCKER_IMAGE_PREFIX}:{name}"
+        all_tags.append({"tag": full, "name": name, "local": full in local_tags})
+    handler.send_json(all_tags)
 
 
 # ── Projects ──
@@ -325,6 +349,46 @@ def _update_vendor(handler):
         handler.send_json({"ok": True, "manifest": manifest})
     except Exception as e:
         handler.send_json({"error": str(e)}, status=500)
+
+
+# ── Global Settings ──
+
+
+def _read_settings(config_dir):
+    """Read global settings from config_dir/settings.json."""
+    path = os.path.join(config_dir, SETTINGS_FILE)
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _write_settings(config_dir, data):
+    """Write global settings to config_dir/settings.json."""
+    path = os.path.join(config_dir, SETTINGS_FILE)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def _get_settings(handler):
+    config_dir = handler.config.get("config_dir")
+    if not config_dir:
+        handler.send_json({})
+        return
+    handler.send_json(_read_settings(config_dir))
+
+
+def _put_settings(handler):
+    config_dir = handler.config.get("config_dir")
+    if not config_dir:
+        handler.send_json({"error": "Not available in single mode"}, status=400)
+        return
+    body = handler.read_json_body()
+    existing = _read_settings(config_dir)
+    existing.update(body)
+    _write_settings(config_dir, existing)
+    handler.send_json(existing)
 
 
 # ── Files ──
