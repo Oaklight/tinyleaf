@@ -127,12 +127,15 @@ def _detect_main_file(project_dir):
 
 
 def _get_mode(handler):
+    from tinyleaf import __version__
+
     config = handler.config
     handler.send_json(
         {
             "mode": config["mode"],
             "docker": config["use_docker"],
             "image": config["docker_image"],
+            "version": __version__,
         }
     )
 
