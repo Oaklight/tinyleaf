@@ -1,0 +1,5 @@
+# MkDocs build output
+site/
+
+# ReadTheDocs local build
+_build/

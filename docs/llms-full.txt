@@ -1,0 +1,394 @@
+# Tinyleaf
+
+> Tinyleaf - Lightweight, zero-dependency web-based LaTeX editor
+
+# Home
+
+# Tinyleaf
+
+**Lightweight, zero-dependency web-based LaTeX editor.**
+
+Tinyleaf is a CLI-first LaTeX editor that runs in your browser. It requires no Python dependencies beyond the standard library, and supports both local and Docker-based compilation.
+
+## Highlights
+
+- **Zero dependencies** -- stdlib only (`http.server` + `threading` + `subprocess`)
+- **Two modes** -- single project or multi-project with a persistent registry
+- **Two compilation backends** -- local `latexmk` or Docker containers
+- **CodeMirror 6** editor with LaTeX syntax highlighting
+- **PDF.js** preview with live reload
+- **Git integration** -- commit and push from the UI
+- **7 themes** with dark/light toggle
+- **i18n** -- English and Chinese
+
+## Quick Start
+
+```bash
+pip install tinyleaf
+
+# Single project
+tinyleaf /path/to/my-thesis
+
+# Multi-project (registry mode)
+tinyleaf
+```
+
+## Links
+
+- [GitHub Repository](https://github.com/Oaklight/tinyleaf)
+- [PyPI Package](https://pypi.org/project/tinyleaf/)
+
+# Getting Started
+
+# Installation
+
+## From PyPI
+
+```bash
+pip install tinyleaf
+```
+
+## From Source
+
+```bash
+git clone https://github.com/Oaklight/tinyleaf.git
+cd tinyleaf
+pip install -e .
+```
+
+## Requirements
+
+- Python 3.8+
+- No additional Python dependencies (stdlib only)
+
+### Optional
+
+- **Docker** -- for Docker-based compilation (`--docker` flag)
+- **latexmk** -- for local compilation (default backend)
+- A TeX Live distribution if compiling locally
+
+# Quick Start
+
+## Single Project Mode
+
+Open a LaTeX project directory directly:
+
+```bash
+tinyleaf /path/to/my-thesis
+```
+
+This starts the editor on `http://localhost:8080` and opens it in your browser.
+
+### With Docker Compilation
+
+```bash
+tinyleaf /path/to/my-thesis --docker
+```
+
+### Custom Port and Host
+
+```bash
+tinyleaf /path/to/my-thesis --port 3000 --host 0.0.0.0
+```
+
+## Multi-Project Mode
+
+Launch without arguments to enter registry mode:
+
+```bash
+tinyleaf
+```
+
+From the project page you can:
+
+- **Open Folder** -- browse the filesystem and register an existing directory
+- **New Project** -- create a new LaTeX project at a chosen path
+- **Remove** -- unregister a project (optionally delete files from disk)
+
+Projects are stored in `~/.config/tinyleaf/projects.json`.
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+S` | Save current file |
+| `Ctrl+Enter` | Compile |
+| `Ctrl+Shift+C` | Git commit |
+| `Ctrl+Shift+P` | Git push |
+
+# Guide
+
+# Architecture
+
+Tinyleaf is a single-binary web application built entirely with Python's standard library.
+
+## Module Overview
+
+| Module | Responsibility |
+|--------|---------------|
+| `cli.py` | CLI argument parsing, server startup |
+| `server.py` | HTTP routing, static file serving, SSE support |
+| `handlers.py` | API request dispatch, file operations, project management |
+| `registry.py` | Thread-safe project registry CRUD (`projects.json`) |
+| `compiler.py` | LaTeX compilation jobs (local or Docker) |
+| `git_ops.py` | Git status, diff, commit, push, pull, log |
+
+## Key Design Decisions
+
+- **Zero dependencies** -- only Python stdlib on the backend
+- **Single HTML file** -- the entire frontend (HTML + CSS + JS) is served from one `index.html`
+- **SSE for compilation** -- real-time log streaming via Server-Sent Events
+- **Registry pattern** -- projects are tracked by name-to-path mapping in a JSON file, not by directory listing
+- **Thread safety** -- `threading.Lock` + atomic `os.replace` for concurrent registry access
+
+# Multi-Project Registry
+
+When tinyleaf is launched without a `project_path` argument, it enters **multi-project mode** backed by a project registry.
+
+## How It Works
+
+Projects are stored in `~/.config/tinyleaf/projects.json`:
+
+```json
+{
+  "my-thesis": {
+    "path": "/home/user/documents/thesis",
+    "added_at": "2025-01-15T10:30:00"
+  },
+  "paper-2025": {
+    "path": "/home/user/research/paper",
+    "added_at": "2025-02-20T14:00:00"
+  }
+}
+```
+
+Each entry maps a project name to an **absolute filesystem path**. Projects can live anywhere -- they don't need to be in the same parent directory.
+
+## Managing Projects
+
+### From the UI
+
+- **Open Folder** -- browse the server filesystem and register an existing directory
+- **New Project** -- specify a name and parent path to create a new project with a default `main.tex`
+- **Remove** -- unregister a project, with an optional checkbox to also delete files from disk
+
+### CLI Options
+
+```bash
+# Registry mode (default when no path given)
+tinyleaf
+
+# Custom config directory
+tinyleaf --config-dir /path/to/config
+
+# Legacy migration: auto-register all subdirectories
+tinyleaf --projects-dir /path/to/old/projects
+```
+
+## Stale Projects
+
+If a registered project's directory no longer exists on disk, it is displayed with a dashed border and "(missing)" label. You can remove stale entries from the project page.
+
+## Thread Safety
+
+The registry uses a `threading.Lock` and atomic writes (`os.replace`) to ensure consistency under concurrent access from the threaded HTTP server.
+
+# Compilation
+
+Tinyleaf supports two compilation backends: **local** and **Docker**.
+
+## Local Compilation (Default)
+
+Uses `latexmk` installed on the host system:
+
+```bash
+tinyleaf /path/to/project
+```
+
+A TeX Live distribution with `latexmk` must be installed locally.
+
+## Docker Compilation
+
+Uses a Docker container with a full TeX Live installation:
+
+```bash
+tinyleaf /path/to/project --docker
+```
+
+The default Docker image is `oaklight/texlive:latest`. You can specify a different image:
+
+```bash
+tinyleaf /path/to/project --docker --image oaklight/texlive:science-cn
+```
+
+## Per-Project Configuration
+
+Each project can have a `.tinyleaf.json` file to configure:
+
+```json
+{
+  "main_file": "thesis.tex",
+  "engine": "lualatex",
+  "docker_image": "oaklight/texlive:science-cn"
+}
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `main_file` | Auto-detected | The `.tex` file containing `\documentclass` |
+| `engine` | `pdflatex` | LaTeX engine: `pdflatex`, `lualatex`, `xelatex` |
+| `docker_image` | Server default | Override Docker image for this project |
+
+## Auto-Detection
+
+If `main_file` is not configured, tinyleaf scans for `.tex` files containing `\documentclass`. If exactly one is found, it is used. If multiple candidates exist, `main.tex` is preferred.
+
+## Compilation Log
+
+Compilation output is streamed in real-time via SSE (Server-Sent Events) to the browser log panel. Toggle the log panel with the log button in the toolbar.
+
+# Docker
+
+Tinyleaf can be deployed as a Docker container or use Docker for LaTeX compilation.
+
+## Docker Compose Deployment
+
+Run the editor itself inside a container:
+
+```bash
+docker compose up
+```
+
+This starts the web editor on `http://localhost:8080` with a persistent TeX Live container for compilation.
+
+## Docker for Compilation Only
+
+Use Docker only for the compilation step while running tinyleaf locally:
+
+```bash
+tinyleaf /path/to/project --docker --image oaklight/texlive:science-cn
+```
+
+### Available Images
+
+The oaklight/texlive images provide various TeX Live configurations:
+
+| Image | Description |
+|-------|-------------|
+| `oaklight/texlive:latest` | Standard TeX Live |
+| `oaklight/texlive:science` | Science packages |
+| `oaklight/texlive:science-cn` | Science + Chinese fonts |
+| `oaklight/texlive:science-jp` | Science + Japanese fonts |
+| `oaklight/texlive:science-kr` | Science + Korean fonts |
+
+### Font Cache
+
+For faster subsequent compilations, Docker volume caching is recommended for font directories:
+
+- `/root/.texlive2023/texmf-var`
+- `/var/lib/texmf/luatex-cache`
+
+# API Reference
+
+Tinyleaf exposes a RESTful HTTP API consumed by the browser frontend.
+
+## Endpoints
+
+### Mode
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/mode` | Server mode and Docker config |
+| `GET` | `/api/docker/images` | List local Docker images |
+
+### Projects
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/projects` | List all registered projects |
+| `POST` | `/api/projects` | Create a new project |
+| `POST` | `/api/projects/register` | Register an existing directory |
+| `DELETE` | `/api/projects/{name}` | Unregister (and optionally delete) a project |
+
+### Filesystem Browser
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/fs/browse?path=...` | List subdirectories for the folder picker |
+
+### Files
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/projects/{name}/files` | List file tree |
+| `GET` | `/api/projects/{name}/files/{path}` | Read file content |
+| `PUT` | `/api/projects/{name}/files/{path}` | Write file content |
+| `DELETE` | `/api/projects/{name}/files/{path}` | Delete file or directory |
+| `POST` | `/api/projects/{name}/mkdir` | Create a directory |
+| `POST` | `/api/projects/{name}/rename` | Rename a file or directory |
+| `POST` | `/api/projects/{name}/upload` | Upload files (multipart) |
+
+### Configuration
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/projects/{name}/config` | Read project config |
+| `PUT` | `/api/projects/{name}/config` | Update project config |
+
+### Compilation
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/projects/{name}/compile` | Start compilation |
+| `GET` | `/api/projects/{name}/compile/{id}/stream` | SSE compilation log stream |
+| `GET` | `/api/projects/{name}/output/{file}` | Download compiled output |
+| `POST` | `/api/projects/{name}/clean` | Remove build artifacts |
+
+### Git
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/projects/{name}/git/status` | Git status |
+| `GET` | `/api/projects/{name}/git/diff` | Git diff |
+| `POST` | `/api/projects/{name}/git/commit` | Git commit |
+| `POST` | `/api/projects/{name}/git/push` | Git push |
+| `POST` | `/api/projects/{name}/git/pull` | Git pull |
+| `GET` | `/api/projects/{name}/git/log` | Git log |
+
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.0] - 2026-04-27
+
+Initial release of tinyleaf (formerly texlive-web).
+
+### Added
+
+- **CLI-first design** with `pip install tinyleaf && tinyleaf /path` to start editing
+- **Single project mode** for opening a specific LaTeX project directory
+- **Multi-project mode** with JSON-based project registry (`~/.config/tinyleaf/projects.json`)
+- **Two compilation backends**: local `latexmk` (default) and Docker
+- **CodeMirror 6** editor with LaTeX syntax highlighting
+- **PDF.js** preview with live reload after compilation
+- **SSE** (Server-Sent Events) real-time compilation log streaming
+- **Git integration**: status, commit, push, and pull from the UI
+- **i18n support** for English and Chinese
+- **7 themes** with dark/light toggle (Light, Indigo Dark, Dracula, etc.)
+- **Docker image selector** from locally available tags
+- **Clean build artifacts** button
+- **Auto-save** and window-focus file refresh
+- **Keyboard shortcuts**: `Ctrl+S` (save), `Ctrl+Enter` (compile), `Ctrl+Shift+C` (commit), `Ctrl+Shift+P` (push)
+- **Docker Compose** support for self-contained setup with Docker compilation
+- **Zero Python dependencies** -- stdlib only (`http.server`, `threading`, `subprocess`)
+
+### Changed
+
+- Renamed project from `texlive-web` to `tinyleaf`
+- Renamed Python package from `texlive_web` to `tinyleaf`
+- Updated CLI entry point, config directory, and program name
+- Updated project config file from `.texlive-web.json` to `.tinyleaf.json`
+- Updated Docker image name to `oaklight/tinyleaf`
