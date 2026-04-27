@@ -151,6 +151,9 @@ class TexliveHandler(BaseHTTPRequestHandler):
             self._handle_api("git_status", name=name)
         elif sub == "git/diff":
             self._handle_api("git_diff", name=name)
+        elif sub.startswith("git/diff/"):
+            file_path = urllib.parse.unquote(sub[9:])
+            self._handle_api("git_diff_file", name=name, file_path=file_path)
         elif sub == "git/log":
             self._handle_api("git_log", name=name)
         else:

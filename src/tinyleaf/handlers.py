@@ -46,6 +46,7 @@ def handle_request(handler, action, **kwargs):
         "clean": _clean,
         "git_status": _git_status,
         "git_diff": _git_diff,
+        "git_diff_file": _git_diff_file,
         "git_commit": _git_commit,
         "git_push": _git_push,
         "git_pull": _git_pull,
@@ -909,6 +910,13 @@ def _git_diff(handler, name):
     if not project_dir:
         return
     handler.send_text(git_ops.diff(project_dir))
+
+
+def _git_diff_file(handler, name, file_path):
+    project_dir = _get_project_dir(handler, name)
+    if not project_dir:
+        return
+    handler.send_text(git_ops.diff(project_dir, file_path=file_path))
 
 
 def _git_commit(handler, name):

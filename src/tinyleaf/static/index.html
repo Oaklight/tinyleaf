@@ -356,6 +356,26 @@ select:focus { border-color: var(--accent); outline: none; }
 .git-status.M { color: var(--orange); }
 .git-status.A, .git-status.new { color: var(--green); }
 .git-status.D { color: var(--red); }
+.git-file { cursor: pointer; display: flex; align-items: center; gap: 4px; }
+.git-file:hover { background: var(--bg-hover); }
+.git-file.active { background: var(--bg-hover); }
+.git-file input[type="checkbox"] { margin: 0; cursor: pointer; flex-shrink: 0; }
+.git-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#git-actions { display: flex; padding: 4px 10px; gap: 4px; }
+#git-diff-view {
+  max-height: 200px;
+  overflow: auto;
+  border-top: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 4px 8px;
+  white-space: pre;
+  background: var(--bg);
+}
+.diff-add { color: var(--green); }
+.diff-del { color: var(--red); }
+.diff-hunk { color: var(--accent); font-weight: 500; }
 
 /* ── Editor ── */
 #editor-container { flex: 1; overflow: hidden; }
@@ -752,8 +772,14 @@ select:focus { border-color: var(--accent); outline: none; }
           <div class="sidebar-section" id="git-panel">
             <div class="sidebar-header">
               <span id="git-branch">Git</span>
+              <span style="flex:1"></span>
+              <button class="sm" id="btn-git-refresh" style="font-size:10px;padding:1px 6px" title="Refresh" onclick="refreshGit()">&#x21bb;</button>
             </div>
             <div id="git-files"></div>
+            <div id="git-actions" style="display:none;padding:4px 10px;gap:4px;display:none">
+              <button class="sm primary" id="btn-git-commit-selected" style="font-size:11px;padding:2px 8px" data-i18n="commit_selected">Commit Selected</button>
+            </div>
+            <div id="git-diff-view" style="display:none"></div>
           </div>
         </div>
 
@@ -788,7 +814,7 @@ select:focus { border-color: var(--accent); outline: none; }
           <span data-i18n="compile_log">Compile Log</span>
           <span id="log-status"></span>
           <span style="flex:1"></span>
-          <button id="btn-log-copy" class="icon-btn" style="padding:1px 4px;font-size:11px" title="Copy log" data-i18n-title="copy_log" onclick="event.stopPropagation(); copyLog()">&#x2398;</button>
+          <button id="btn-log-copy" class="sm" style="font-size:11px;padding:2px 8px" title="Copy log" data-i18n-title="copy_log" data-i18n="copy" onclick="event.stopPropagation(); copyLog()">Copy</button>
         </div>
         <div id="log-content"></div>
       </div>
@@ -923,6 +949,7 @@ const I18N = {
     compile_log: "Compile Log",
     copy_log: "Copy log",
     log_copied: "Log copied to clipboard",
+    copy: "Copy",
     ready: "Ready",
     projects: "Projects",
     new_project: "New Project",
@@ -948,6 +975,11 @@ const I18N = {
     commit_message: "Commit message",
     saved: "Saved",
     committed: "Committed",
+    no_changes: "No changes",
+    no_diff: "No diff",
+    no_files_selected: "No files selected",
+    files_selected: "file(s) selected",
+    commit_selected: "Commit Selected",
     pushing: "Pushing...",
     pushed: "Pushed",
     compile_success: "Compilation successful",
@@ -956,6 +988,7 @@ const I18N = {
     compile_error: "Compile error",
     connection_lost: "Compilation connection lost",
     loading_pdf: "Loading PDF...",
+    loading: "Loading",
     pdf_error: "Failed to load PDF",
     pages: "page(s)",
     search_files: "Search files...",
@@ -1029,6 +1062,7 @@ const I18N = {
     compile_log: "编译日志",
     copy_log: "复制日志",
     log_copied: "日志已复制到剪贴板",
+    copy: "复制",
     ready: "就绪",
     projects: "项目",
     new_project: "新建项目",
@@ -1054,6 +1088,11 @@ const I18N = {
     commit_message: "提交信息",
     saved: "已保存",
     committed: "已提交",
+    no_changes: "无更改",
+    no_diff: "无差异",
+    no_files_selected: "未选择文件",
+    files_selected: "个文件已选择",
+    commit_selected: "提交所选",
     pushing: "推送中...",
     pushed: "已推送",
     compile_success: "编译成功",
@@ -1062,6 +1101,7 @@ const I18N = {
     compile_error: "编译错误",
     connection_lost: "编译连接断开",
     loading_pdf: "加载 PDF...",
+    loading: "加载中",
     pdf_error: "PDF 加载失败",
     pages: "页",
     search_files: "搜索文件...",
@@ -2517,26 +2557,95 @@ async function refreshGit() {
       (st.ahead ? ` \u2191${st.ahead}` : "") +
       (st.behind ? ` \u2193${st.behind}` : "");
 
+    S.gitFiles = st.files || [];
     const fd = document.getElementById("git-files");
+    const diffView = document.getElementById("git-diff-view");
+    const actionsEl = document.getElementById("git-actions");
     fd.innerHTML = "";
-    for (const f of st.files) {
+    diffView.style.display = "none";
+    diffView.innerHTML = "";
+
+    if (S.gitFiles.length === 0) {
+      actionsEl.style.display = "none";
+      fd.innerHTML = `<div style="padding:6px 14px;font-size:12px;color:var(--text-dim)">${t("no_changes")}</div>`;
+      return;
+    }
+    actionsEl.style.display = "flex";
+
+    for (const f of S.gitFiles) {
       const cls = f.status === "??" ? "new" : f.status.includes("D") ? "D" : "M";
       const div = document.createElement("div");
       div.className = "git-file";
-      div.innerHTML = `<span class="git-status ${cls}">${esc(f.status)}</span>${esc(f.path)}`;
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = true;
+      cb.dataset.path = f.path;
+      div.appendChild(cb);
+      const statusSpan = document.createElement("span");
+      statusSpan.className = `git-status ${cls}`;
+      statusSpan.textContent = f.status;
+      div.appendChild(statusSpan);
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "git-file-name";
+      nameSpan.textContent = f.path;
+      nameSpan.title = f.path;
+      div.appendChild(nameSpan);
+      nameSpan.onclick = () => showGitDiff(f.path, div);
       fd.appendChild(div);
     }
   } catch { document.getElementById("git-panel").style.display = "none"; }
 }
 
+async function showGitDiff(filePath, activeEl) {
+  document.querySelectorAll("#git-files .git-file").forEach((el) => el.classList.remove("active"));
+  if (activeEl) activeEl.classList.add("active");
+
+  const diffView = document.getElementById("git-diff-view");
+  diffView.style.display = "block";
+  diffView.innerHTML = `<span style="color:var(--text-dim)">${t("loading")}...</span>`;
+
+  try {
+    const resp = await fetch(`/api/projects/${enc(S.projectName)}/git/diff/${enc(filePath)}`);
+    const text = await resp.text();
+    if (!text.trim()) {
+      diffView.innerHTML = `<span style="color:var(--text-dim)">${t("no_diff")}</span>`;
+      return;
+    }
+    diffView.innerHTML = "";
+    for (const line of text.split("\n")) {
+      const span = document.createElement("span");
+      if (line.startsWith("+") && !line.startsWith("+++")) span.className = "diff-add";
+      else if (line.startsWith("-") && !line.startsWith("---")) span.className = "diff-del";
+      else if (line.startsWith("@@")) span.className = "diff-hunk";
+      span.textContent = line;
+      diffView.appendChild(span);
+      diffView.appendChild(document.createTextNode("\n"));
+    }
+  } catch {
+    diffView.innerHTML = `<span style="color:var(--red)">Failed to load diff</span>`;
+  }
+}
+
 async function doCommit() {
-  showModal(t("git_commit_title"), `<textarea id="inp-commit" placeholder="${t("commit_message")}" rows="3"></textarea>`, [
+  const checkboxes = document.querySelectorAll("#git-files input[type=checkbox]");
+  const selectedFiles = [...checkboxes].filter((cb) => cb.checked).map((cb) => cb.dataset.path);
+
+  if (S.gitFiles && S.gitFiles.length > 0 && selectedFiles.length === 0) {
+    setStatus(t("no_files_selected"), "warning");
+    return;
+  }
+
+  showModal(t("git_commit_title"), `<textarea id="inp-commit" placeholder="${t("commit_message")}" rows="3"></textarea>
+    ${selectedFiles.length ? `<div style="font-size:12px;color:var(--text-dim);margin-top:6px">${selectedFiles.length} ${t("files_selected")}</div>` : ""}`, [
     { label: t("cancel"), action: closeModal },
     { label: t("commit"), primary: true, action: async () => {
       const msg = document.getElementById("inp-commit").value.trim();
       if (!msg) return;
       if (S.modified.has(S.currentFile)) await saveCurrentFile();
-      const r = await api("POST", `/api/projects/${enc(S.projectName)}/git/commit`, { message: msg });
+      const r = await api("POST", `/api/projects/${enc(S.projectName)}/git/commit`, {
+        message: msg,
+        files: selectedFiles.length ? selectedFiles : null,
+      });
       closeModal();
       setStatus(r.success ? t("committed") : r.message, r.success ? "success" : "error");
       refreshGit();
@@ -2623,6 +2732,7 @@ document.getElementById("auto-compile-toggle").onchange = (e) => {
   api("PUT", `/api/projects/${enc(S.projectName)}/config`, { auto_compile: S.autoCompile });
 };
 document.getElementById("btn-commit").onclick = doCommit;
+document.getElementById("btn-git-commit-selected").onclick = doCommit;
 document.getElementById("btn-push").onclick = doPush;
 document.getElementById("btn-log-toggle").onclick = toggleLog;
 document.getElementById("btn-new-file").onclick = showNewFileModal;
