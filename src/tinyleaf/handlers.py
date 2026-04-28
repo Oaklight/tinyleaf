@@ -6,6 +6,7 @@ import subprocess
 import time
 
 from tinyleaf import compiler, git_ops, registry, vendor
+from tinyleaf._vendor import synctex
 
 # Project config file name
 CONFIG_FILE = ".tinyleaf.json"
@@ -44,6 +45,7 @@ def handle_request(handler, action, **kwargs):
         "cancel_compile": _cancel_compile,
         "compile_stream": _compile_stream,
         "get_output": _get_output,
+        "synctex_query": _synctex_query,
         "clean": _clean,
         "git_status": _git_status,
         "git_diff": _git_diff,
@@ -873,7 +875,60 @@ def _get_output(handler, name, file_path):
     handler.send_file(full_path, content_type=content_type)
 
 
-# LaTeX build artifacts to clean
+def _synctex_query(handler, name, qs=None):
+    """Handle SyncTeX inverse search: PDF click → source location."""
+    project_dir = _get_project_dir(handler, name)
+    if not project_dir:
+        return
+
+    qs = qs or {}
+    try:
+        page = int(qs.get("page", [None])[0])
+        x = float(qs.get("x", [None])[0])
+        y = float(qs.get("y", [None])[0])
+    except (TypeError, ValueError, IndexError):
+        handler.send_json({"error": "Missing or invalid page/x/y parameters"}, status=400)
+        return
+
+    # Determine synctex file path from main_file
+    config_data = _read_project_config(project_dir)
+    main_file = config_data.get("main_file") or _detect_main_file(project_dir)
+    if not main_file:
+        handler.send_json({"error": "No main file found"}, status=404)
+        return
+
+    base = os.path.splitext(main_file)[0]
+    synctex_gz = os.path.join(project_dir, base + ".synctex.gz")
+    synctex_plain = os.path.join(project_dir, base + ".synctex")
+
+    synctex_path = None
+    if os.path.exists(synctex_gz):
+        synctex_path = synctex_gz
+    elif os.path.exists(synctex_plain):
+        synctex_path = synctex_plain
+
+    if not synctex_path:
+        handler.send_json(
+            {"error": "SyncTeX file not found. Compile with -synctex=1"},
+            status=404,
+        )
+        return
+
+    try:
+        # Docker builds produce paths like /workspace/./main.tex
+        data = synctex.parse_synctex(synctex_path, strip_prefix="/workspace/")
+        result = synctex.inverse_search(data, page, x, y)
+    except Exception as exc:
+        handler.send_json({"error": f"SyncTeX parse error: {exc}"}, status=500)
+        return
+
+    if result is None:
+        handler.send_json({"error": "No match found"}, status=404)
+        return
+
+    handler.send_json(result)
+
+
 _CLEAN_EXTENSIONS = {
     ".aux",
     ".bbl",

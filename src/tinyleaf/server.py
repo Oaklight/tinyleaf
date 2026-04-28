@@ -147,6 +147,9 @@ class TexliveHandler(BaseHTTPRequestHandler):
         elif sub.startswith("output/"):
             file_path = urllib.parse.unquote(sub[7:])
             self._handle_api("get_output", name=name, file_path=file_path)
+        elif sub == "synctex":
+            qs = urllib.parse.parse_qs(query_string)
+            self._handle_api("synctex_query", name=name, qs=qs)
         elif sub == "git/status":
             self._handle_api("git_status", name=name)
         elif sub == "git/diff":
