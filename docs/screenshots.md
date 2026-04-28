@@ -11,11 +11,19 @@ hide:
 
 ![编辑器](assets/tinyleaf-editor.png)
 
-## 编辑器与中文内容
+## 编辑器与 CJK 内容
 
-完整的 CJK 支持 — 使用 ctex 宏包编辑中文论文。
+完整的 CJK 支持 — 使用 ctex 宏包和 lualatex 编辑中文 NLP 论文。
 
-![编辑器 CJK](assets/tinyleaf-editor-cn.png)
+![编辑器 中文](assets/tinyleaf-chinese-nlp.png)
+
+使用 luatexja 和 lualatex 编辑日语 NLP 论文。
+
+![编辑器 日文](assets/tinyleaf-japanese-nlp.png)
+
+使用 kotex 和 xelatex 编辑韩语 NLP 论文。
+
+![编辑器 韩文](assets/tinyleaf-korean-nlp.png)
 
 ## 项目列表 — 网格视图
 
