@@ -431,6 +431,7 @@ select:focus { border-color: var(--accent); outline: none; }
   gap: 16px;
 }
 #pdf-container canvas { box-shadow: 0 2px 12px rgba(0,0,0,0.15); border-radius: 2px; }
+#pdf-container.synctex-ready canvas { cursor: crosshair; }
 #btn-pdf-hd.active { background: var(--accent); color: #fff; }
 
 #pdf-toolbar {
@@ -2846,6 +2847,16 @@ async function renderPDF() {
     canvas.height = viewport.height * dpr;
     canvas.style.width = viewport.width + "px";
     canvas.style.height = viewport.height + "px";
+    canvas.dataset.pageNum = i;
+    canvas.dataset.scale = scale;
+    canvas.addEventListener("click", (e) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const pdfX = (e.clientX - rect.left) / parseFloat(canvas.dataset.scale);
+      const pdfY = (e.clientY - rect.top) / parseFloat(canvas.dataset.scale);
+      syncTexInverseSearch(parseInt(canvas.dataset.pageNum), pdfX, pdfY);
+    });
     container.appendChild(canvas);
     const ctx = canvas.getContext("2d");
     ctx.scale(dpr, dpr);
@@ -2855,6 +2866,25 @@ async function renderPDF() {
 
 function updateZoomLabel() {
   document.getElementById("pdf-zoom-level").textContent = Math.round(S.pdfZoom * 100) + "%";
+}
+
+async function syncTexInverseSearch(page, x, y) {
+  try {
+    const data = await api("GET",
+      `/api/projects/${enc(S.projectName)}/synctex?page=${page}&x=${x}&y=${y}`);
+    if (!data.file || !data.line) return;
+    if (data.file !== S.currentFile) await openFile(data.file);
+    if (S.editorView) {
+      const line = S.editorView.state.doc.line(data.line);
+      S.editorView.dispatch({
+        selection: { anchor: line.from },
+        effects: EditorView.scrollIntoView(line.from, { y: "center" })
+      });
+      S.editorView.focus();
+    }
+  } catch (err) {
+    console.warn("SyncTeX:", err.message);
+  }
 }
 
 function showImagePreview(url, filePath) {
@@ -3171,6 +3201,19 @@ document.getElementById("btn-pdf-hd").onclick = () => {
 // Init HD button state
 S.pdfRenderHD = localStorage.getItem("tinyleaf-pdf-hd") !== "0";
 document.getElementById("btn-pdf-hd").classList.toggle("active", S.pdfRenderHD);
+
+// ── SyncTeX: Ctrl/Cmd cursor hint ──
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Control" || e.key === "Meta")
+    document.getElementById("pdf-container")?.classList.add("synctex-ready");
+});
+document.addEventListener("keyup", (e) => {
+  if (e.key === "Control" || e.key === "Meta")
+    document.getElementById("pdf-container")?.classList.remove("synctex-ready");
+});
+window.addEventListener("blur", () => {
+  document.getElementById("pdf-container")?.classList.remove("synctex-ready");
+});
 
 // ── Auto-refresh on window focus ──
 window.addEventListener("focus", () => {
