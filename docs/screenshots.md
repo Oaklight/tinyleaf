@@ -13,9 +13,17 @@ The main editing interface: LaTeX source on the left, live PDF preview on the ri
 
 ## Editor with CJK Content
 
-Full CJK support — editing a Chinese thesis with ctex macros.
+Full CJK support — editing a Chinese NLP paper with ctex macros and lualatex.
 
-![Editor CJK](assets/tinyleaf-editor-cn.png)
+![Editor Chinese](assets/tinyleaf-chinese-nlp.png)
+
+Editing a Japanese NLP paper with luatexja and lualatex.
+
+![Editor Japanese](assets/tinyleaf-japanese-nlp.png)
+
+Editing a Korean NLP paper with kotex and xelatex.
+
+![Editor Korean](assets/tinyleaf-korean-nlp.png)
 
 ## Project List — Grid View
 
