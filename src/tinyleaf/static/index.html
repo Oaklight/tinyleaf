@@ -1235,6 +1235,8 @@ const I18N = {
     sc_push: "Push",
     sc_close: "Close dialog / Escape",
     sc_shortcuts: "Show shortcuts",
+    sc_synctex: "Jump to source (click on PDF)",
+    shortcut_pdf: "PDF Preview",
     search_files_title: "Search files",
     upload_file_title: "Upload file",
     locate_in_tree: "Locate in tree",
@@ -1376,6 +1378,8 @@ const I18N = {
     sc_push: "推送",
     sc_close: "关闭对话框 / 退出",
     sc_shortcuts: "显示快捷键",
+    sc_synctex: "跳转到源码（点击 PDF）",
+    shortcut_pdf: "PDF 预览",
     search_files_title: "搜索文件",
     upload_file_title: "上传文件",
     locate_in_tree: "在文件树中定位",
@@ -3105,6 +3109,9 @@ function showShortcutsPopup() {
       { keys: [MOD, "Shift", "Alt", "C"], desc: t("sc_commit") },
       { keys: [MOD, "Shift", "Alt", "P"], desc: t("sc_push") },
     ]},
+    { title: t("shortcut_pdf"), shortcuts: [
+      { keys: [MOD, "Click"], desc: t("sc_synctex") },
+    ]},
     { title: t("shortcut_general"), shortcuts: [
       { keys: [MOD, "/"], desc: t("sc_shortcuts") },
       { keys: ["Esc"], desc: t("sc_close") },
@@ -3202,18 +3209,35 @@ document.getElementById("btn-pdf-hd").onclick = () => {
 S.pdfRenderHD = localStorage.getItem("tinyleaf-pdf-hd") !== "0";
 document.getElementById("btn-pdf-hd").classList.toggle("active", S.pdfRenderHD);
 
-// ── SyncTeX: Ctrl/Cmd cursor hint ──
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Control" || e.key === "Meta")
-    document.getElementById("pdf-container")?.classList.add("synctex-ready");
-});
-document.addEventListener("keyup", (e) => {
-  if (e.key === "Control" || e.key === "Meta")
-    document.getElementById("pdf-container")?.classList.remove("synctex-ready");
-});
-window.addEventListener("blur", () => {
-  document.getElementById("pdf-container")?.classList.remove("synctex-ready");
-});
+// ── SyncTeX: Ctrl/Cmd cursor hint + status bar ──
+{
+  const pdfEl = document.getElementById("pdf-container");
+  const statusLeft = document.getElementById("status-left");
+  let savedStatus = "";
+  let ctrlHeld = false;
+  let hoveringPdf = false;
+
+  function updateSynctexHint() {
+    if (ctrlHeld && hoveringPdf) {
+      pdfEl?.classList.add("synctex-ready");
+      savedStatus = statusLeft.textContent;
+      statusLeft.textContent = t("sc_synctex");
+    } else {
+      pdfEl?.classList.remove("synctex-ready");
+      if (statusLeft.textContent === t("sc_synctex")) statusLeft.textContent = savedStatus;
+    }
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Control" || e.key === "Meta") { ctrlHeld = true; updateSynctexHint(); }
+  });
+  document.addEventListener("keyup", (e) => {
+    if (e.key === "Control" || e.key === "Meta") { ctrlHeld = false; updateSynctexHint(); }
+  });
+  pdfEl?.addEventListener("mouseenter", () => { hoveringPdf = true; updateSynctexHint(); });
+  pdfEl?.addEventListener("mouseleave", () => { hoveringPdf = false; updateSynctexHint(); });
+  window.addEventListener("blur", () => { ctrlHeld = false; hoveringPdf = false; updateSynctexHint(); });
+}
 
 // ── Auto-refresh on window focus ──
 window.addEventListener("focus", () => {
