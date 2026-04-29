@@ -5,6 +5,23 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [0.2.0] - 2026-04-29
+
+### 新增
+
+- **项目级全文搜索**（`Ctrl+Shift+F`）——grep 风格的项目内文件搜索，结果按文件分组，关键词高亮，点击跳转到对应行
+- **关闭文件按钮**（×）——面包屑栏中新增关闭按钮，可将编辑器恢复为空白状态
+- 搜索支持大小写敏感切换
+
+### 修复
+
+- **CDN 回退**：从 jsdelivr 切换至 esm.sh，解决模块去重问题——修复单项目模式下无 vendor 文件时 CodeMirror 崩溃（"多个 @codemirror/state 实例"）
+- 语言扩展冲突时自动降级（编辑器可用，仅无语法高亮）
+
+### 变更
+
+- 面包屑栏布局调整：定位按钮移至文件名左侧，关闭按钮在右侧
+
 ## [0.1.0] - 2026-04-28
 
 tinyleaf 首次发布（前身为 texlive-web）。
@@ -98,4 +115,5 @@ tinyleaf 首次发布（前身为 texlive-web）。
 - 更新了 CLI 入口、配置目录和程序名称
 - 默认编译后端改为 Docker（使用 `--no-docker` 切换为本地编译）
 
+[0.2.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.1.0
