@@ -995,8 +995,10 @@ select:focus { border-color: var(--accent); outline: none; }
         <div id="workspace">
           <div id="editor-pane">
             <div id="editor-breadcrumb">
-              <span id="breadcrumb-path">—</span>
               <button class="icon-btn" id="btn-locate-file" title="Locate in tree" data-i18n-title="locate_in_tree"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="2"/><line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="2"/><line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" stroke-width="2"/><line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="2"/></svg></button>
+              <span id="breadcrumb-path">—</span>
+              <span style="flex:1"></span>
+              <button class="icon-btn" id="btn-close-file" title="Close file" data-i18n-title="close_file" style="display:none;padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/></svg></button>
             </div>
             <div id="editor-container"></div>
           </div>
@@ -1286,6 +1288,7 @@ const I18N = {
     search_files_title: "Search files",
     upload_file_title: "Upload file",
     locate_in_tree: "Locate in tree",
+    close_file: "Close file",
     toggle_sidebar: "Toggle sidebar",
     toggle_pdf: "Toggle PDF panel",
     image_error: "Failed to load image",
@@ -1435,6 +1438,7 @@ const I18N = {
     search_files_title: "搜索文件",
     upload_file_title: "上传文件",
     locate_in_tree: "在文件树中定位",
+    close_file: "关闭文件",
     toggle_sidebar: "切换侧边栏",
     toggle_pdf: "切换 PDF 面板",
     image_error: "图片加载失败",
@@ -1560,7 +1564,7 @@ function initThemeSelect() {
 // Module loader: local vendor first, CDN fallback
 // ══════════════════════════════════════════
 const VENDOR = "/vendor/";
-const CDN = "https://cdn.jsdelivr.net/npm/";
+const CDN = "https://esm.sh/";
 
 async function loadMod(localFile, cdnPath) {
   try { return await import(VENDOR + localFile); }
@@ -1587,12 +1591,12 @@ const [
   { closeBrackets, closeBracketsKeymap, autocompletion },
   { search, searchKeymap, highlightSelectionMatches },
 ] = await Promise.all([
-  loadMod("cm-view.js", "@codemirror/view@6/+esm"),
-  loadMod("cm-state.js", "@codemirror/state@6/+esm"),
-  loadMod("cm-commands.js", "@codemirror/commands@6/+esm"),
-  loadMod("cm-language.js", "@codemirror/language@6/+esm"),
-  loadMod("cm-autocomplete.js", "@codemirror/autocomplete@6/+esm"),
-  loadMod("cm-search.js", "@codemirror/search@6/+esm"),
+  loadMod("cm-view.js", "@codemirror/view@6"),
+  loadMod("cm-state.js", "@codemirror/state@6"),
+  loadMod("cm-commands.js", "@codemirror/commands@6"),
+  loadMod("cm-language.js", "@codemirror/language@6"),
+  loadMod("cm-autocomplete.js", "@codemirror/autocomplete@6"),
+  loadMod("cm-search.js", "@codemirror/search@6"),
 ]);
 
 // ── Language extensions (loaded on demand) ──
@@ -1609,44 +1613,44 @@ function isArtifact(name) {
 }
 
 const LANG_MAP = {
-  ".tex": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
-  ".bib": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
-  ".sty": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
-  ".cls": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
-  ".dtx": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex/+esm", fn: "latex" },
-  ".md":  { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6/+esm", fn: "markdown" },
-  ".markdown": { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6/+esm", fn: "markdown" },
-  ".mmd": { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6/+esm", fn: "markdown" },
-  ".mermaid": { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6/+esm", fn: "markdown" },
-  ".py":  { mod: "cm-lang-python.js", cdn: "@codemirror/lang-python@6/+esm", fn: "python" },
-  ".pyw": { mod: "cm-lang-python.js", cdn: "@codemirror/lang-python@6/+esm", fn: "python" },
-  ".js":  { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6/+esm", fn: "javascript" },
-  ".mjs": { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6/+esm", fn: "javascript" },
-  ".jsx": { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6/+esm", fn: "javascript" },
-  ".ts":  { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6/+esm", fn: "javascript" },
-  ".tsx": { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6/+esm", fn: "javascript" },
-  ".json": { mod: "cm-lang-json.js", cdn: "@codemirror/lang-json@6/+esm", fn: "json" },
-  ".jsonc": { mod: "cm-lang-json.js", cdn: "@codemirror/lang-json@6/+esm", fn: "json" },
-  ".css": { mod: "cm-lang-css.js", cdn: "@codemirror/lang-css@6/+esm", fn: "css" },
-  ".scss": { mod: "cm-lang-css.js", cdn: "@codemirror/lang-css@6/+esm", fn: "css" },
-  ".less": { mod: "cm-lang-css.js", cdn: "@codemirror/lang-css@6/+esm", fn: "css" },
-  ".html": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6/+esm", fn: "html" },
-  ".htm": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6/+esm", fn: "html" },
-  ".xml": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6/+esm", fn: "html" },
-  ".svg": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6/+esm", fn: "html" },
-  ".yaml": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
-  ".yml": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
-  ".toml": { mod: "cm-lang-json.js", cdn: "@codemirror/lang-json@6/+esm", fn: "json" },
-  ".ini": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
-  ".cfg": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
-  ".conf": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
+  ".tex": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latex" },
+  ".bib": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latex" },
+  ".sty": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latex" },
+  ".cls": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latex" },
+  ".dtx": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latex" },
+  ".md":  { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6", fn: "markdown" },
+  ".markdown": { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6", fn: "markdown" },
+  ".mmd": { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6", fn: "markdown" },
+  ".mermaid": { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6", fn: "markdown" },
+  ".py":  { mod: "cm-lang-python.js", cdn: "@codemirror/lang-python@6", fn: "python" },
+  ".pyw": { mod: "cm-lang-python.js", cdn: "@codemirror/lang-python@6", fn: "python" },
+  ".js":  { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6", fn: "javascript" },
+  ".mjs": { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6", fn: "javascript" },
+  ".jsx": { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6", fn: "javascript" },
+  ".ts":  { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6", fn: "javascript" },
+  ".tsx": { mod: "cm-lang-javascript.js", cdn: "@codemirror/lang-javascript@6", fn: "javascript" },
+  ".json": { mod: "cm-lang-json.js", cdn: "@codemirror/lang-json@6", fn: "json" },
+  ".jsonc": { mod: "cm-lang-json.js", cdn: "@codemirror/lang-json@6", fn: "json" },
+  ".css": { mod: "cm-lang-css.js", cdn: "@codemirror/lang-css@6", fn: "css" },
+  ".scss": { mod: "cm-lang-css.js", cdn: "@codemirror/lang-css@6", fn: "css" },
+  ".less": { mod: "cm-lang-css.js", cdn: "@codemirror/lang-css@6", fn: "css" },
+  ".html": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6", fn: "html" },
+  ".htm": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6", fn: "html" },
+  ".xml": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6", fn: "html" },
+  ".svg": { mod: "cm-lang-html.js", cdn: "@codemirror/lang-html@6", fn: "html" },
+  ".yaml": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6", fn: "yaml" },
+  ".yml": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6", fn: "yaml" },
+  ".toml": { mod: "cm-lang-json.js", cdn: "@codemirror/lang-json@6", fn: "json" },
+  ".ini": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6", fn: "yaml" },
+  ".cfg": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6", fn: "yaml" },
+  ".conf": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6", fn: "yaml" },
 };
 // Filename-based language mappings (no extension)
 const LANG_NAME_MAP = {
-  "Makefile": { mod: "cm-lang-python.js", cdn: "@codemirror/lang-python@6/+esm", fn: "python" },
-  "Dockerfile": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
-  ".gitignore": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
-  ".dockerignore": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6/+esm", fn: "yaml" },
+  "Makefile": { mod: "cm-lang-python.js", cdn: "@codemirror/lang-python@6", fn: "python" },
+  "Dockerfile": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6", fn: "yaml" },
+  ".gitignore": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6", fn: "yaml" },
+  ".dockerignore": { mod: "cm-lang-yaml.js", cdn: "@codemirror/lang-yaml@6", fn: "yaml" },
 };
 const _langCache = {};
 async function getLangExtension(filePath) {
@@ -2661,6 +2665,7 @@ async function openFile(filePath) {
   S.fileMtime = data.mtime || 0;
   document.getElementById("breadcrumb-path").textContent = filePath;
   document.getElementById("breadcrumb-path").title = filePath;
+  document.getElementById("btn-close-file").style.display = "";
   document.getElementById("reload-bar")?.remove();
 
   if (S.editorView) S.editorView.destroy();
@@ -2694,10 +2699,19 @@ async function openFile(filePath) {
   const langExt = await getLangExtension(S.currentFile);
   if (langExt) extensions.push(langExt);
 
-  S.editorView = new EditorView({
-    state: EditorState.create({ doc: data.content, extensions }),
-    parent: document.getElementById("editor-container"),
-  });
+  try {
+    S.editorView = new EditorView({
+      state: EditorState.create({ doc: data.content, extensions }),
+      parent: document.getElementById("editor-container"),
+    });
+  } catch {
+    // Language extension may conflict with CDN-loaded core modules; retry without it
+    extensions.length = extensions.length - (langExt ? 1 : 0);
+    S.editorView = new EditorView({
+      state: EditorState.create({ doc: data.content, extensions }),
+      parent: document.getElementById("editor-container"),
+    });
+  }
   renderFileTree();
 }
 
@@ -2722,6 +2736,18 @@ async function saveCurrentFile() {
       compile().finally(() => { S._autoCompiling = false; });
     }, 500);
   }
+}
+
+function closeFile() {
+  if (S.currentFile && S.modified.has(S.currentFile)) saveCurrentFile();
+  if (S.editorView) { S.editorView.destroy(); S.editorView = null; }
+  S.currentFile = null;
+  S.fileMtime = 0;
+  document.getElementById("breadcrumb-path").textContent = "—";
+  document.getElementById("breadcrumb-path").title = "";
+  document.getElementById("btn-close-file").style.display = "none";
+  document.getElementById("editor-container").innerHTML = "";
+  document.getElementById("reload-bar")?.remove();
 }
 
 // ══════════════════════════════════════════
@@ -3378,6 +3404,7 @@ document.getElementById("btn-new-folder").onclick = showNewFolderModal;
 document.getElementById("btn-search-file").onclick = toggleFileSearch;
 document.getElementById("btn-upload-file").onclick = () => triggerUpload("");
 document.getElementById("btn-locate-file").onclick = locateInTree;
+document.getElementById("btn-close-file").onclick = closeFile;
 document.getElementById("btn-collapse-all").onclick = () => {
   expandedDirs.clear();
   saveExpandedDirs();
