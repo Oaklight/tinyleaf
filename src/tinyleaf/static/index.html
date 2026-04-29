@@ -423,6 +423,7 @@ select:focus { border-color: var(--accent); outline: none; }
 #pdf-container {
   flex: 1;
   overflow: auto;
+  position: relative;
   background: color-mix(in srgb, var(--bg) 80%, #525252);
   display: flex;
   flex-direction: column;
@@ -2904,6 +2905,11 @@ async function syncTexInverseSearch(page, x, y) {
 
 async function syncTexForwardSearch() {
   if (!S.editorView || !S.currentFile || !S.projectName) return;
+  const container = document.getElementById("pdf-container");
+  if (!container.querySelector("canvas")) {
+    setStatus("Compile first to enable forward search", "warn");
+    return;
+  }
   const lineNum = S.editorView.state.doc.lineAt(
     S.editorView.state.selection.main.head
   ).number;
@@ -2911,7 +2917,6 @@ async function syncTexForwardSearch() {
     const data = await api("GET",
       `/api/projects/${enc(S.projectName)}/synctex/forward?file=${enc(S.currentFile)}&line=${lineNum}`);
     if (!data.page) return;
-    const container = document.getElementById("pdf-container");
     const canvases = container.querySelectorAll("canvas");
     const canvas = canvases[data.page - 1];
     if (!canvas) return;
@@ -2927,7 +2932,7 @@ async function syncTexForwardSearch() {
     container.appendChild(marker);
     setTimeout(() => marker.remove(), 1500);
   } catch (err) {
-    console.warn("SyncTeX forward:", err.message);
+    setStatus(`SyncTeX: ${err.message}`, "warn");
   }
 }
 
