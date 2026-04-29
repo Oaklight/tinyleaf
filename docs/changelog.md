@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-04-29
+
+### Added
+
+- **Project-wide text search** (`Ctrl+Shift+F`) — grep-style search across all project files with results grouped by file, keyword highlighting, and click-to-jump navigation
+- **Close file button** (×) in breadcrumb bar — return editor to blank state
+- Case-sensitive toggle for project search
+
+### Fixed
+
+- **CDN fallback**: switch from jsdelivr to esm.sh for proper module deduplication — fixes CodeMirror crash ("multiple instances of @codemirror/state") in single-project mode without vendor files
+- Add try-catch fallback when language extensions conflict with CDN modules (editor works without syntax highlighting)
+
+### Changed
+
+- Breadcrumb bar layout: locate button moved to the left of the filename, close button on the right
+
 ## [0.1.0] - 2026-04-28
 
 Initial release of tinyleaf (formerly texlive-web).
@@ -98,4 +115,5 @@ Initial release of tinyleaf (formerly texlive-web).
 - Updated CLI entry point, config directory, and program name
 - Default compilation backend changed to Docker (use `--no-docker` for local)
 
+[0.2.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.1.0
