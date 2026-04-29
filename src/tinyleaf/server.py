@@ -162,6 +162,9 @@ class TexliveHandler(BaseHTTPRequestHandler):
             self._handle_api("git_diff_file", name=name, file_path=file_path)
         elif sub == "git/log":
             self._handle_api("git_log", name=name)
+        elif sub == "search":
+            qs = urllib.parse.parse_qs(query_string)
+            self._handle_api("search_files", name=name, qs=qs)
         else:
             self._send_error(404, "Not found")
 
