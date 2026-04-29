@@ -38,6 +38,9 @@ Initial release of tinyleaf (formerly texlive-web).
 
 - **PDF.js** viewer with live reload after compilation
 - Zoom controls (+, -, Fit, percentage) and HD/fast rendering toggle
+- **SyncTeX** bidirectional search powered by a pure-Python parser
+    - **Inverse search**: `Ctrl+Click` on PDF to jump to the corresponding source line
+    - **Forward search**: `Ctrl+Shift+Enter` in editor to jump to the corresponding PDF position with highlight flash
 - Color-coded status bar messages (error/warning/success)
 - Compile cancellation support
 
@@ -78,6 +81,8 @@ Initial release of tinyleaf (formerly texlive-web).
 |----------|--------|
 | `Ctrl+S` | Save file |
 | `Ctrl+Enter` | Compile |
+| `Ctrl+Shift+Enter` | Jump to PDF (forward search) |
+| `Ctrl+Click` (PDF) | Jump to source (inverse search) |
 | `Ctrl+Shift+E` | Files tab |
 | `Ctrl+Shift+G` | Git tab |
 | `Ctrl+Shift+Alt+C` | Git commit |

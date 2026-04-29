@@ -55,6 +55,8 @@ Projects are stored in `~/.config/tinyleaf/projects.json`.
 |----------|--------|
 | `Ctrl+S` | Save current file |
 | `Ctrl+Enter` | Compile |
+| `Ctrl+Shift+Enter` | Jump to PDF (forward search) |
+| `Ctrl+Click` (PDF) | Jump to source (inverse search) |
 | `Ctrl+Shift+E` | Switch to Files tab |
 | `Ctrl+Shift+G` | Switch to Git tab |
 | `Ctrl+Shift+Alt+C` | Git commit |
