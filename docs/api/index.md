@@ -444,3 +444,50 @@ Tinyleaf 暴露 RESTful HTTP API，由浏览器前端消费。所有响应使用
 从远程仓库拉取。
 
 **响应：** `{"success": true, "message": "Already up to date"}`
+
+---
+
+## SyncTeX
+
+SyncTeX 提供源文件与编译 PDF 之间的双向导航。需要编译时生成的 `.synctex.gz` 文件（tinyleaf 默认使用 `-synctex=1` 编译）。
+
+### `GET /api/projects/{name}/synctex?page={N}&x={X}&y={Y}`
+
+反向搜索：根据 PDF 页面上的位置查找对应源码位置。
+
+**查询参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `page` | int | 从 1 开始的页码 |
+| `x` | float | 水平位置，PDF 点（72 DPI） |
+| `y` | float | 垂直位置，PDF 点（72 DPI） |
+
+**响应：**
+
+```json
+{"file": "main.tex", "line": 42}
+```
+
+**错误：** `404` 无 SyncTeX 文件或无匹配结果。
+
+### `GET /api/projects/{name}/synctex/forward?file={path}&line={N}`
+
+正向搜索：根据源文件和行号查找 PDF 对应位置。
+
+**查询参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `file` | string | 源文件路径（相对于项目根目录） |
+| `line` | int | 从 1 开始的行号 |
+
+**响应：**
+
+```json
+{"page": 1, "x": 150.0, "y": 300.0}
+```
+
+坐标单位为 PDF 点（72 DPI）。
+
+**错误：** `400` 缺少参数，`404` 无 SyncTeX 文件或无匹配结果。

@@ -55,6 +55,8 @@ tinyleaf
 |--------|------|
 | `Ctrl+S` | 保存当前文件 |
 | `Ctrl+Enter` | 编译 |
+| `Ctrl+Shift+Enter` | 跳转到 PDF（正向搜索） |
+| `Ctrl+点击`（PDF） | 跳转到源码（反向搜索） |
 | `Ctrl+Shift+E` | 切换到文件标签页 |
 | `Ctrl+Shift+G` | 切换到 Git 标签页 |
 | `Ctrl+Shift+Alt+C` | Git 提交 |

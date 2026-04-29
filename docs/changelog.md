@@ -38,6 +38,9 @@ tinyleaf 首次发布（前身为 texlive-web）。
 
 - **PDF.js** 查看器，编译后自动刷新
 - 缩放控制（+、-、适应、百分比）和高清/快速渲染切换
+- **SyncTeX** 双向搜索，基于纯 Python 解析器
+    - **反向搜索**：在 PDF 上 `Ctrl+点击` 跳转到对应源码行
+    - **正向搜索**：在编辑器中 `Ctrl+Shift+Enter` 跳转到 PDF 对应位置并高亮闪烁
 - 彩色状态栏消息（错误/警告/成功）
 - 编译取消支持
 
@@ -78,6 +81,8 @@ tinyleaf 首次发布（前身为 texlive-web）。
 |--------|------|
 | `Ctrl+S` | 保存文件 |
 | `Ctrl+Enter` | 编译 |
+| `Ctrl+Shift+Enter` | 跳转到 PDF（正向搜索） |
+| `Ctrl+点击`（PDF） | 跳转到源码（反向搜索） |
 | `Ctrl+Shift+E` | 文件标签页 |
 | `Ctrl+Shift+G` | Git 标签页 |
 | `Ctrl+Shift+Alt+C` | Git 提交 |
