@@ -346,6 +346,37 @@ select:focus { border-color: var(--accent); outline: none; }
 
 #sidebar-files { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 #sidebar-git { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+#sidebar-search { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+
+/* ── Search panel ── */
+#search-input-area { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+#project-search-input {
+  width: 100%; padding: 5px 8px; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 4px; font-size: 12px;
+  font-family: var(--font); outline: none; box-sizing: border-box;
+}
+#project-search-input:focus { border-color: var(--accent); }
+#search-options { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-dim); }
+#search-case-toggle { display: flex; align-items: center; gap: 2px; cursor: pointer; font-family: var(--mono); font-size: 11px; }
+#search-status { padding: 4px 10px; font-size: 11px; color: var(--text-dim); }
+#search-results { flex: 1; overflow-y: auto; padding-bottom: 8px; }
+.search-file-group { margin-top: 2px; }
+.search-file-header {
+  padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--text);
+  cursor: pointer; display: flex; align-items: center; gap: 4px;
+  position: sticky; top: 0; background: var(--bg-card);
+}
+.search-file-header:hover { background: var(--bg-hover); }
+.search-file-header .match-count { font-weight: 400; color: var(--text-dim); font-size: 11px; margin-left: auto; }
+.search-match {
+  padding: 2px 10px 2px 20px; font-size: 12px; font-family: var(--mono);
+  color: var(--text-dim); cursor: pointer; display: flex; gap: 6px;
+  white-space: nowrap; overflow: hidden;
+}
+.search-match:hover { background: var(--bg-hover); color: var(--text); }
+.search-match .line-num { color: var(--accent); min-width: 32px; text-align: right; flex-shrink: 0; }
+.search-match .line-text { overflow: hidden; text-overflow: ellipsis; }
+.search-match .line-text mark { background: rgba(255, 200, 0, 0.35); color: inherit; border-radius: 2px; padding: 0 1px; }
 
 /* ── Git panel ── */
 .git-file {
@@ -910,6 +941,7 @@ select:focus { border-color: var(--accent); outline: none; }
           <div class="sidebar-tabs">
             <button class="sidebar-tab active" data-tab="files" data-i18n="files" id="tab-files">Files</button>
             <button class="sidebar-tab" data-tab="git" id="tab-git">Git</button>
+            <button class="sidebar-tab" data-tab="search" id="tab-search" data-i18n="search">Search</button>
           </div>
           <div id="sidebar-files">
           <div class="sidebar-section">
@@ -944,6 +976,16 @@ select:focus { border-color: var(--accent); outline: none; }
                 <button class="sm" id="btn-git-push" data-i18n="push">Push</button>
               </div>
             </div>
+          </div>
+          <div id="sidebar-search">
+            <div id="search-input-area">
+              <input type="text" id="project-search-input" data-i18n-placeholder="search_in_project_placeholder" placeholder="Search in project...">
+              <div id="search-options">
+                <label id="search-case-toggle"><input type="checkbox" id="search-case-cb"> <span>Aa</span></label>
+              </div>
+            </div>
+            <div id="search-status"></div>
+            <div id="search-results"></div>
           </div>
         </div>
 
@@ -1257,6 +1299,13 @@ const I18N = {
     image_removed: "Image removed",
     remove_failed: "Failed to remove image",
     confirm_rmi: "Remove local image \"{name}\"?",
+    search: "Search",
+    search_in_project: "Search in project",
+    search_in_project_placeholder: "Search in project...",
+    no_results: "No results",
+    search_summary: "{n} result(s) in {f} file(s)",
+    results_truncated: "Results truncated (max {n})",
+    sc_search_tab: "Search tab",
   },
   zh: {
     compile: "编译",
@@ -1399,6 +1448,13 @@ const I18N = {
     image_removed: "镜像已删除",
     remove_failed: "删除镜像失败",
     confirm_rmi: "删除本地镜像 \"{name}\"？",
+    search: "搜索",
+    search_in_project: "在项目中搜索",
+    search_in_project_placeholder: "在项目中搜索...",
+    no_results: "无结果",
+    search_summary: "{f} 个文件中找到 {n} 个结果",
+    results_truncated: "结果已截断（上限 {n}）",
+    sc_search_tab: "搜索标签",
   },
 };
 
@@ -2973,7 +3029,83 @@ function switchSidebarTab(tabName) {
   document.querySelectorAll(".sidebar-tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === tabName));
   document.getElementById("sidebar-files").style.display = tabName === "files" ? "flex" : "none";
   document.getElementById("sidebar-git").style.display = tabName === "git" ? "flex" : "none";
+  document.getElementById("sidebar-search").style.display = tabName === "search" ? "flex" : "none";
   if (tabName === "git") refreshGit();
+  if (tabName === "search") document.getElementById("project-search-input").focus();
+}
+
+// ══════════════════════════════════════════
+// Project Search
+// ══════════════════════════════════════════
+let _searchTimer = null;
+
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+async function projectSearch(query) {
+  const statusEl = document.getElementById("search-status");
+  const resultsEl = document.getElementById("search-results");
+  if (!query || !query.trim()) {
+    statusEl.textContent = "";
+    resultsEl.innerHTML = "";
+    return;
+  }
+  const caseSensitive = document.getElementById("search-case-cb").checked;
+  statusEl.textContent = "…";
+  try {
+    const data = await api("GET",
+      `/api/projects/${enc(S.projectName)}/search?q=${encodeURIComponent(query)}&case=${caseSensitive ? 1 : 0}`);
+    renderSearchResults(data, query, caseSensitive);
+  } catch (err) {
+    statusEl.textContent = err.message;
+    resultsEl.innerHTML = "";
+  }
+}
+
+function renderSearchResults(data, query, caseSensitive) {
+  const statusEl = document.getElementById("search-status");
+  const resultsEl = document.getElementById("search-results");
+  const files = Object.keys(data.results);
+  if (data.total === 0) {
+    statusEl.textContent = t("no_results");
+    resultsEl.innerHTML = "";
+    return;
+  }
+  let summary = t("search_summary").replace("{n}", data.total).replace("{f}", files.length);
+  if (data.truncated) summary += " — " + t("results_truncated").replace("{n}", 500);
+  statusEl.textContent = summary;
+
+  const flags = caseSensitive ? "g" : "gi";
+  const highlightRe = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), flags);
+
+  let html = "";
+  for (const file of files) {
+    const matches = data.results[file];
+    html += `<div class="search-file-group">`;
+    html += `<div class="search-file-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">`;
+    html += `<span>${escapeHtml(file)}</span><span class="match-count">${matches.length}</span></div>`;
+    html += `<div>`;
+    for (const m of matches) {
+      const safe = escapeHtml(m.text).replace(highlightRe, s => `<mark>${s}</mark>`);
+      html += `<div class="search-match" onclick="openFileAtLine('${file.replace(/'/g, "\\'")}', ${m.line})">`;
+      html += `<span class="line-num">${m.line}</span><span class="line-text">${safe}</span></div>`;
+    }
+    html += `</div></div>`;
+  }
+  resultsEl.innerHTML = html;
+}
+
+async function openFileAtLine(filePath, lineNum) {
+  if (filePath !== S.currentFile) await openFile(filePath);
+  if (S.editorView) {
+    const line = S.editorView.state.doc.line(Math.min(lineNum, S.editorView.state.doc.lines));
+    S.editorView.dispatch({
+      selection: { anchor: line.from },
+      effects: EditorView.scrollIntoView(line.from, { y: "center" })
+    });
+    S.editorView.focus();
+  }
 }
 
 // ══════════════════════════════════════════
@@ -3141,6 +3273,7 @@ function showShortcutsPopup() {
     { title: t("shortcut_navigation"), shortcuts: [
       { keys: [MOD, "Shift", "E"], desc: t("sc_files_tab") },
       { keys: [MOD, "Shift", "G"], desc: t("sc_git_tab") },
+      { keys: [MOD, "Shift", "F"], desc: t("sc_search_tab") },
     ]},
     { title: t("shortcut_git"), shortcuts: [
       { keys: [MOD, "Shift", "Alt", "C"], desc: t("sc_commit") },
@@ -3179,6 +3312,7 @@ function setupKeybindings() {
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "Enter") { e.preventDefault(); compile(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "E") { e.preventDefault(); switchSidebarTab("files"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "G") { e.preventDefault(); switchSidebarTab("git"); }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "F") { e.preventDefault(); switchSidebarTab("search"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.key === "C") { e.preventDefault(); doCommit(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.key === "P") { e.preventDefault(); doPush(); }
     if ((e.ctrlKey || e.metaKey) && e.key === "/") { e.preventDefault(); showShortcutsPopup(); }
@@ -3216,6 +3350,21 @@ document.getElementById("btn-git-push").onclick = doPush;
 document.getElementById("btn-git-refresh").onclick = refreshGit;
 document.getElementById("tab-files").onclick = () => switchSidebarTab("files");
 document.getElementById("tab-git").onclick = () => switchSidebarTab("git");
+document.getElementById("tab-search").onclick = () => switchSidebarTab("search");
+
+// Search input wiring
+document.getElementById("project-search-input").addEventListener("input", (e) => {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => projectSearch(e.target.value), 300);
+});
+document.getElementById("project-search-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { clearTimeout(_searchTimer); projectSearch(e.target.value); }
+  if (e.key === "Escape") { e.target.value = ""; document.getElementById("search-status").textContent = ""; document.getElementById("search-results").innerHTML = ""; }
+});
+document.getElementById("search-case-cb").addEventListener("change", () => {
+  const q = document.getElementById("project-search-input").value;
+  if (q) projectSearch(q);
+});
 document.getElementById("btn-push").onclick = doPush;
 document.getElementById("btn-log-toggle").onclick = toggleLog;
 document.getElementById("btn-new-file").onclick = showNewFileModal;

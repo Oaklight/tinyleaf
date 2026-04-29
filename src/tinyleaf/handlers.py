@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import subprocess
 import time
 
@@ -48,6 +49,7 @@ def handle_request(handler, action, **kwargs):
         "synctex_query": _synctex_query,
         "synctex_forward": _synctex_forward,
         "clean": _clean,
+        "search_files": _search_files,
         "git_status": _git_status,
         "git_diff": _git_diff,
         "git_diff_file": _git_diff_file,
@@ -1019,6 +1021,123 @@ def _clean(handler, name):
                     pass
 
     handler.send_json({"removed": removed, "count": len(removed)})
+
+
+# ── Search ──
+
+_SEARCH_SKIP_DIRS = {".git", "__pycache__", ".ruff_cache", "node_modules"}
+_SEARCH_BINARY_EXTS = {
+    ".pdf",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".svg",
+    ".webp",
+    ".bmp",
+    ".ico",
+    ".zip",
+    ".tar",
+    ".gz",
+    ".bz2",
+    ".xz",
+    ".7z",
+    ".rar",
+    ".exe",
+    ".dll",
+    ".so",
+    ".dylib",
+    ".o",
+    ".a",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".otf",
+    ".eot",
+    ".mp3",
+    ".mp4",
+    ".avi",
+    ".mov",
+    ".wav",
+    ".flac",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".ppt",
+    ".pptx",
+}
+
+
+def _search_files(handler, name, qs=None):
+    """Search for text across all project files (grep-style)."""
+    project_dir = _get_project_dir(handler, name)
+    if not project_dir:
+        return
+
+    qs = qs or {}
+    query = qs.get("q", [None])[0]
+    if not query:
+        handler.send_json({"error": "Missing search query"}, status=400)
+        return
+
+    case_sensitive = qs.get("case", ["0"])[0] == "1"
+    max_results = 500
+
+    flags = 0 if case_sensitive else re.IGNORECASE
+    try:
+        pattern = re.compile(re.escape(query), flags)
+    except re.error:
+        handler.send_json({"error": "Invalid search pattern"}, status=400)
+        return
+
+    results = {}
+    total = 0
+
+    for root, dirs, filenames in os.walk(project_dir):
+        dirs[:] = [d for d in dirs if d not in _SEARCH_SKIP_DIRS]
+        for fname in sorted(filenames):
+            if fname.endswith(".synctex.gz"):
+                continue
+            ext = os.path.splitext(fname)[1].lower()
+            if ext in _SEARCH_BINARY_EXTS:
+                continue
+
+            full = os.path.join(root, fname)
+            rel = os.path.relpath(full, project_dir)
+
+            try:
+                with open(full, encoding="utf-8") as f:
+                    for line_num, line_text in enumerate(f, 1):
+                        if pattern.search(line_text):
+                            if rel not in results:
+                                results[rel] = []
+                            results[rel].append(
+                                {
+                                    "line": line_num,
+                                    "text": line_text.rstrip("\n\r")[:300],
+                                }
+                            )
+                            total += 1
+                            if total >= max_results:
+                                break
+            except (UnicodeDecodeError, OSError):
+                continue
+
+            if total >= max_results:
+                break
+        if total >= max_results:
+            break
+
+    handler.send_json(
+        {
+            "query": query,
+            "case_sensitive": case_sensitive,
+            "results": results,
+            "total": total,
+            "truncated": total >= max_results,
+        }
+    )
 
 
 # ── Git ──
