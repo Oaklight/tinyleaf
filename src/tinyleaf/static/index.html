@@ -3083,12 +3083,12 @@ function renderSearchResults(data, query, caseSensitive) {
   for (const file of files) {
     const matches = data.results[file];
     html += `<div class="search-file-group">`;
-    html += `<div class="search-file-header" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">`;
+    html += `<div class="search-file-header" data-toggle>`;
     html += `<span>${escapeHtml(file)}</span><span class="match-count">${matches.length}</span></div>`;
     html += `<div>`;
     for (const m of matches) {
       const safe = escapeHtml(m.text).replace(highlightRe, s => `<mark>${s}</mark>`);
-      html += `<div class="search-match" onclick="openFileAtLine('${file.replace(/'/g, "\\'")}', ${m.line})">`;
+      html += `<div class="search-match" data-file="${escapeHtml(file)}" data-line="${m.line}">`;
       html += `<span class="line-num">${m.line}</span><span class="line-text">${safe}</span></div>`;
     }
     html += `</div></div>`;
@@ -3364,6 +3364,12 @@ document.getElementById("project-search-input").addEventListener("keydown", (e) 
 document.getElementById("search-case-cb").addEventListener("change", () => {
   const q = document.getElementById("project-search-input").value;
   if (q) projectSearch(q);
+});
+document.getElementById("search-results").addEventListener("click", (e) => {
+  const header = e.target.closest(".search-file-header[data-toggle]");
+  if (header) { const body = header.nextElementSibling; body.style.display = body.style.display === "none" ? "" : "none"; return; }
+  const match = e.target.closest(".search-match[data-file]");
+  if (match) openFileAtLine(match.dataset.file, parseInt(match.dataset.line, 10));
 });
 document.getElementById("btn-push").onclick = doPush;
 document.getElementById("btn-log-toggle").onclick = toggleLog;
