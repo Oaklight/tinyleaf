@@ -491,3 +491,45 @@ Forward search: find the PDF position for a source file and line number.
 Coordinates are in PDF points (72 DPI).
 
 **Errors:** `400` if parameters are missing, `404` if no SyncTeX file exists or no match is found.
+
+---
+
+## Search
+
+### `GET /api/projects/{name}/search?q={keyword}&case={0|1}`
+
+Search for text across all project files (grep-style). Skips binary files and hidden directories (`.git`, `__pycache__`, etc.).
+
+**Query parameters:**
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `q` | string | Search query (required) |
+| `case` | `0` or `1` | Case-sensitive search (default: `0`) |
+
+**Response:**
+
+```json
+{
+  "query": "documentclass",
+  "case_sensitive": false,
+  "results": {
+    "main.tex": [
+      {"line": 1, "text": "\\documentclass{article}"}
+    ],
+    "sections/intro.tex": [
+      {"line": 3, "text": "% see documentclass options above"}
+    ]
+  },
+  "total": 2,
+  "truncated": false
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `results` | object | Matches grouped by relative file path |
+| `total` | int | Total number of matching lines |
+| `truncated` | bool | `true` if results were capped at 500 matches |
+
+**Errors:** `400` if `q` parameter is missing.

@@ -50,6 +50,7 @@ Initial release of tinyleaf (formerly texlive-web).
 - Files and Git tabs
 - File tree with expand/collapse state persistence
 - Collapse-all button, search, upload, new file/folder, delete, rename
+- **Project-wide text search** (`Ctrl+Shift+F`) — grep-style search across all project files with results grouped by file, keyword highlighting, and click-to-jump navigation
 - LaTeX build artifacts grayed out in tree
 
 #### Git Integration
@@ -84,6 +85,7 @@ Initial release of tinyleaf (formerly texlive-web).
 | `Ctrl+Shift+Enter` | Jump to PDF (forward search) |
 | `Ctrl+Click` (PDF) | Jump to source (inverse search) |
 | `Ctrl+Shift+E` | Files tab |
+| `Ctrl+Shift+F` | Search tab |
 | `Ctrl+Shift+G` | Git tab |
 | `Ctrl+Shift+Alt+C` | Git commit |
 | `Ctrl+Shift+Alt+P` | Git push |
