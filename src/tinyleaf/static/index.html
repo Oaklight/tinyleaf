@@ -432,6 +432,15 @@ select:focus { border-color: var(--accent); outline: none; }
 }
 #pdf-container canvas { box-shadow: 0 2px 12px rgba(0,0,0,0.15); border-radius: 2px; }
 #pdf-container.synctex-ready canvas { cursor: crosshair; }
+.synctex-highlight {
+  position: absolute;
+  height: 20px;
+  background: rgba(255, 200, 0, 0.35);
+  pointer-events: none;
+  border-radius: 2px;
+  animation: synctex-fade 1.5s ease-out forwards;
+}
+@keyframes synctex-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 #btn-pdf-hd.active { background: var(--accent); color: #fff; }
 
 #pdf-toolbar {
@@ -1236,6 +1245,7 @@ const I18N = {
     sc_close: "Close dialog / Escape",
     sc_shortcuts: "Show shortcuts",
     sc_synctex: "Jump to source (click on PDF)",
+    sc_forward_search: "Jump to PDF",
     shortcut_pdf: "PDF Preview",
     search_files_title: "Search files",
     upload_file_title: "Upload file",
@@ -1379,6 +1389,7 @@ const I18N = {
     sc_close: "关闭对话框 / 退出",
     sc_shortcuts: "显示快捷键",
     sc_synctex: "跳转到源码（点击 PDF）",
+    sc_forward_search: "跳转到 PDF",
     shortcut_pdf: "PDF 预览",
     search_files_title: "搜索文件",
     upload_file_title: "上传文件",
@@ -2891,6 +2902,35 @@ async function syncTexInverseSearch(page, x, y) {
   }
 }
 
+async function syncTexForwardSearch() {
+  if (!S.editorView || !S.currentFile || !S.projectName) return;
+  const lineNum = S.editorView.state.doc.lineAt(
+    S.editorView.state.selection.main.head
+  ).number;
+  try {
+    const data = await api("GET",
+      `/api/projects/${enc(S.projectName)}/synctex/forward?file=${enc(S.currentFile)}&line=${lineNum}`);
+    if (!data.page) return;
+    const container = document.getElementById("pdf-container");
+    const canvases = container.querySelectorAll("canvas");
+    const canvas = canvases[data.page - 1];
+    if (!canvas) return;
+    const scale = parseFloat(canvas.dataset.scale);
+    const cssY = data.y * scale;
+    container.scrollTop = canvas.offsetTop + cssY - container.clientHeight / 2;
+    // Flash highlight
+    const marker = document.createElement("div");
+    marker.className = "synctex-highlight";
+    marker.style.top = `${canvas.offsetTop + cssY - 10}px`;
+    marker.style.left = `${canvas.offsetLeft}px`;
+    marker.style.width = `${canvas.width / (window.devicePixelRatio || 1)}px`;
+    container.appendChild(marker);
+    setTimeout(() => marker.remove(), 1500);
+  } catch (err) {
+    console.warn("SyncTeX forward:", err.message);
+  }
+}
+
 function showImagePreview(url, filePath) {
   const container = document.getElementById("pdf-container");
   container.innerHTML = "";
@@ -3111,6 +3151,7 @@ function showShortcutsPopup() {
     ]},
     { title: t("shortcut_pdf"), shortcuts: [
       { keys: [MOD, "Click"], desc: t("sc_synctex") },
+      { keys: [MOD, "Shift", "Enter"], desc: t("sc_forward_search") },
     ]},
     { title: t("shortcut_general"), shortcuts: [
       { keys: [MOD, "/"], desc: t("sc_shortcuts") },
@@ -3137,7 +3178,8 @@ function showShortcutsPopup() {
 function setupKeybindings() {
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); saveCurrentFile(); }
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") { e.preventDefault(); compile(); }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "Enter") { e.preventDefault(); syncTexForwardSearch(); }
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "Enter") { e.preventDefault(); compile(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "E") { e.preventDefault(); switchSidebarTab("files"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "G") { e.preventDefault(); switchSidebarTab("git"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.key === "C") { e.preventDefault(); doCommit(); }
