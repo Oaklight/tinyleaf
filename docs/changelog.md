@@ -50,6 +50,7 @@ tinyleaf 首次发布（前身为 texlive-web）。
 - 文件和 Git 标签页
 - 文件树展开/折叠状态持久化
 - 全部折叠按钮、搜索、上传、新建文件/文件夹、删除、重命名
+- **项目级全文搜索**（`Ctrl+Shift+F`）——grep 风格的项目内文件搜索，结果按文件分组，关键词高亮，点击跳转到对应行
 - LaTeX 构建产物在文件树中灰显
 
 #### Git 集成
@@ -84,6 +85,7 @@ tinyleaf 首次发布（前身为 texlive-web）。
 | `Ctrl+Shift+Enter` | 跳转到 PDF（正向搜索） |
 | `Ctrl+点击`（PDF） | 跳转到源码（反向搜索） |
 | `Ctrl+Shift+E` | 文件标签页 |
+| `Ctrl+Shift+F` | 搜索标签页 |
 | `Ctrl+Shift+G` | Git 标签页 |
 | `Ctrl+Shift+Alt+C` | Git 提交 |
 | `Ctrl+Shift+Alt+P` | Git 推送 |

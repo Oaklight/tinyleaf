@@ -491,3 +491,45 @@ SyncTeX 提供源文件与编译 PDF 之间的双向导航。需要编译时生�
 坐标单位为 PDF 点（72 DPI）。
 
 **错误：** `400` 缺少参数，`404` 无 SyncTeX 文件或无匹配结果。
+
+---
+
+## 搜索
+
+### `GET /api/projects/{name}/search?q={keyword}&case={0|1}`
+
+在项目所有文件中搜索文本（grep 风格）。自动跳过二进制文件和隐藏目录（`.git`、`__pycache__` 等）。
+
+**查询参数：**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `q` | string | 搜索关键词（必填） |
+| `case` | `0` 或 `1` | 区分大小写搜索（默认：`0`） |
+
+**响应：**
+
+```json
+{
+  "query": "documentclass",
+  "case_sensitive": false,
+  "results": {
+    "main.tex": [
+      {"line": 1, "text": "\\documentclass{article}"}
+    ],
+    "sections/intro.tex": [
+      {"line": 3, "text": "% see documentclass options above"}
+    ]
+  },
+  "total": 2,
+  "truncated": false
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `results` | object | 按相对文件路径分组的匹配结果 |
+| `total` | int | 匹配行总数 |
+| `truncated` | bool | 结果超过 500 条上限时为 `true` |
+
+**错误：** `400` 缺少 `q` 参数。
