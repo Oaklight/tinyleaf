@@ -5,6 +5,33 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [0.3.0] - 2026-05-18
+
+### 新增
+
+- **布局切换器**（Overleaf 风格）位于状态栏左下角——三种预设：
+    - **Editor**：侧边栏 + 编辑器，隐藏 PDF
+    - **Split**：三栏全显（默认）
+    - **PDF**：仅显示 PDF，隐藏侧边栏和编辑器
+- **侧边栏折叠按钮**——项目打开后显示于工具栏
+- **编译日志开关**移至状态栏；新增 `Ctrl+\`` 快捷键开关日志面板
+- 布局切换快捷键：`Ctrl+Shift+1` / `2` / `3`
+- `Ctrl+B` 快捷键切换侧边栏（PDF 模式下禁用）
+- 布局偏好持久化至 `localStorage`
+- 快捷键弹窗新增布局相关条目（中英文）
+
+### 变更
+
+- 编译日志开关按钮从工具栏移至状态栏右侧
+- 布局切换器置于状态栏最左侧，视觉上更突出
+
+### 内部
+
+- 新增 CI lint workflow（ruff + ty via pre-commit），在 push 和 PR 时自动运行
+- 新增 release workflow（手动 `workflow_dispatch` 触发）
+- 修复 `ty` 类型收窄：在 `compiler.py` 中添加 `assert proc.stdout is not None`
+- 将 `_vendor/` 从 ruff 格式化范围中排除
+
 ## [0.2.0] - 2026-04-29
 
 ### 新增
@@ -115,5 +142,6 @@ tinyleaf 首次发布（前身为 texlive-web）。
 - 更新了 CLI 入口、配置目录和程序名称
 - 默认编译后端改为 Docker（使用 `--no-docker` 切换为本地编译）
 
+[0.3.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.1.0
