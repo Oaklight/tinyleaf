@@ -948,7 +948,6 @@ select:focus { border-color: var(--accent); outline: none; }
     <button id="btn-commit" class="sm" data-i18n="commit">Commit</button>
     <button id="btn-push" class="sm" data-i18n="push">Push</button>
     <span class="toolbar-sep"></span>
-    <button class="icon-btn" id="btn-log-toggle" title="Toggle log" data-i18n-title="toggle_log"><svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
     </span>
   </div>
 
@@ -1065,7 +1064,6 @@ select:focus { border-color: var(--accent); outline: none; }
           <span id="log-status"></span>
           <span style="flex:1"></span>
           <button id="btn-log-copy" class="sm" style="font-size:11px;padding:2px 8px" title="Copy log" data-i18n-title="copy_log" data-i18n="copy" onclick="event.stopPropagation(); copyLog()">Copy</button>
-          <button class="icon-btn" title="Close log (Ctrl+\`)" onclick="event.stopPropagation(); toggleLog()" style="margin-left:2px"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>
         <div id="log-content"></div>
       </div>
@@ -1077,6 +1075,7 @@ select:focus { border-color: var(--accent); outline: none; }
     <span id="status-left" data-i18n="ready">Ready</span>
     <span style="flex:1"></span>
     <span id="status-right"></span>
+    <button class="icon-btn" id="btn-log-toggle" title="Toggle compile log (Ctrl+\`)" data-i18n-title="toggle_log" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
     <div class="layout-switcher" id="layout-switcher" role="group" style="display:none">
       <button class="layout-btn" id="layout-btn-editor" data-layout="editor" title="Editor only">
         <svg viewBox="0 0 20 14" fill="none"><rect x="1" y="1" width="11" height="12" rx="1" fill="currentColor" opacity="0.9"/><rect x="13" y="1" width="6" height="12" rx="1" fill="currentColor" opacity="0.2"/></svg>
