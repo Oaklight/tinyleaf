@@ -135,6 +135,40 @@ body {
 }
 .panel-toggle:hover { background: var(--bg-hover); color: var(--text); }
 
+/* ── Layout Switcher ── */
+.layout-switcher {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+.layout-btn {
+  padding: 2px 6px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  border-right: 1px solid var(--border);
+}
+.layout-btn:last-child { border-right: none; }
+.layout-btn:hover { background: var(--bg-hover); color: var(--text); }
+.layout-btn.active { background: var(--accent); color: #fff; }
+.layout-btn svg { width: 20px; height: 14px; display: block; }
+
+/* ── Editor-pane hidden state (PDF-only mode) ── */
+#editor-pane.hidden { display: none; }
+
+/* ── Hide resize handles when adjacent panel is gone ── */
+#resize-sidebar.hidden,
+#resize-pdf.hidden { display: none; }
+
 #statusbar {
   display: flex;
   align-items: center;
@@ -892,6 +926,7 @@ select:focus { border-color: var(--accent); outline: none; }
     <span class="toolbar-sep"></span>
     <span id="project-name" style="font-size: 13px; color: var(--text-dim);">&mdash;</span>
     </span>
+    <button class="icon-btn" id="btn-sidebar-toggle" title="Toggle sidebar (Ctrl+B)" style="display:none"><svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
     <span style="flex:1"></span>
 
     <span id="toolbar-project" style="display:none;align-items:center;gap:8px">
@@ -1041,6 +1076,17 @@ select:focus { border-color: var(--accent); outline: none; }
     <span id="status-left" data-i18n="ready">Ready</span>
     <span style="flex:1"></span>
     <span id="status-right"></span>
+    <div class="layout-switcher" id="layout-switcher" role="group" style="display:none">
+      <button class="layout-btn" id="layout-btn-editor" data-layout="editor" title="Editor only">
+        <svg viewBox="0 0 20 14" fill="none"><rect x="1" y="1" width="11" height="12" rx="1" fill="currentColor" opacity="0.9"/><rect x="13" y="1" width="6" height="12" rx="1" fill="currentColor" opacity="0.2"/></svg>
+      </button>
+      <button class="layout-btn active" id="layout-btn-split" data-layout="split" title="Split view">
+        <svg viewBox="0 0 20 14" fill="none"><rect x="1" y="1" width="8" height="12" rx="1" fill="currentColor" opacity="0.9"/><rect x="11" y="1" width="8" height="12" rx="1" fill="currentColor" opacity="0.9"/></svg>
+      </button>
+      <button class="layout-btn" id="layout-btn-pdf" data-layout="pdf" title="PDF only">
+        <svg viewBox="0 0 20 14" fill="none"><rect x="1" y="1" width="6" height="12" rx="1" fill="currentColor" opacity="0.2"/><rect x="8" y="1" width="11" height="12" rx="1" fill="currentColor" opacity="0.9"/></svg>
+      </button>
+    </div>
     <button class="icon-btn" id="btn-shortcuts" title="Keyboard shortcuts" data-i18n-title="keyboard_shortcuts" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="8" x2="6" y2="8"/><line x1="10" y1="8" x2="10" y2="8"/><line x1="14" y1="8" x2="14" y2="8"/><line x1="18" y1="8" x2="18" y2="8"/><line x1="6" y1="12" x2="6" y2="12"/><line x1="10" y1="12" x2="10" y2="12"/><line x1="14" y1="12" x2="14" y2="12"/><line x1="18" y1="12" x2="18" y2="12"/><line x1="8" y1="16" x2="16" y2="16"/></svg></button>
     <button class="icon-btn" id="btn-settings" title="Settings" data-i18n-title="settings" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
   </div>
@@ -1309,6 +1355,14 @@ const I18N = {
     search_summary: "{n} result(s) in {f} file(s)",
     results_truncated: "Results truncated (max {n})",
     sc_search_tab: "Search tab",
+    layout_editor: "Editor only",
+    layout_split: "Split view",
+    layout_pdf: "PDF only",
+    sc_toggle_sidebar: "Toggle sidebar",
+    sc_layout_editor: "Editor only layout",
+    sc_layout_split: "Split layout",
+    sc_layout_pdf: "PDF only layout",
+    shortcut_layout: "Layout",
   },
   zh: {
     compile: "编译",
@@ -1459,6 +1513,14 @@ const I18N = {
     search_summary: "{f} 个文件中找到 {n} 个结果",
     results_truncated: "结果已截断（上限 {n}）",
     sc_search_tab: "搜索标签",
+    layout_editor: "仅编辑器",
+    layout_split: "分屏视图",
+    layout_pdf: "仅 PDF",
+    sc_toggle_sidebar: "切换侧边栏",
+    sc_layout_editor: "仅编辑器布局",
+    sc_layout_split: "分屏布局",
+    sc_layout_pdf: "仅 PDF 布局",
+    shortcut_layout: "布局",
   },
 };
 
@@ -2224,6 +2286,8 @@ async function showProjectList() {
   document.getElementById("editor-view").style.display = "none";
   document.getElementById("toolbar-project").style.display = "none";
   document.getElementById("toolbar-project-name").style.display = "none";
+  document.getElementById("btn-sidebar-toggle").style.display = "none";
+  document.getElementById("layout-switcher").style.display = "none";
 
   const projects = await api("GET", "/api/projects");
   const grid = document.getElementById("project-grid");
@@ -2435,6 +2499,8 @@ async function openProject(name) {
   document.getElementById("editor-view").style.display = "flex";
   document.getElementById("toolbar-project").style.display = "flex";
   document.getElementById("toolbar-project-name").style.display = "flex";
+  document.getElementById("btn-sidebar-toggle").style.display = "";
+  document.getElementById("layout-switcher").style.display = "";
 
   // Clear previous project state
   S.pdfDoc = null;
@@ -3030,6 +3096,58 @@ function showImagePreview(url, filePath) {
 // ══════════════════════════════════════════
 function openLog() { document.getElementById("log-panel").classList.add("open"); }
 function toggleLog() { document.getElementById("log-panel").classList.toggle("open"); }
+
+// ══════════════════════════════════════════
+// Layout Switcher
+// ══════════════════════════════════════════
+function setLayout(mode) {
+  const sidebar          = document.getElementById("sidebar");
+  const editorPane       = document.getElementById("editor-pane");
+  const pdfPane          = document.getElementById("pdf-pane");
+  const resizeSidebar    = document.getElementById("resize-sidebar");
+  const resizePdf        = document.getElementById("resize-pdf");
+  const btnSidebarToggle = document.getElementById("btn-sidebar-toggle");
+
+  if (mode === "editor") {
+    sidebar.classList.remove("collapsed");
+    editorPane.classList.remove("hidden");
+    pdfPane.classList.add("collapsed");
+    resizeSidebar.classList.remove("hidden");
+    resizePdf.classList.add("hidden");
+  } else if (mode === "split") {
+    sidebar.classList.remove("collapsed");
+    editorPane.classList.remove("hidden");
+    pdfPane.classList.remove("collapsed");
+    resizeSidebar.classList.remove("hidden");
+    resizePdf.classList.remove("hidden");
+  } else if (mode === "pdf") {
+    sidebar.classList.add("collapsed");
+    editorPane.classList.add("hidden");
+    pdfPane.classList.remove("collapsed");
+    resizeSidebar.classList.add("hidden");
+    resizePdf.classList.add("hidden");
+  }
+
+  if (btnSidebarToggle) {
+    btnSidebarToggle.disabled = (mode === "pdf");
+    btnSidebarToggle.style.opacity = (mode === "pdf") ? "0.4" : "";
+  }
+
+  document.querySelectorAll(".layout-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.layout === mode);
+  });
+
+  localStorage.setItem("tinyleaf-layout", mode);
+  S.layoutMode = mode;
+}
+
+function toggleSidebar() {
+  if (S.layoutMode === "pdf") return;
+  const sidebar = document.getElementById("sidebar");
+  const isCollapsed = sidebar.classList.toggle("collapsed");
+  localStorage.setItem("tinyleaf-sidebar-collapsed", isCollapsed ? "1" : "0");
+}
+
 function clearLog() {
   document.getElementById("log-content").innerHTML = "";
   document.getElementById("log-status").innerHTML = "";
@@ -3297,6 +3415,7 @@ function showShortcutsPopup() {
       { keys: [MOD, "Enter"], desc: t("sc_compile") },
     ]},
     { title: t("shortcut_navigation"), shortcuts: [
+      { keys: [MOD, "B"],          desc: t("sc_toggle_sidebar") },
       { keys: [MOD, "Shift", "E"], desc: t("sc_files_tab") },
       { keys: [MOD, "Shift", "G"], desc: t("sc_git_tab") },
       { keys: [MOD, "Shift", "F"], desc: t("sc_search_tab") },
@@ -3308,6 +3427,11 @@ function showShortcutsPopup() {
     { title: t("shortcut_pdf"), shortcuts: [
       { keys: [MOD, "Click"], desc: t("sc_synctex") },
       { keys: [MOD, "Shift", "Enter"], desc: t("sc_forward_search") },
+    ]},
+    { title: t("shortcut_layout"), shortcuts: [
+      { keys: [MOD, "Shift", "1"], desc: t("sc_layout_editor") },
+      { keys: [MOD, "Shift", "2"], desc: t("sc_layout_split") },
+      { keys: [MOD, "Shift", "3"], desc: t("sc_layout_pdf") },
     ]},
     { title: t("shortcut_general"), shortcuts: [
       { keys: [MOD, "/"], desc: t("sc_shortcuts") },
@@ -3342,6 +3466,10 @@ function setupKeybindings() {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.key === "C") { e.preventDefault(); doCommit(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.key === "P") { e.preventDefault(); doPush(); }
     if ((e.ctrlKey || e.metaKey) && e.key === "/") { e.preventDefault(); showShortcutsPopup(); }
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "b") { e.preventDefault(); toggleSidebar(); }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "1") { e.preventDefault(); setLayout("editor"); }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "2") { e.preventDefault(); setLayout("split"); }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "3") { e.preventDefault(); setLayout("pdf"); }
     if (e.key === "Escape") { closeModal(); closeContextMenu(); document.getElementById("settings-popup").classList.remove("open"); document.getElementById("shortcuts-popup").classList.remove("open"); }
   });
 }
@@ -3411,6 +3539,11 @@ document.getElementById("btn-collapse-all").onclick = () => {
   renderFileTree();
 };
 document.getElementById("log-header").onclick = toggleLog;
+// Layout switcher
+document.querySelectorAll(".layout-btn").forEach(btn => {
+  btn.addEventListener("click", () => setLayout(btn.dataset.layout));
+});
+document.getElementById("btn-sidebar-toggle").addEventListener("click", toggleSidebar);
 document.getElementById("btn-pdf-refresh").onclick = () => {
   if (S.projectName) {
     const base = (S.currentFile || "main.tex").replace(/\.tex$/, ".pdf");
@@ -3482,9 +3615,12 @@ window.addEventListener("focus", () => {
   const savedPdfW = localStorage.getItem("tinyleaf-pdf-width");
   if (savedPdfW) pdfPane.style.flex = "0 0 " + savedPdfW + "px";
 
-  // Restore collapsed states
-  if (localStorage.getItem("tinyleaf-sidebar-collapsed") === "1") sidebar.classList.add("collapsed");
-  if (localStorage.getItem("tinyleaf-pdf-collapsed") === "1") pdfPane.classList.add("collapsed");
+  // Restore layout preset first, then honor individual sidebar toggle
+  const savedLayout = localStorage.getItem("tinyleaf-layout") || "split";
+  setLayout(savedLayout);
+  if (savedLayout !== "pdf" && localStorage.getItem("tinyleaf-sidebar-collapsed") === "1") {
+    sidebar.classList.add("collapsed");
+  }
 
   function setupResize(handle, target, applySizeFn, storageKey, min, max, invert) {
     handle.addEventListener("mousedown", function (e) {
