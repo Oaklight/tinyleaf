@@ -17,13 +17,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install lint tools
-        run: pip install ruff ty
+        run: pip install pre-commit ty
 
-      - name: ruff check
-        run: ruff check src/
-
-      - name: ruff format check
-        run: ruff format --check src/
-
-      - name: ty check
-        run: ty check
+      - name: Run pre-commit
+        run: pre-commit run --all-files
