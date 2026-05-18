@@ -217,6 +217,7 @@ def _run_compile(job: CompileJob):
             )
             job.proc = proc
 
+            assert proc.stdout is not None
             for line in proc.stdout:
                 if job.is_cancelled:
                     break
@@ -326,6 +327,7 @@ def _docker_pull(job, image, registry_mirror=None):
         )
         job.proc = proc
 
+        assert proc.stdout is not None
         for line in proc.stdout:
             if job.is_cancelled:
                 proc.kill()
@@ -382,6 +384,7 @@ def docker_pull_image(image, registry_mirror=None):
         with _pull_procs_lock:
             _pull_procs[image] = proc
 
+        assert proc.stdout is not None
         output_lines = []
         for line in proc.stdout:
             output_lines.append(line)
