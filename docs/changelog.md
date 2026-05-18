@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-05-18
+
+### Added
+
+- **Layout switcher** (Overleaf-style) in statusbar bottom-left — three presets:
+    - **Editor**: sidebar + editor, PDF hidden
+    - **Split**: all three panels visible (default)
+    - **PDF**: PDF only, sidebar and editor hidden
+- **Sidebar toggle button** in toolbar — shown when a project is open
+- **Compile log toggle** button moved to statusbar; `Ctrl+\`` shortcut to open/close log panel
+- Keyboard shortcuts for layout switching: `Ctrl+Shift+1` / `2` / `3`
+- `Ctrl+B` shortcut to toggle sidebar (disabled in PDF-only mode)
+- Layout preference persisted to `localStorage`
+- New shortcuts shown in the keyboard shortcuts popup (EN/ZH)
+
+### Changed
+
+- Compile log toggle button moved from toolbar to statusbar (right side)
+- Layout switcher placed at far left of statusbar for visual prominence
+
+### Internal
+
+- Added CI lint workflow (ruff + ty via pre-commit) on push and PR
+- Added release workflow (manual `workflow_dispatch`)
+- Fixed `ty` type narrowing: `assert proc.stdout is not None` in `compiler.py`
+- Excluded `_vendor/` from ruff formatting
+
 ## [0.2.0] - 2026-04-29
 
 ### Added
@@ -115,5 +142,6 @@ Initial release of tinyleaf (formerly texlive-web).
 - Updated CLI entry point, config directory, and program name
 - Default compilation backend changed to Docker (use `--no-docker` for local)
 
+[0.3.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.1.0
