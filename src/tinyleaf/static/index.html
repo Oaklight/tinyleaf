@@ -1065,6 +1065,7 @@ select:focus { border-color: var(--accent); outline: none; }
           <span id="log-status"></span>
           <span style="flex:1"></span>
           <button id="btn-log-copy" class="sm" style="font-size:11px;padding:2px 8px" title="Copy log" data-i18n-title="copy_log" data-i18n="copy" onclick="event.stopPropagation(); copyLog()">Copy</button>
+          <button class="icon-btn" title="Close log (Ctrl+\`)" onclick="event.stopPropagation(); toggleLog()" style="margin-left:2px"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
         </div>
         <div id="log-content"></div>
       </div>
@@ -1358,6 +1359,7 @@ const I18N = {
     layout_editor: "Editor only",
     layout_split: "Split view",
     layout_pdf: "PDF only",
+    sc_toggle_log: "Toggle compile log",
     sc_toggle_sidebar: "Toggle sidebar",
     sc_layout_editor: "Editor only layout",
     sc_layout_split: "Split layout",
@@ -1516,6 +1518,7 @@ const I18N = {
     layout_editor: "仅编辑器",
     layout_split: "分屏视图",
     layout_pdf: "仅 PDF",
+    sc_toggle_log: "切换编译日志",
     sc_toggle_sidebar: "切换侧边栏",
     sc_layout_editor: "仅编辑器布局",
     sc_layout_split: "分屏布局",
@@ -3413,6 +3416,7 @@ function showShortcutsPopup() {
     ]},
     { title: t("shortcut_compile"), shortcuts: [
       { keys: [MOD, "Enter"], desc: t("sc_compile") },
+      { keys: [MOD, "`"],     desc: t("sc_toggle_log") },
     ]},
     { title: t("shortcut_navigation"), shortcuts: [
       { keys: [MOD, "B"],          desc: t("sc_toggle_sidebar") },
@@ -3466,6 +3470,7 @@ function setupKeybindings() {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.key === "C") { e.preventDefault(); doCommit(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.key === "P") { e.preventDefault(); doPush(); }
     if ((e.ctrlKey || e.metaKey) && e.key === "/") { e.preventDefault(); showShortcutsPopup(); }
+    if ((e.ctrlKey || e.metaKey) && e.key === "`") { e.preventDefault(); toggleLog(); }
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "b") { e.preventDefault(); toggleSidebar(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "1") { e.preventDefault(); setLayout("editor"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "2") { e.preventDefault(); setLayout("split"); }
