@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 0.3.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate version
+        id: version
+        run: |
+          VER="${{ github.event.inputs.version }}"
+          if git tag -l "v${VER}" | grep -q .; then
+            echo "::error::Tag v${VER} already exists"
+            exit 1
+          fi
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "Release version: ${VER}"
+
+      - name: Bump version in __init__.py
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          sed -i "s/^__version__ = .*/__version__ = \"${VER}\"/" src/tinyleaf/__init__.py
+          grep __version__ src/tinyleaf/__init__.py
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build package
+        run: python -m build
+
+      - name: Publish to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: twine upload dist/*
+
+      - name: Commit and tag
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/tinyleaf/__init__.py
+          git commit -m "chore: bump version to ${VER}"
+          git tag "v${VER}"
+          git push origin HEAD --tags
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VER="${{ steps.version.outputs.version }}"
+          gh release create "v${VER}" \
+            dist/*.whl dist/*.tar.gz \
+            --title "v${VER}" \
+            --generate-notes
