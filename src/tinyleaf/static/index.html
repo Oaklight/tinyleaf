@@ -1072,11 +1072,7 @@ select:focus { border-color: var(--accent); outline: none; }
 
   <!-- Status bar -->
   <div id="statusbar">
-    <span id="status-left" data-i18n="ready">Ready</span>
-    <span style="flex:1"></span>
-    <span id="status-right"></span>
-    <button class="icon-btn" id="btn-log-toggle" title="Toggle compile log (Ctrl+\`)" data-i18n-title="toggle_log" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
-    <div class="layout-switcher" id="layout-switcher" role="group" style="display:none">
+    <div class="layout-switcher" id="layout-switcher" role="group" style="display:none;margin-right:8px">
       <button class="layout-btn" id="layout-btn-editor" data-layout="editor" title="Editor only">
         <svg viewBox="0 0 20 14" fill="none"><rect x="1" y="1" width="11" height="12" rx="1" fill="currentColor" opacity="0.9"/><rect x="13" y="1" width="6" height="12" rx="1" fill="currentColor" opacity="0.2"/></svg>
       </button>
@@ -1087,6 +1083,10 @@ select:focus { border-color: var(--accent); outline: none; }
         <svg viewBox="0 0 20 14" fill="none"><rect x="1" y="1" width="6" height="12" rx="1" fill="currentColor" opacity="0.2"/><rect x="8" y="1" width="11" height="12" rx="1" fill="currentColor" opacity="0.9"/></svg>
       </button>
     </div>
+    <span id="status-left" data-i18n="ready">Ready</span>
+    <span style="flex:1"></span>
+    <span id="status-right"></span>
+    <button class="icon-btn" id="btn-log-toggle" title="Toggle compile log (Ctrl+\`)" data-i18n-title="toggle_log" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
     <button class="icon-btn" id="btn-shortcuts" title="Keyboard shortcuts" data-i18n-title="keyboard_shortcuts" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="8" x2="6" y2="8"/><line x1="10" y1="8" x2="10" y2="8"/><line x1="14" y1="8" x2="14" y2="8"/><line x1="18" y1="8" x2="18" y2="8"/><line x1="6" y1="12" x2="6" y2="12"/><line x1="10" y1="12" x2="10" y2="12"/><line x1="14" y1="12" x2="14" y2="12"/><line x1="18" y1="12" x2="18" y2="12"/><line x1="8" y1="16" x2="16" y2="16"/></svg></button>
     <button class="icon-btn" id="btn-settings" title="Settings" data-i18n-title="settings" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
   </div>
