@@ -18,7 +18,8 @@ repos:
         types: [python]
 
   # complexipy disabled: cli.py::main, compiler.py::_run_compile,
-  # handlers.py::_search_files, handlers.py::_upload exceed threshold
+  # handlers.py::_search_files, handlers.py::_upload exceed threshold (>20)
+  # TODO: refactor above functions to re-enable
   # - repo: local
   #   hooks:
   #     - id: complexipy
