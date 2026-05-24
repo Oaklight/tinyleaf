@@ -57,7 +57,7 @@ tinyleaf /path/to/project --image oaklight/texlive:alpine-science
 docker compose up
 ```
 
-Web 编辑器将在 `http://localhost:8080` 启动，并使用持久化的 TeX Live 容器进行编译。
+Web 编辑器将在 `http://localhost:14159` 启动，并使用持久化的 TeX Live 容器进行编译。
 
 ## 禁用 Docker
 

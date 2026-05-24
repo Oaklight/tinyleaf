@@ -77,7 +77,7 @@ pip install -e .
 tinyleaf /path/to/my-thesis
 ```
 
-编辑器将在 `http://localhost:8080` 启动并自动打开浏览器。
+编辑器将在 `http://localhost:14159` 启动并自动打开浏览器。
 
 ### 使用 Docker 编译
 
@@ -259,7 +259,7 @@ Tinyleaf 可以部署为 Docker 容器，也可以仅使用 Docker 进行 LaTeX 
 docker compose up
 ```
 
-Web 编辑器将在 `http://localhost:8080` 启动，并使用持久化的 TeX Live 容器进行编译。
+Web 编辑器将在 `http://localhost:14159` 启动，并使用持久化的 TeX Live 容器进行编译。
 
 ## 仅用 Docker 编译
 

@@ -8,7 +8,7 @@
 tinyleaf /path/to/my-thesis
 ```
 
-编辑器将在 `http://localhost:8080` 启动并自动打开浏览器。默认启用 Docker 编译。
+编辑器将在 `http://localhost:14159` 启动并自动打开浏览器。默认启用 Docker 编译。
 
 ### 禁用 Docker（本地编译）
 
