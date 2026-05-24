@@ -805,6 +805,105 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
 .modal textarea { resize: vertical; min-height: 60px; font-family: var(--mono); }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
 
+/* ── Quick Open (Ctrl+P) palette ── */
+#quick-open-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.4);
+  display: none;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 80px;
+  z-index: 1100;
+}
+#quick-open-overlay.open { display: flex; }
+.quick-open-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: min(640px, 90vw);
+  max-height: calc(100vh - 160px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+  overflow: hidden;
+}
+#quick-open-input {
+  width: 100%;
+  padding: 12px 14px;
+  background: transparent;
+  color: var(--text);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 14px;
+  outline: none;
+  flex-shrink: 0;
+}
+#quick-open-results {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.qo-empty {
+  padding: 16px;
+  color: var(--text-dim);
+  font-size: 13px;
+  text-align: center;
+}
+.qo-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 14px;
+  font-family: var(--mono);
+  font-size: 13px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.qo-row:hover { background: var(--bg-hover); }
+.qo-row.active {
+  background: var(--bg-hover);
+  border-left-color: var(--accent);
+}
+.qo-name {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+.qo-dir {
+  color: var(--text-dim);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+  min-width: 0;
+  flex: 1;
+}
+.qo-match { color: var(--accent); font-weight: 600; }
+.qo-footer {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--text-dim);
+  font-size: 11px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.qo-footer kbd {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
 /* ── Project List (multi-project mode) ── */
 #project-list-view {
   display: none;
@@ -1420,6 +1519,19 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
   </div>
 </div>
 
+<!-- Quick Open (Ctrl+P) -->
+<div id="quick-open-overlay">
+  <div class="quick-open-panel" onclick="event.stopPropagation()">
+    <input id="quick-open-input" type="text" autocomplete="off" spellcheck="false">
+    <div id="quick-open-results"></div>
+    <div class="qo-footer">
+      <span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="quick_open_hint_nav">navigate</span></span>
+      <span><kbd>↵</kbd> <span data-i18n="quick_open_hint_open">open</span></span>
+      <span><kbd>Esc</kbd> <span data-i18n="quick_open_hint_close">close</span></span>
+    </div>
+  </div>
+</div>
+
 <script type="module">
 // ══════════════════════════════════════════
 // i18n
@@ -1598,6 +1710,12 @@ const I18N = {
     sc_next_tab: "Next tab",
     sc_prev_tab: "Previous tab",
     sc_close_tab: "Close current tab",
+    sc_quick_open: "Quick open file",
+    quick_open_placeholder: "Type a file name…",
+    quick_open_no_results: "No matching files",
+    quick_open_hint_nav: "navigate",
+    quick_open_hint_open: "open",
+    quick_open_hint_close: "close",
   },
   zh: {
     compile: "编译",
@@ -1772,6 +1890,12 @@ const I18N = {
     sc_next_tab: "下一个标签",
     sc_prev_tab: "上一个标签",
     sc_close_tab: "关闭当前标签",
+    sc_quick_open: "快速打开文件",
+    quick_open_placeholder: "输入文件名…",
+    quick_open_no_results: "没有匹配的文件",
+    quick_open_hint_nav: "导航",
+    quick_open_hint_open: "打开",
+    quick_open_hint_close: "关闭",
   },
 };
 
@@ -2130,6 +2254,7 @@ async function init() {
   setupFileSearch();
   setupUpload();
   setupLogClickHandler();
+  setupQuickOpen();
   startFileWatcher();
   setStatus(t("ready"));
 
@@ -4410,6 +4535,7 @@ function showShortcutsPopup() {
       { keys: [MOD, "`"],     desc: t("sc_toggle_log") },
     ]},
     { title: t("shortcut_navigation"), shortcuts: [
+      { keys: [MOD, "P"],          desc: t("sc_quick_open") },
       { keys: [MOD, "B"],          desc: t("sc_toggle_sidebar") },
       { keys: [MOD, "Shift", "E"], desc: t("sc_files_tab") },
       { keys: [MOD, "Shift", "G"], desc: t("sc_git_tab") },
@@ -4454,6 +4580,196 @@ function showShortcutsPopup() {
   document.getElementById("shortcuts-popup").classList.add("open");
 }
 
+// ══════════════════════════════════════════
+// Quick Open (Ctrl+P fuzzy file switcher)
+// ══════════════════════════════════════════
+const QO = {
+  matches: [],     // [{path, indices, score}]
+  active: 0,       // active row index
+  maxResults: 50,
+};
+
+/**
+ * Score a path against a query using subsequence fuzzy match.
+ *
+ * Returns null when the query is not a subsequence of the path; otherwise
+ * an object {indices, score}. Higher scores rank earlier.
+ */
+function quickOpenScore(query, path) {
+  if (!query) return { indices: [], score: 0 };
+  const q = query.toLowerCase();
+  const p = path.toLowerCase();
+  const indices = [];
+  let qi = 0;
+  let score = 0;
+  let lastMatchPos = -2;
+  let consecutive = 0;
+  const basenameStart = path.lastIndexOf("/") + 1;
+  for (let i = 0; i < p.length && qi < q.length; i++) {
+    if (p[i] === q[qi]) {
+      indices.push(i);
+      let bonus = 1;
+      const prevCh = i > 0 ? p[i - 1] : "/";
+      if (prevCh === "/") bonus += 25;
+      else if (prevCh === "_" || prevCh === "-" || prevCh === "." || prevCh === " ") bonus += 10;
+      if (i >= basenameStart) bonus += 6;
+      if (lastMatchPos === i - 1) {
+        consecutive++;
+        bonus += 15 * consecutive;
+      } else {
+        consecutive = 0;
+      }
+      score += bonus;
+      lastMatchPos = i;
+      qi++;
+    }
+  }
+  if (qi < q.length) return null;
+  // Shorter paths win on ties
+  score -= path.length * 0.1;
+  return { indices, score };
+}
+
+function quickOpenFilter(query) {
+  const files = S.files || [];
+  const trimmed = query.trim();
+  if (!trimmed) {
+    // Empty query: tabs first (recent), then all files alphabetically
+    const tabSet = new Set(S.tabs || []);
+    const head = (S.tabs || []).slice();
+    const tail = files.filter((f) => !tabSet.has(f)).sort();
+    return [...head, ...tail].slice(0, QO.maxResults).map((path) => ({
+      path,
+      indices: [],
+      score: 0,
+    }));
+  }
+  const scored = [];
+  for (const path of files) {
+    const r = quickOpenScore(trimmed, path);
+    if (r) scored.push({ path, indices: r.indices, score: r.score });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, QO.maxResults);
+}
+
+function _qoEscape(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function _qoHighlight(text, indices, offset = 0) {
+  if (!indices.length) return _qoEscape(text);
+  const set = new Set(indices.map((i) => i - offset));
+  let out = "";
+  for (let i = 0; i < text.length; i++) {
+    const ch = _qoEscape(text[i]);
+    out += set.has(i) ? `<span class="qo-match">${ch}</span>` : ch;
+  }
+  return out;
+}
+
+function renderQuickOpenResults() {
+  const container = document.getElementById("quick-open-results");
+  if (!QO.matches.length) {
+    container.innerHTML = `<div class="qo-empty">${t("quick_open_no_results")}</div>`;
+    return;
+  }
+  if (QO.active >= QO.matches.length) QO.active = QO.matches.length - 1;
+  if (QO.active < 0) QO.active = 0;
+  const html = QO.matches.map((m, idx) => {
+    const slash = m.path.lastIndexOf("/");
+    const name = slash >= 0 ? m.path.slice(slash + 1) : m.path;
+    const dir = slash >= 0 ? m.path.slice(0, slash + 1) : "";
+    const nameHtml = _qoHighlight(name, m.indices, slash + 1);
+    const dirHtml = dir ? _qoHighlight(dir, m.indices, 0) : "";
+    return `<div class="qo-row${idx === QO.active ? " active" : ""}" data-idx="${idx}" data-path="${_qoEscape(m.path)}">
+      <span class="qo-name">${nameHtml}</span>
+      <span class="qo-dir">${dirHtml}</span>
+    </div>`;
+  }).join("");
+  container.innerHTML = html;
+  const activeEl = container.querySelector(".qo-row.active");
+  if (activeEl) activeEl.scrollIntoView({ block: "nearest" });
+}
+
+function quickOpenUpdate(query) {
+  QO.matches = quickOpenFilter(query);
+  QO.active = 0;
+  renderQuickOpenResults();
+}
+
+function openQuickOpen() {
+  if (!S.projectName) return;
+  const overlay = document.getElementById("quick-open-overlay");
+  const input = document.getElementById("quick-open-input");
+  input.placeholder = t("quick_open_placeholder");
+  input.value = "";
+  overlay.classList.add("open");
+  quickOpenUpdate("");
+  // Focus after the overlay becomes visible
+  setTimeout(() => input.focus(), 0);
+}
+
+function closeQuickOpen() {
+  const overlay = document.getElementById("quick-open-overlay");
+  if (!overlay.classList.contains("open")) return;
+  overlay.classList.remove("open");
+  document.getElementById("quick-open-input").blur();
+}
+
+function quickOpenPick(idx) {
+  if (idx < 0 || idx >= QO.matches.length) return;
+  const path = QO.matches[idx].path;
+  closeQuickOpen();
+  openFile(path);
+}
+
+function setupQuickOpen() {
+  const overlay = document.getElementById("quick-open-overlay");
+  const input = document.getElementById("quick-open-input");
+  const results = document.getElementById("quick-open-results");
+
+  input.addEventListener("input", () => quickOpenUpdate(input.value));
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      QO.active = Math.min(QO.active + 1, QO.matches.length - 1);
+      renderQuickOpenResults();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      QO.active = Math.max(QO.active - 1, 0);
+      renderQuickOpenResults();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      quickOpenPick(QO.active);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      closeQuickOpen();
+    }
+  });
+
+  results.addEventListener("click", (e) => {
+    const row = e.target.closest(".qo-row");
+    if (!row) return;
+    quickOpenPick(parseInt(row.dataset.idx, 10));
+  });
+
+  results.addEventListener("mousemove", (e) => {
+    const row = e.target.closest(".qo-row");
+    if (!row) return;
+    const idx = parseInt(row.dataset.idx, 10);
+    if (idx !== QO.active) {
+      QO.active = idx;
+      renderQuickOpenResults();
+    }
+  });
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeQuickOpen();
+  });
+}
+
 function setupKeybindings() {
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); saveCurrentFile(); }
@@ -4468,6 +4784,7 @@ function setupKeybindings() {
     if ((e.ctrlKey || e.metaKey) && e.key === "/") { e.preventDefault(); showShortcutsPopup(); }
     if ((e.ctrlKey || e.metaKey) && e.key === "`") { e.preventDefault(); toggleLog(); }
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "b") { e.preventDefault(); toggleSidebar(); }
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "p") { e.preventDefault(); openQuickOpen(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "1") { e.preventDefault(); setLayout("editor"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "2") { e.preventDefault(); setLayout("split"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "3") { e.preventDefault(); setLayout("pdf"); }
@@ -4478,7 +4795,7 @@ function setupKeybindings() {
       e.preventDefault();
       cycleTabs(e.shiftKey ? -1 : 1);
     }
-    if (e.key === "Escape") { closeModal(); closeContextMenu(); document.getElementById("settings-popup").classList.remove("open"); document.getElementById("shortcuts-popup").classList.remove("open"); if (document.getElementById("diff-pane").classList.contains("open")) closeDiffPane(); }
+    if (e.key === "Escape") { closeModal(); closeContextMenu(); closeQuickOpen(); document.getElementById("settings-popup").classList.remove("open"); document.getElementById("shortcuts-popup").classList.remove("open"); if (document.getElementById("diff-pane").classList.contains("open")) closeDiffPane(); }
   });
 }
 
