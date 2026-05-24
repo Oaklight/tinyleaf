@@ -48,7 +48,7 @@ tinyleaf
   --projects-dir DIR    旧版：将子目录迁移到注册表
   --docker              使用 Docker 编译（默认：本地 latexmk）
   --image IMAGE         Docker 镜像（默认：oaklight/texlive:latest）
-  --port PORT           服务端口（默认：8080）
+  --port PORT           服务端口（默认：14159，环境变量：TINYLEAF_PORT）
   --host HOST           服务地址（默认：127.0.0.1）
   --no-browser          启动时不自动打开浏览器
 ```
@@ -80,7 +80,7 @@ tinyleaf
 docker compose up
 ```
 
-Web 编辑器将在 `http://localhost:8080` 启动，并使用持久化的 TeX Live 容器进行编译。
+Web 编辑器将在 `http://localhost:14159` 启动，并使用持久化的 TeX Live 容器进行编译。
 
 ## 许可证
 

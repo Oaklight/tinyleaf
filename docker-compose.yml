@@ -2,7 +2,7 @@ services:
   web:
     build: .
     ports:
-      - "8080:8080"
+      - "14159:14159"
     volumes:
       - ./projects:/data/projects
       - /var/run/docker.sock:/var/run/docker.sock

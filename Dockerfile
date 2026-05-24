@@ -6,6 +6,6 @@ COPY src/ src/
 
 RUN pip install --no-cache-dir .
 
-EXPOSE 8080
+EXPOSE 14159
 
 ENTRYPOINT ["tinyleaf"]

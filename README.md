@@ -48,7 +48,7 @@ options:
   --projects-dir DIR    Legacy: migrate subdirs into registry
   --docker              Use Docker for compilation (default: local latexmk)
   --image IMAGE         Docker image to use (default: oaklight/texlive:latest)
-  --port PORT           Server port (default: 8080)
+  --port PORT           Server port (default: 14159, env: TINYLEAF_PORT)
   --host HOST           Server host (default: 127.0.0.1)
   --no-browser          Don't auto-open browser on start
 ```
@@ -80,7 +80,7 @@ For a self-contained setup with Docker compilation:
 docker compose up
 ```
 
-This starts the web editor on `http://localhost:8080` with a persistent TeX Live container for compilation.
+This starts the web editor on `http://localhost:14159` with a persistent TeX Live container for compilation.
 
 ## License
 

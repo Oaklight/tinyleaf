@@ -10,6 +10,8 @@ from tinyleaf import registry
 from tinyleaf.server import run_server
 
 DEFAULT_CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", "tinyleaf")
+DEFAULT_PORT = 14159
+DEFAULT_HOST = "127.0.0.1"
 
 
 def main():
@@ -47,13 +49,13 @@ def main():
     parser.add_argument(
         "--port",
         type=int,
-        default=8080,
-        help="Server port (default: 8080)",
+        default=int(os.environ.get("TINYLEAF_PORT", DEFAULT_PORT)),
+        help=f"Server port (default: {DEFAULT_PORT}, env: TINYLEAF_PORT)",
     )
     parser.add_argument(
         "--host",
-        default="127.0.0.1",
-        help="Server host (default: 127.0.0.1)",
+        default=os.environ.get("TINYLEAF_HOST", DEFAULT_HOST),
+        help=f"Server host (default: {DEFAULT_HOST}, env: TINYLEAF_HOST)",
     )
     parser.add_argument(
         "--no-browser",
