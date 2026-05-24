@@ -1150,18 +1150,45 @@ def _git_status(handler, name):
     handler.send_json(git_ops.status(project_dir))
 
 
-def _git_diff(handler, name):
+def _parse_diff_qs(qs):
+    """Extract diff query-string parameters.
+
+    Args:
+        qs: Parsed query string dict (values are lists).
+
+    Returns:
+        Tuple of (staged, fmt) where staged is one of ``"both"``,
+        ``"staged"``, ``"unstaged"`` and fmt is ``"text"`` or ``"json"``.
+    """
+    staged_raw = (qs or {}).get("staged", ["both"])[0]
+    staged = staged_raw if staged_raw in ("both", "staged", "unstaged") else "both"
+    fmt_raw = (qs or {}).get("format", ["text"])[0]
+    fmt = "json" if fmt_raw == "json" else "text"
+    return staged, fmt
+
+
+def _git_diff(handler, name, qs=None):
     project_dir = _get_project_dir(handler, name)
     if not project_dir:
         return
-    handler.send_text(git_ops.diff(project_dir))
+    staged, fmt = _parse_diff_qs(qs)
+    result = git_ops.diff(project_dir, staged=staged, fmt=fmt)
+    if fmt == "json":
+        handler.send_json(result)
+    else:
+        handler.send_text(result)
 
 
-def _git_diff_file(handler, name, file_path):
+def _git_diff_file(handler, name, file_path, qs=None):
     project_dir = _get_project_dir(handler, name)
     if not project_dir:
         return
-    handler.send_text(git_ops.diff(project_dir, file_path=file_path))
+    staged, fmt = _parse_diff_qs(qs)
+    result = git_ops.diff(project_dir, file_path=file_path, staged=staged, fmt=fmt)
+    if fmt == "json":
+        handler.send_json(result)
+    else:
+        handler.send_text(result)
 
 
 def _git_commit(handler, name):

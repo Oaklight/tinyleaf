@@ -450,6 +450,100 @@ select:focus { border-color: var(--accent); outline: none; }
 .diff-add { color: var(--green); }
 .diff-del { color: var(--red); }
 .diff-hunk { color: var(--accent); font-weight: 500; }
+
+/* ── Diff pane (workspace overlay) ── */
+#diff-pane {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+#diff-pane.open { display: flex; }
+#diff-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  gap: 6px;
+  min-height: 24px;
+  flex-shrink: 0;
+}
+#diff-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+#diff-content {
+  flex: 1;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  background: var(--bg);
+}
+.diff-section-header {
+  display: flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  user-select: none;
+}
+.diff-section-header:first-child { border-top: none; }
+.diff-no-changes {
+  padding: 20px 16px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-family: var(--font);
+  text-align: center;
+}
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.diff-table col.ln-old,
+.diff-table col.ln-new { width: 44px; }
+.diff-table col.code { width: auto; }
+.diff-ln {
+  width: 44px;
+  min-width: 44px;
+  text-align: right;
+  padding: 0 6px;
+  user-select: none;
+  color: var(--text-dim);
+  border-right: 1px solid var(--border);
+  background: var(--bg-card);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.diff-code {
+  padding: 0 8px;
+  white-space: pre;
+  overflow: hidden;
+}
+tr.diff-row-add .diff-ln { background: color-mix(in srgb, var(--green) 10%, var(--bg-card)); }
+tr.diff-row-add .diff-code { color: var(--green); background: color-mix(in srgb, var(--green) 8%, var(--bg)); }
+tr.diff-row-del .diff-ln { background: color-mix(in srgb, var(--red) 10%, var(--bg-card)); }
+tr.diff-row-del .diff-code { color: var(--red); background: color-mix(in srgb, var(--red) 8%, var(--bg)); }
+tr.diff-row-hunk .diff-ln { background: color-mix(in srgb, var(--accent) 10%, var(--bg-card)); }
+tr.diff-row-hunk .diff-code { color: var(--accent); font-weight: 600; background: color-mix(in srgb, var(--accent) 6%, var(--bg)); }
+tr.diff-row-ctx .diff-code { color: var(--text); }
+
 #git-commit-area {
   flex-shrink: 0; border-top: 1px solid var(--border); padding: 8px 10px;
   display: flex; flex-direction: column; gap: 6px;
@@ -1035,6 +1129,21 @@ select:focus { border-color: var(--accent); outline: none; }
               <button class="icon-btn" id="btn-close-file" title="Close file" data-i18n-title="close_file" style="display:none;padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/></svg></button>
             </div>
             <div id="editor-container"></div>
+            <!-- Diff viewer pane — shown in place of the editor when a git diff is open -->
+            <div id="diff-pane">
+              <div id="diff-toolbar">
+                <svg viewBox="0 0 24 24" style="width:14px;height:14px;flex-shrink:0;stroke:var(--text-dim);fill:none;stroke-width:2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
+                <span id="diff-title">—</span>
+                <span style="flex:1"></span>
+                <button class="icon-btn" id="btn-diff-refresh" title="Refresh diff" style="padding:2px 4px">
+                  <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+                </button>
+                <button class="icon-btn" id="btn-diff-close" title="Close diff" style="padding:2px 4px">
+                  <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+              <div id="diff-content"></div>
+            </div>
           </div>
           <div class="resize-handle" id="resize-pdf"></div>
           <div id="pdf-pane">
@@ -1266,6 +1375,10 @@ const I18N = {
     committed: "Committed",
     no_changes: "No changes",
     no_diff: "No diff",
+    diff_staged: "Staged changes",
+    diff_unstaged: "Unstaged changes",
+    diff_new_file: "New file",
+    diff_no_changes: "No changes in this file",
     no_files_selected: "No files selected",
     files_selected: "file(s) selected",
     commit_selected: "Commit Selected",
@@ -1425,6 +1538,10 @@ const I18N = {
     committed: "已提交",
     no_changes: "无更改",
     no_diff: "无差异",
+    diff_staged: "暂存的更改",
+    diff_unstaged: "未暂存的更改",
+    diff_new_file: "新文件",
+    diff_no_changes: "此文件无更改",
     no_files_selected: "未选择文件",
     files_selected: "个文件已选择",
     commit_selected: "提交所选",
@@ -3268,10 +3385,11 @@ async function refreshGit() {
 
     S.gitFiles = st.files || [];
     const fd = document.getElementById("git-files");
-    const diffView = document.getElementById("git-diff-view");
+    // Legacy diff view (sidebar widget) — keep hidden
+    const legacyDiffView = document.getElementById("git-diff-view");
     fd.innerHTML = "";
-    diffView.style.display = "none";
-    diffView.innerHTML = "";
+    legacyDiffView.style.display = "none";
+    legacyDiffView.innerHTML = "";
 
     if (S.gitFiles.length === 0) {
       fd.innerHTML = `<div style="padding:6px 14px;font-size:12px;color:var(--text-dim)">${t("no_changes")}</div>`;
@@ -3302,33 +3420,156 @@ async function refreshGit() {
   } catch { /* git not available */ }
 }
 
+// ── Diff pane helpers ──
+
+/** Open the diff pane in the editor area, hiding the editor container. */
+function _openDiffPane() {
+  document.getElementById("editor-container").style.display = "none";
+  document.getElementById("diff-pane").classList.add("open");
+}
+
+/** Close the diff pane and restore the editor container. */
+function closeDiffPane() {
+  document.getElementById("diff-pane").classList.remove("open");
+  document.getElementById("editor-container").style.display = "";
+  document.querySelectorAll("#git-files .git-file").forEach((el) => el.classList.remove("active"));
+  S._diffFilePath = null;
+  // Ask CodeMirror to re-measure layout after the container becomes visible.
+  if (S.editorView) S.editorView.requestMeasure();
+}
+
+/**
+ * Render a unified-diff string into a table with old/new line numbers.
+ *
+ * @param {string} diffText  Raw unified diff text.
+ * @param {HTMLElement} container  Element to append rendered rows into.
+ */
+function _renderDiffText(diffText, container) {
+  if (!diffText || !diffText.trim()) return false;
+
+  const table = document.createElement("table");
+  table.className = "diff-table";
+
+  const colgroup = document.createElement("colgroup");
+  colgroup.innerHTML = '<col class="ln-old"><col class="ln-new"><col class="code">';
+  table.appendChild(colgroup);
+
+  const tbody = document.createElement("tbody");
+  table.appendChild(tbody);
+
+  const hunkRe = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
+  let oldLine = 0, newLine = 0;
+  let hasContent = false;
+
+  for (const rawLine of diffText.split("\n")) {
+    // Skip diff file headers (--- a/... +++ b/...)
+    if (rawLine.startsWith("--- ") || rawLine.startsWith("+++ ")) continue;
+    if (rawLine.startsWith("diff --git") || rawLine.startsWith("index ")) continue;
+    if (rawLine.startsWith("new file mode") || rawLine.startsWith("deleted file mode")) continue;
+
+    const tr = document.createElement("tr");
+    const tdOld = document.createElement("td");
+    tdOld.className = "diff-ln";
+    const tdNew = document.createElement("td");
+    tdNew.className = "diff-ln";
+    const tdCode = document.createElement("td");
+    tdCode.className = "diff-code";
+
+    const hunkMatch = rawLine.match(hunkRe);
+    if (hunkMatch) {
+      oldLine = parseInt(hunkMatch[1], 10);
+      newLine = parseInt(hunkMatch[2], 10);
+      tr.className = "diff-row-hunk";
+      tdOld.textContent = "";
+      tdNew.textContent = "";
+      tdCode.textContent = rawLine;
+      hasContent = true;
+    } else if (rawLine.startsWith("+")) {
+      tr.className = "diff-row-add";
+      tdOld.textContent = "";
+      tdNew.textContent = newLine++;
+      tdCode.textContent = rawLine;
+      hasContent = true;
+    } else if (rawLine.startsWith("-")) {
+      tr.className = "diff-row-del";
+      tdOld.textContent = oldLine++;
+      tdNew.textContent = "";
+      tdCode.textContent = rawLine;
+      hasContent = true;
+    } else {
+      tr.className = "diff-row-ctx";
+      tdOld.textContent = oldLine > 0 ? oldLine++ : "";
+      tdNew.textContent = newLine > 0 ? newLine++ : "";
+      tdCode.textContent = rawLine;
+    }
+
+    tr.appendChild(tdOld);
+    tr.appendChild(tdNew);
+    tr.appendChild(tdCode);
+    tbody.appendChild(tr);
+  }
+
+  if (hasContent) container.appendChild(table);
+  return hasContent;
+}
+
 async function showGitDiff(filePath, activeEl) {
   document.querySelectorAll("#git-files .git-file").forEach((el) => el.classList.remove("active"));
   if (activeEl) activeEl.classList.add("active");
 
-  const diffView = document.getElementById("git-diff-view");
-  diffView.style.display = "block";
-  diffView.innerHTML = `<span style="color:var(--text-dim)">${t("loading")}...</span>`;
+  S._diffFilePath = filePath;
+  document.getElementById("diff-title").textContent = filePath;
+
+  const content = document.getElementById("diff-content");
+  content.innerHTML = `<div class="diff-no-changes" style="color:var(--text-dim)">${t("loading")}…</div>`;
+  _openDiffPane();
 
   try {
-    const resp = await fetch(`/api/projects/${enc(S.projectName)}/git/diff/${enc(filePath)}`);
-    const text = await resp.text();
-    if (!text.trim()) {
-      diffView.innerHTML = `<span style="color:var(--text-dim)">${t("no_diff")}</span>`;
+    const resp = await fetch(
+      `/api/projects/${enc(S.projectName)}/git/diff/${enc(filePath)}?format=json`
+    );
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+
+    content.innerHTML = "";
+
+    const hasBoth = data.staged && data.unstaged;
+    const hasAny = (data.staged && data.staged.trim()) || (data.unstaged && data.unstaged.trim());
+
+    if (!hasAny) {
+      content.innerHTML = `<div class="diff-no-changes">${t("diff_no_changes")}</div>`;
       return;
     }
-    diffView.innerHTML = "";
-    for (const line of text.split("\n")) {
-      const span = document.createElement("span");
-      if (line.startsWith("+") && !line.startsWith("+++")) span.className = "diff-add";
-      else if (line.startsWith("-") && !line.startsWith("---")) span.className = "diff-del";
-      else if (line.startsWith("@@")) span.className = "diff-hunk";
-      span.textContent = line;
-      diffView.appendChild(span);
-      diffView.appendChild(document.createTextNode("\n"));
+
+    // Render unstaged section.
+    if (data.unstaged && data.unstaged.trim()) {
+      if (hasBoth) {
+        const hdr = document.createElement("div");
+        hdr.className = "diff-section-header";
+        hdr.textContent = t("diff_unstaged");
+        content.appendChild(hdr);
+      }
+      _renderDiffText(data.unstaged, content);
+    }
+
+    // Render staged section.
+    if (data.staged && data.staged.trim()) {
+      if (hasBoth) {
+        const hdr = document.createElement("div");
+        hdr.className = "diff-section-header";
+        hdr.textContent = t("diff_staged");
+        content.appendChild(hdr);
+      }
+      _renderDiffText(data.staged, content);
+    }
+
+    // Handle pseudo-diff for untracked files: only the unstaged section.
+    // If nothing rendered at all (e.g. truly empty), show friendly message.
+    if (!content.querySelector("table, .diff-no-changes")) {
+      content.innerHTML = `<div class="diff-no-changes">${t("diff_no_changes")}</div>`;
     }
   } catch {
-    diffView.innerHTML = `<span style="color:var(--red)">Failed to load diff</span>`;
+    content.innerHTML = `<div class="diff-no-changes" style="color:var(--red)">Failed to load diff</div>`;
   }
 }
 
@@ -3474,7 +3715,7 @@ function setupKeybindings() {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "1") { e.preventDefault(); setLayout("editor"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "2") { e.preventDefault(); setLayout("split"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "3") { e.preventDefault(); setLayout("pdf"); }
-    if (e.key === "Escape") { closeModal(); closeContextMenu(); document.getElementById("settings-popup").classList.remove("open"); document.getElementById("shortcuts-popup").classList.remove("open"); }
+    if (e.key === "Escape") { closeModal(); closeContextMenu(); document.getElementById("settings-popup").classList.remove("open"); document.getElementById("shortcuts-popup").classList.remove("open"); if (document.getElementById("diff-pane").classList.contains("open")) closeDiffPane(); }
   });
 }
 
@@ -3506,6 +3747,13 @@ document.getElementById("btn-commit").onclick = doCommit;
 document.getElementById("btn-git-commit-selected").onclick = doCommit;
 document.getElementById("btn-git-push").onclick = doPush;
 document.getElementById("btn-git-refresh").onclick = refreshGit;
+document.getElementById("btn-diff-close").onclick = closeDiffPane;
+document.getElementById("btn-diff-refresh").onclick = () => {
+  if (S._diffFilePath) {
+    const active = document.querySelector("#git-files .git-file.active");
+    showGitDiff(S._diffFilePath, active);
+  }
+};
 document.getElementById("tab-files").onclick = () => switchSidebarTab("files");
 document.getElementById("tab-git").onclick = () => switchSidebarTab("git");
 document.getElementById("tab-search").onclick = () => switchSidebarTab("search");
