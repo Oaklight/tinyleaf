@@ -568,6 +568,12 @@ select:focus { border-color: var(--accent); outline: none; }
 .log-line { padding: 1px 0; }
 .log-line.error { color: var(--red); }
 .log-line.warning { color: var(--orange); }
+.log-link {
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.log-link:hover { color: var(--accent-hover); }
 
 /* ── Modal ── */
 .modal-overlay {
@@ -1842,6 +1848,7 @@ async function init() {
   setupSettingsPopup();
   setupFileSearch();
   setupUpload();
+  setupLogClickHandler();
   startFileWatcher();
   setStatus(t("ready"));
 
@@ -3154,11 +3161,62 @@ function clearLog() {
   document.getElementById("log-content").innerHTML = "";
   document.getElementById("log-status").innerHTML = "";
 }
+
+/**
+ * Normalize a path from the compile log to a project-relative path.
+ * Strips leading `./` and `/workspace/` prefixes produced by Docker builds.
+ * @param {string} rawPath - Path as it appears in the log.
+ * @returns {string} Normalized relative path.
+ */
+function normalizeLogPath(rawPath) {
+  if (rawPath.startsWith("/workspace/")) return rawPath.slice("/workspace/".length);
+  if (rawPath.startsWith("./")) return rawPath.slice(2);
+  return rawPath;
+}
+
+/**
+ * Build an HTML string for a log line, turning recognized `filename:line:`
+ * references into clickable `.log-link` spans. Non-matching text is HTML-escaped
+ * so that characters like `<`, `>`, `&` render safely.
+ *
+ * Only references whose resolved path exists in `S.files` are linkified;
+ * unrecognized paths fall through as plain escaped text.
+ *
+ * @param {string} line - Raw log line text.
+ * @returns {string} HTML string safe to set as innerHTML.
+ */
+function buildLogLineHTML(line) {
+  // Matches -file-line-error format: ./path/file.tex:42: or /workspace/path/file.tex:42:
+  // Character set covers typical LaTeX file paths (alphanumeric, slashes, dots, hyphens, underscores).
+  const re = /((?:\.\/|\/workspace\/)?[-\w./]+\.(?:tex|sty|bib|cls|bbl)):(\d+):/g;
+  let result = "";
+  let lastIndex = 0;
+  let match;
+  while ((match = re.exec(line)) !== null) {
+    const [full, rawPath, lineStr] = match;
+    const normalizedPath = normalizeLogPath(rawPath);
+    // Only linkify if the file is known in the current project
+    if (S.files && S.files.includes(normalizedPath)) {
+      // Escape and append the text segment before this match
+      result += escapeHtml(line.slice(lastIndex, match.index));
+      // Build the clickable span; store normalized path and line number as data attrs
+      const safeFile = escapeHtml(normalizedPath);
+      result += `<span class="log-link" data-file="${safeFile}" data-line="${lineStr}">${escapeHtml(full)}</span>`;
+      lastIndex = match.index + full.length;
+    }
+  }
+  // Append any remaining text after the last match
+  result += escapeHtml(line.slice(lastIndex));
+  return result;
+}
+
 function appendLog(line, level = "info") {
   const el = document.getElementById("log-content");
   const div = document.createElement("div");
   div.className = "log-line " + level;
-  div.textContent = line;
+  // Use innerHTML so that log-link spans are rendered; textContent on the div
+  // still returns the full plain text (used by copyLog).
+  div.innerHTML = buildLogLineHTML(line);
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
 }
@@ -3166,6 +3224,20 @@ function copyLog() {
   const el = document.getElementById("log-content");
   const text = [...el.querySelectorAll(".log-line")].map((l) => l.textContent).join("\n");
   navigator.clipboard.writeText(text).then(() => setStatus(t("log_copied"), "success"));
+}
+
+/**
+ * Set up event delegation on the compile log panel for `.log-link` clicks.
+ * Delegates to openFileAtLine so the referenced file is opened and scrolled to.
+ */
+function setupLogClickHandler() {
+  document.getElementById("log-content").addEventListener("click", (e) => {
+    const link = e.target.closest(".log-link");
+    if (!link) return;
+    const file = link.dataset.file;
+    const line = parseInt(link.dataset.line, 10);
+    if (file && line) openFileAtLine(file, line);
+  });
 }
 
 // ══════════════════════════════════════════
