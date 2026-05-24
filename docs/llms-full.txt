@@ -77,7 +77,7 @@ Open a LaTeX project directory directly:
 tinyleaf /path/to/my-thesis
 ```
 
-This starts the editor on `http://localhost:8080` and opens it in your browser.
+This starts the editor on `http://localhost:14159` and opens it in your browser.
 
 ### With Docker Compilation
 
@@ -259,7 +259,7 @@ Run the editor itself inside a container:
 docker compose up
 ```
 
-This starts the web editor on `http://localhost:8080` with a persistent TeX Live container for compilation.
+This starts the web editor on `http://localhost:14159` with a persistent TeX Live container for compilation.
 
 ## Docker for Compilation Only
 

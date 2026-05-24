@@ -8,7 +8,7 @@ Open a LaTeX project directory directly:
 tinyleaf /path/to/my-thesis
 ```
 
-This starts the editor on `http://localhost:8080` and opens it in your browser. Docker compilation is enabled by default.
+This starts the editor on `http://localhost:14159` and opens it in your browser. Docker compilation is enabled by default.
 
 ### Disable Docker (Local Compilation)
 

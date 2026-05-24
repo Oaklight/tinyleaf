@@ -57,7 +57,7 @@ Run the editor itself inside a container:
 docker compose up
 ```
 
-This starts the web editor on `http://localhost:8080` with a persistent TeX Live container for compilation.
+This starts the web editor on `http://localhost:14159` with a persistent TeX Live container for compilation.
 
 ## Disabling Docker
 
