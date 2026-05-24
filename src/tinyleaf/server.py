@@ -156,10 +156,12 @@ class TexliveHandler(BaseHTTPRequestHandler):
         elif sub == "git/status":
             self._handle_api("git_status", name=name)
         elif sub == "git/diff":
-            self._handle_api("git_diff", name=name)
+            qs = urllib.parse.parse_qs(query_string)
+            self._handle_api("git_diff", name=name, qs=qs)
         elif sub.startswith("git/diff/"):
             file_path = urllib.parse.unquote(sub[9:])
-            self._handle_api("git_diff_file", name=name, file_path=file_path)
+            qs = urllib.parse.parse_qs(query_string)
+            self._handle_api("git_diff_file", name=name, file_path=file_path, qs=qs)
         elif sub == "git/log":
             self._handle_api("git_log", name=name)
         elif sub == "search":
