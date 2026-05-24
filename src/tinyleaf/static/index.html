@@ -712,6 +712,24 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
   color: var(--text-dim);
   flex-shrink: 0;
 }
+#pdf-page-nav { display: inline-flex; align-items: center; gap: 4px; }
+#pdf-page-nav.hidden { display: none; }
+#pdf-page-input {
+  width: 32px;
+  text-align: center;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-main);
+  color: var(--text);
+  font-size: 12px;
+  padding: 2px 2px;
+  outline: none;
+  -moz-appearance: textfield;
+}
+#pdf-page-input::-webkit-outer-spin-button,
+#pdf-page-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+#pdf-page-input:focus { border-color: var(--accent); }
+#pdf-page-total { font-size: 12px; color: var(--text-dim); }
 
 .pdf-placeholder {
   display: flex;
@@ -1358,6 +1376,12 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
           <div id="pdf-pane">
             <div id="pdf-toolbar">
               <span id="pdf-status" data-i18n="no_pdf">No PDF</span>
+              <span id="pdf-page-nav" class="hidden">
+                <button class="sm" id="btn-pdf-prev" title="Previous page" data-i18n-title="prev_page">◀</button>
+                <input id="pdf-page-input" type="number" min="1" value="1">
+                <span id="pdf-page-total">/ 0</span>
+                <button class="sm" id="btn-pdf-next" title="Next page" data-i18n-title="next_page">▶</button>
+              </span>
               <span style="flex:1"></span>
               <button class="sm" id="btn-pdf-zoom-out" title="Zoom out" data-i18n-title="zoom_out">−</button>
               <span id="pdf-zoom-level" style="min-width:40px;text-align:center;font-size:11px">100%</span>
@@ -1615,6 +1639,8 @@ const I18N = {
     loading: "Loading",
     pdf_error: "Failed to load PDF",
     pages: "page(s)",
+    prev_page: "Previous page",
+    next_page: "Next page",
     search_files: "Search files...",
     search_projects: "Search projects...",
     rename: "Rename",
@@ -1795,6 +1821,8 @@ const I18N = {
     loading: "加载中",
     pdf_error: "PDF 加载失败",
     pages: "页",
+    prev_page: "上一页",
+    next_page: "下一页",
     search_files: "搜索文件...",
     search_projects: "搜索项目...",
     rename: "重命名",
@@ -2035,6 +2063,34 @@ const [
   loadMod("cm-autocomplete.js", "@codemirror/autocomplete@6"),
   loadMod("cm-search.js", "@codemirror/search@6"),
 ]);
+
+// ── Auto-pair \begin{env} → \end{env} on Enter ──
+function latexAutoCloseEnv() {
+  return keymap.of([{
+    key: "Enter",
+    run(view) {
+      const { state } = view;
+      const { head } = state.selection.main;
+      const line = state.doc.lineAt(head);
+      const before = state.doc.sliceString(line.from, head);
+      const match = before.match(/\\begin\{([^}]+)\}$/);
+      if (!match) return false;
+      const env = match[1];
+      // Determine indentation of the current line
+      const lineIndent = before.match(/^(\s*)/)[1];
+      const inner = lineIndent + "  ";
+      const insert = "\n" + inner + "\n" + lineIndent + "\\end{" + env + "}";
+      // Place cursor on the middle (indented) line
+      const cursorPos = head + 1 + inner.length;
+      view.dispatch({
+        changes: { from: head, insert },
+        selection: { anchor: cursorPos },
+        scrollIntoView: true,
+      });
+      return true;
+    },
+  }]);
+}
 
 // ── Language extensions (loaded on demand) ──
 // LaTeX build artifact extensions (grayed out in file tree)
@@ -2963,7 +3019,7 @@ async function openProject(name) {
   S.pdfDoc = null;
   const pdfContainer = document.getElementById("pdf-container");
   pdfContainer.innerHTML = `<div class="pdf-placeholder" data-i18n="compile_to_preview">${t("compile_to_preview")}</div>`;
-  document.getElementById("pdf-status").textContent = t("no_pdf");
+  setPdfStatus(t("no_pdf"));
 
   const config = await api("GET", `/api/projects/${enc(name)}/config`);
   document.getElementById("engine-select").value = config.engine || "latexmk";
@@ -3397,6 +3453,7 @@ async function openFile(filePath) {
     history(),
     bracketMatching(),
     closeBrackets(),
+    latexAutoCloseEnv(),
     foldGutter(),
     autocompletion(),
     search(),
@@ -3634,10 +3691,11 @@ async function doClean() {
 // ══════════════════════════════════════════
 // PDF Viewer
 // ══════════════════════════════════════════
+
 async function loadPDF(url) {
   const container = document.getElementById("pdf-container");
   container.innerHTML = "";
-  document.getElementById("pdf-status").textContent = t("loading_pdf");
+  setPdfStatus(t("loading_pdf"));
   S.pdfUrl = url;
 
   try {
@@ -3649,8 +3707,63 @@ async function loadPDF(url) {
     await renderPDF();
   } catch (err) {
     container.innerHTML = `<div class="pdf-placeholder">${t("pdf_error")}: ${esc(err.message)}</div>`;
-    document.getElementById("pdf-status").textContent = t("pdf_error");
+    setPdfStatus(t("pdf_error"));
   }
+}
+
+// Set PDF status text and toggle page nav visibility.
+// When showing a status message (loading, error, etc.), hide the page nav.
+// When null, hide the status text (page nav is shown separately by renderPDF).
+function setPdfStatus(text) {
+  const statusEl = document.getElementById("pdf-status");
+  const pageNav = document.getElementById("pdf-page-nav");
+  if (text) {
+    statusEl.textContent = text;
+    statusEl.style.display = "";
+    pageNav.classList.add("hidden");
+  } else {
+    statusEl.style.display = "none";
+    pageNav.classList.remove("hidden");
+  }
+}
+
+// Observer to track which page is currently visible in the PDF container
+let pdfPageObserver = null;
+
+function setupPdfPageObserver() {
+  if (pdfPageObserver) pdfPageObserver.disconnect();
+  const container = document.getElementById("pdf-container");
+  pdfPageObserver = new IntersectionObserver((entries) => {
+    // Find the most visible canvas
+    let best = null;
+    let bestRatio = 0;
+    for (const entry of entries) {
+      if (entry.isIntersecting && entry.intersectionRatio > bestRatio) {
+        bestRatio = entry.intersectionRatio;
+        best = entry.target;
+      }
+    }
+    if (best) {
+      const pageNum = parseInt(best.dataset.pageNum);
+      const input = document.getElementById("pdf-page-input");
+      if (input && document.activeElement !== input) {
+        input.value = pageNum;
+      }
+    }
+  }, { root: container, threshold: [0, 0.25, 0.5, 0.75, 1] });
+
+  container.querySelectorAll("canvas[data-page-num]").forEach((c) => {
+    pdfPageObserver.observe(c);
+  });
+}
+
+function jumpToPdfPage(pageNum) {
+  if (!S.pdfDoc) return;
+  const n = Math.max(1, Math.min(pageNum, S.pdfDoc.numPages));
+  const container = document.getElementById("pdf-container");
+  const canvas = container.querySelector(`canvas[data-page-num="${n}"]`);
+  if (canvas) canvas.scrollIntoView({ behavior: "smooth", block: "start" });
+  document.getElementById("pdf-page-input").value = n;
 }
 
 async function renderPDF() {
@@ -3658,7 +3771,14 @@ async function renderPDF() {
   const container = document.getElementById("pdf-container");
   container.innerHTML = "";
   const doc = S.pdfDoc;
-  document.getElementById("pdf-status").textContent = `${doc.numPages} ${t("pages")}`;
+
+  // Show page nav, hide status text
+  setPdfStatus(null);
+  const pageInput = document.getElementById("pdf-page-input");
+  pageInput.value = 1;
+  pageInput.max = doc.numPages;
+  document.getElementById("pdf-page-total").textContent = `/ ${doc.numPages}`;
+
   const dpr = S.pdfRenderHD ? (window.devicePixelRatio || 2) : 1;
 
   for (let i = 1; i <= doc.numPages; i++) {
@@ -3686,6 +3806,7 @@ async function renderPDF() {
     ctx.scale(dpr, dpr);
     await page.render({ canvasContext: ctx, viewport }).promise;
   }
+  setupPdfPageObserver();
 }
 
 function updateZoomLabel() {
@@ -3748,7 +3869,7 @@ function showImagePreview(url, filePath) {
   const container = document.getElementById("pdf-container");
   container.innerHTML = "";
   const name = filePath.split("/").pop();
-  document.getElementById("pdf-status").textContent = name;
+  setPdfStatus(name);
   const img = document.createElement("img");
   img.src = url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();
   img.alt = name;
@@ -4904,6 +5025,31 @@ document.getElementById("btn-pdf-hd").onclick = () => {
 // Init HD button state
 S.pdfRenderHD = localStorage.getItem("tinyleaf-pdf-hd") !== "0";
 document.getElementById("btn-pdf-hd").classList.toggle("active", S.pdfRenderHD);
+
+// ── PDF page navigation ──
+document.getElementById("btn-pdf-prev").onclick = () => {
+  const input = document.getElementById("pdf-page-input");
+  jumpToPdfPage(parseInt(input.value) - 1);
+};
+document.getElementById("btn-pdf-next").onclick = () => {
+  const input = document.getElementById("pdf-page-input");
+  jumpToPdfPage(parseInt(input.value) + 1);
+};
+document.getElementById("pdf-page-input").addEventListener("click", (e) => {
+  e.target.select();
+});
+document.getElementById("pdf-page-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    jumpToPdfPage(parseInt(e.target.value) || 1);
+    e.target.blur();
+  }
+});
+document.getElementById("pdf-page-input").addEventListener("blur", (e) => {
+  if (S.pdfDoc) {
+    jumpToPdfPage(parseInt(e.target.value) || 1);
+  }
+});
 
 // ── SyncTeX: Ctrl/Cmd cursor hint + status bar ──
 {
