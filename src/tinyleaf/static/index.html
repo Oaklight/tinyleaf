@@ -381,6 +381,23 @@ select:focus { border-color: var(--accent); outline: none; }
 #sidebar-files { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 #sidebar-git { display: none; flex-direction: column; flex: 1; overflow: hidden; }
 #sidebar-search { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+#sidebar-outline { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+
+/* ── Outline panel ── */
+#outline-status {
+  padding: 6px 10px; font-size: 11px; color: var(--text-dim); flex-shrink: 0;
+}
+#outline-tree { flex: 1; overflow-y: auto; padding-bottom: 8px; }
+.outline-item {
+  display: flex; align-items: baseline; gap: 4px;
+  padding: 2px 10px; font-size: 12px; cursor: pointer;
+  color: var(--text-dim); white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis;
+}
+.outline-item:hover { background: var(--bg-hover); color: var(--text); }
+.outline-item.active { color: var(--accent); }
+.outline-item .outline-label { overflow: hidden; text-overflow: ellipsis; flex: 1; }
+.outline-item .outline-linenum { color: var(--accent); font-size: 10px; flex-shrink: 0; font-family: var(--mono); }
 
 /* ── Search panel ── */
 #search-input-area { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
@@ -982,6 +999,7 @@ select:focus { border-color: var(--accent); outline: none; }
             <button class="sidebar-tab active" data-tab="files" data-i18n="files" id="tab-files">Files</button>
             <button class="sidebar-tab" data-tab="git" id="tab-git">Git</button>
             <button class="sidebar-tab" data-tab="search" id="tab-search" data-i18n="search">Search</button>
+            <button class="sidebar-tab" data-tab="outline" id="tab-outline" data-i18n="outline">Outline</button>
           </div>
           <div id="sidebar-files">
           <div class="sidebar-section">
@@ -1026,6 +1044,10 @@ select:focus { border-color: var(--accent); outline: none; }
             </div>
             <div id="search-status"></div>
             <div id="search-results"></div>
+          </div>
+          <div id="sidebar-outline">
+            <div id="outline-status"></div>
+            <div id="outline-tree"></div>
           </div>
         </div>
 
@@ -1370,6 +1392,10 @@ const I18N = {
     sc_layout_split: "Split layout",
     sc_layout_pdf: "PDF only layout",
     shortcut_layout: "Layout",
+    outline: "Outline",
+    outline_no_file: "Open a .tex file to see outline",
+    outline_no_sections: "No sections found",
+    sc_outline_tab: "Outline tab",
   },
   zh: {
     compile: "编译",
@@ -1529,6 +1555,10 @@ const I18N = {
     sc_layout_split: "分屏布局",
     sc_layout_pdf: "仅 PDF 布局",
     shortcut_layout: "布局",
+    outline: "大纲",
+    outline_no_file: "打开 .tex 文件以查看大纲",
+    outline_no_sections: "未找到章节",
+    sc_outline_tab: "大纲标签",
   },
 };
 
@@ -2767,6 +2797,7 @@ async function openFile(filePath) {
         S.modified.add(S.currentFile);
         renderFileTree();
         scheduleAutoSave();
+        scheduleOutlineRefresh();
       }
     }),
     EditorView.lineWrapping,
@@ -2788,6 +2819,10 @@ async function openFile(filePath) {
     });
   }
   renderFileTree();
+  // Re-render outline if the outline tab is visible
+  if (document.getElementById("sidebar-outline").style.display !== "none") {
+    renderOutline();
+  }
 }
 
 function scheduleAutoSave() {
@@ -2803,6 +2838,10 @@ async function saveCurrentFile() {
   S.modified.delete(S.currentFile);
   renderFileTree();
   setStatus(`${t("saved")} ${S.currentFile}`, "success");
+  // Refresh outline if the outline tab is visible
+  if (document.getElementById("sidebar-outline").style.display !== "none") {
+    renderOutline();
+  }
   // Auto-compile after save (guard against re-entry from compile's own save)
   if (S.autoCompile && !S.compiling && !S._autoCompiling) {
     clearTimeout(S.autoCompileTimer);
@@ -3248,8 +3287,10 @@ function switchSidebarTab(tabName) {
   document.getElementById("sidebar-files").style.display = tabName === "files" ? "flex" : "none";
   document.getElementById("sidebar-git").style.display = tabName === "git" ? "flex" : "none";
   document.getElementById("sidebar-search").style.display = tabName === "search" ? "flex" : "none";
+  document.getElementById("sidebar-outline").style.display = tabName === "outline" ? "flex" : "none";
   if (tabName === "git") refreshGit();
   if (tabName === "search") document.getElementById("project-search-input").focus();
+  if (tabName === "outline") renderOutline();
 }
 
 // ══════════════════════════════════════════
@@ -3324,6 +3365,174 @@ async function openFileAtLine(filePath, lineNum) {
     });
     S.editorView.focus();
   }
+}
+
+// ══════════════════════════════════════════
+// LaTeX Outline
+// ══════════════════════════════════════════
+
+/**
+ * Indent levels for LaTeX sectioning commands.
+ * Lower number = higher in hierarchy.
+ * @type {Object<string, number>}
+ */
+const OUTLINE_LEVELS = {
+  part: 0,
+  chapter: 1,
+  section: 2,
+  subsection: 3,
+  subsubsection: 4,
+  paragraph: 5,
+  subparagraph: 6,
+};
+
+/**
+ * Parse LaTeX content and extract sectioning commands.
+ *
+ * @param {string} content - Raw LaTeX source text.
+ * @returns {Array<{level: number, title: string, line: number}>} Ordered list of sections.
+ */
+function parseOutline(content) {
+  const items = [];
+  // Regex: optional star, command name, optional title argument.
+  // Handles \section{title}, \section*{title}, \section[short]{title}
+  const sectionRe = /^\s*\\(part|chapter|section|subsection|subsubsection|paragraph|subparagraph)\*?\s*(?:\[[^\]]*\])?\{([^}]*)\}/;
+  const lines = content.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    // Skip fully-commented lines (% not preceded by \)
+    const stripped = raw.replace(/^(\s*)/, "");
+    if (stripped.startsWith("%")) continue;
+    // Remove inline comments before matching
+    const noComment = raw.replace(/(?<!\\)%.*$/, "");
+    const m = noComment.match(sectionRe);
+    if (m) {
+      const cmd = m[1];
+      const title = m[2].trim();
+      items.push({ level: OUTLINE_LEVELS[cmd], title, line: i + 1 });
+    }
+  }
+  return items;
+}
+
+/**
+ * Render the outline tree for the currently open file.
+ * Reads content from the live editor if available, otherwise fetches from API.
+ */
+async function renderOutline() {
+  const statusEl = document.getElementById("outline-status");
+  const treeEl = document.getElementById("outline-tree");
+
+  if (!S.currentFile || !S.projectName) {
+    statusEl.textContent = t("outline_no_file");
+    treeEl.innerHTML = "";
+    return;
+  }
+  if (!S.currentFile.endsWith(".tex")) {
+    statusEl.textContent = t("outline_no_file");
+    treeEl.innerHTML = "";
+    return;
+  }
+
+  // Use live editor content when possible; fall back to API fetch
+  let content;
+  if (S.editorView) {
+    content = S.editorView.state.doc.toString();
+  } else {
+    try {
+      const data = await api("GET", `/api/projects/${enc(S.projectName)}/files/${enc(S.currentFile)}`);
+      content = data.content;
+    } catch (err) {
+      statusEl.textContent = err.message;
+      treeEl.innerHTML = "";
+      return;
+    }
+  }
+
+  const items = parseOutline(content);
+  if (items.length === 0) {
+    statusEl.textContent = t("outline_no_sections");
+    treeEl.innerHTML = "";
+    return;
+  }
+
+  statusEl.textContent = "";
+
+  // Compute indent relative to the minimum level present so shallow trees
+  // (e.g., only \section and \subsection) still start at indent 0.
+  const minLevel = items.reduce((m, it) => Math.min(m, it.level), Infinity);
+  const INDENT_PX = 14;
+
+  let html = "";
+  for (const item of items) {
+    const indent = (item.level - minLevel) * INDENT_PX;
+    html += `<div class="outline-item" data-line="${item.line}" style="padding-left:${10 + indent}px" title="${escapeHtml(item.title)} (line ${item.line})">`;
+    html += `<span class="outline-label">${escapeHtml(item.title)}</span>`;
+    html += `<span class="outline-linenum">${item.line}</span>`;
+    html += `</div>`;
+  }
+  treeEl.innerHTML = html;
+
+  // Attach click handlers
+  treeEl.querySelectorAll(".outline-item").forEach((el) => {
+    el.onclick = () => {
+      const lineNum = parseInt(el.dataset.line, 10);
+      jumpToOutlineLine(lineNum);
+    };
+  });
+
+  // Highlight the section containing the current cursor
+  highlightOutlineActive();
+}
+
+/**
+ * Jump the editor to the given 1-based line number in the current file.
+ *
+ * @param {number} lineNum - 1-based line number to scroll to.
+ */
+function jumpToOutlineLine(lineNum) {
+  if (!S.editorView) return;
+  const totalLines = S.editorView.state.doc.lines;
+  const clampedLine = Math.min(Math.max(lineNum, 1), totalLines);
+  const line = S.editorView.state.doc.line(clampedLine);
+  S.editorView.dispatch({
+    selection: { anchor: line.from },
+    effects: EditorView.scrollIntoView(line.from, { y: "center" }),
+  });
+  S.editorView.focus();
+  highlightOutlineActive();
+}
+
+/**
+ * Mark the outline item whose section the editor cursor is currently inside.
+ * The active item is the last one whose line number is ≤ the cursor line.
+ */
+function highlightOutlineActive() {
+  if (!S.editorView) return;
+  const cursorLine = S.editorView.state.doc.lineAt(
+    S.editorView.state.selection.main.head
+  ).number;
+  const items = document.querySelectorAll("#outline-tree .outline-item");
+  let activeEl = null;
+  items.forEach((el) => {
+    const ln = parseInt(el.dataset.line, 10);
+    el.classList.remove("active");
+    if (ln <= cursorLine) activeEl = el;
+  });
+  if (activeEl) activeEl.classList.add("active");
+}
+
+/** Debounce timer for outline refresh triggered by editor changes. */
+let _outlineRefreshTimer = null;
+
+/**
+ * Schedule a deferred outline refresh (debounced at 500 ms).
+ * Called on document edits so the outline stays in sync without live-parsing on every keystroke.
+ */
+function scheduleOutlineRefresh() {
+  if (document.getElementById("sidebar-outline").style.display === "none") return;
+  clearTimeout(_outlineRefreshTimer);
+  _outlineRefreshTimer = setTimeout(() => renderOutline(), 500);
 }
 
 // ══════════════════════════════════════════
@@ -3494,6 +3703,7 @@ function showShortcutsPopup() {
       { keys: [MOD, "Shift", "E"], desc: t("sc_files_tab") },
       { keys: [MOD, "Shift", "G"], desc: t("sc_git_tab") },
       { keys: [MOD, "Shift", "F"], desc: t("sc_search_tab") },
+      { keys: [MOD, "Shift", "O"], desc: t("sc_outline_tab") },
     ]},
     { title: t("shortcut_git"), shortcuts: [
       { keys: [MOD, "Shift", "Alt", "C"], desc: t("sc_commit") },
@@ -3538,6 +3748,7 @@ function setupKeybindings() {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "E") { e.preventDefault(); switchSidebarTab("files"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "G") { e.preventDefault(); switchSidebarTab("git"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "F") { e.preventDefault(); switchSidebarTab("search"); }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "O") { e.preventDefault(); switchSidebarTab("outline"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.key === "C") { e.preventDefault(); doCommit(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.key === "P") { e.preventDefault(); doPush(); }
     if ((e.ctrlKey || e.metaKey) && e.key === "/") { e.preventDefault(); showShortcutsPopup(); }
@@ -3581,6 +3792,7 @@ document.getElementById("btn-git-refresh").onclick = refreshGit;
 document.getElementById("tab-files").onclick = () => switchSidebarTab("files");
 document.getElementById("tab-git").onclick = () => switchSidebarTab("git");
 document.getElementById("tab-search").onclick = () => switchSidebarTab("search");
+document.getElementById("tab-outline").onclick = () => switchSidebarTab("outline");
 
 // Search input wiring
 document.getElementById("project-search-input").addEventListener("input", (e) => {
