@@ -580,8 +580,84 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
 #git-commit-btns { display: flex; gap: 6px; }
 #git-commit-btns button { flex: 1; }
 
+/* ── Editor Tab Bar ── */
+#editor-tabs {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-shrink: 0;
+  min-height: 30px;
+  scrollbar-width: thin;
+}
+#editor-tabs:empty { display: none; }
+#editor-tabs::-webkit-scrollbar { height: 4px; }
+#editor-tabs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.editor-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px 4px 12px;
+  font-size: 12px;
+  font-family: var(--mono);
+  color: var(--text-dim);
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  flex-shrink: 0;
+  max-width: 220px;
+  transition: background 0.1s, color 0.1s;
+}
+.editor-tab:hover { background: var(--bg-hover); color: var(--text); }
+.editor-tab.active {
+  background: var(--bg);
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.editor-tab .editor-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+}
+.editor-tab .editor-tab-dirty {
+  color: var(--accent);
+  font-weight: 700;
+  margin-left: -2px;
+}
+.editor-tab .editor-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s;
+}
+.editor-tab:hover .editor-tab-close,
+.editor-tab.active .editor-tab-close { opacity: 1; }
+.editor-tab .editor-tab-close:hover { background: var(--bg-hover); color: var(--red); }
+.editor-tab.dirty .editor-tab-close { opacity: 1; }
+
 /* ── Editor ── */
-#editor-container { flex: 1; overflow: hidden; }
+#editor-container { flex: 1; overflow: hidden; position: relative; }
+.editor-tab-pane {
+  position: absolute;
+  inset: 0;
+  display: none;
+}
+.editor-tab-pane.active { display: block; }
+.editor-tab-pane .cm-editor { height: 100%; }
 #editor-container .cm-editor { height: 100%; }
 #editor-container .cm-editor .cm-scroller {
   overflow: auto;
@@ -1159,8 +1235,9 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
               <button class="icon-btn" id="btn-locate-file" title="Locate in tree" data-i18n-title="locate_in_tree"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="2"/><line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="2"/><line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" stroke-width="2"/><line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="2"/></svg></button>
               <span id="breadcrumb-path">—</span>
               <span style="flex:1"></span>
-              <button class="icon-btn" id="btn-close-file" title="Close file" data-i18n-title="close_file" style="display:none;padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/></svg></button>
+              <button class="icon-btn" id="btn-close-file" title="Close tab" data-i18n-title="close_tab" style="display:none;padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/></svg></button>
             </div>
+            <div id="editor-tabs" role="tablist"></div>
             <div id="editor-container"></div>
             <!-- Diff viewer pane — shown in place of the editor when a git diff is open -->
             <div id="diff-pane">
@@ -1514,6 +1591,13 @@ const I18N = {
     outline_no_file: "Open a .tex file to see outline",
     outline_no_sections: "No sections found",
     sc_outline_tab: "Outline tab",
+    close_tab: "Close tab",
+    close_other_tabs: "Close other tabs",
+    close_all_tabs: "Close all tabs",
+    tab_unsaved_confirm: "\"{name}\" has unsaved changes. Close anyway?",
+    sc_next_tab: "Next tab",
+    sc_prev_tab: "Previous tab",
+    sc_close_tab: "Close current tab",
   },
   zh: {
     compile: "编译",
@@ -1681,6 +1765,13 @@ const I18N = {
     outline_no_file: "打开 .tex 文件以查看大纲",
     outline_no_sections: "未找到章节",
     sc_outline_tab: "大纲标签",
+    close_tab: "关闭标签",
+    close_other_tabs: "关闭其他标签",
+    close_all_tabs: "关闭所有标签",
+    tab_unsaved_confirm: "\"{name}\" 有未保存的更改。仍要关闭吗？",
+    sc_next_tab: "下一个标签",
+    sc_prev_tab: "上一个标签",
+    sc_close_tab: "关闭当前标签",
   },
 };
 
@@ -1895,11 +1986,15 @@ async function getLangExtension(filePath) {
 const S = {
   mode: "single",
   projectName: null,
-  currentFile: null,
   files: [],
   fileTree: [],
   modified: new Set(),
-  editorView: null,
+  // Multi-tab state. `tabs` is the open-tab order; `activeTab` is the path
+  // currently in the editor. `editors` maps path -> { view, mtime } so each
+  // tab keeps its own CodeMirror instance (preserves undo + scroll on switch).
+  tabs: [],
+  activeTab: null,
+  editors: new Map(),
   compiling: false,
   compileId: null,
   pulling: false,
@@ -1912,10 +2007,44 @@ const S = {
   pdfRenderHD: true,
   autoSaveTimer: null,
   autoSaveInterval: 2000,
-  fileMtime: 0,
   useDocker: true,
   dockerImage: "oaklight/texlive:alpine-science-cn",
 };
+
+// Back-compat aliases so the older single-file call sites keep working
+// without churn. `currentFile` and `editorView` now route through the
+// per-tab state. `fileMtime` reads/writes the mtime on the active tab's
+// editor record.
+Object.defineProperty(S, "currentFile", {
+  get() { return S.activeTab; },
+  set(v) { S.activeTab = v; },
+});
+Object.defineProperty(S, "editorView", {
+  get() {
+    const entry = S.activeTab ? S.editors.get(S.activeTab) : null;
+    return entry ? entry.view : null;
+  },
+  // Legacy setter: null clears the active tab's view; otherwise no-op
+  // (new views are created via openFile's tab logic).
+  set(v) {
+    if (v === null && S.activeTab) {
+      const entry = S.editors.get(S.activeTab);
+      if (entry && entry.view) entry.view.destroy();
+      S.editors.delete(S.activeTab);
+    }
+  },
+});
+Object.defineProperty(S, "fileMtime", {
+  get() {
+    const entry = S.activeTab ? S.editors.get(S.activeTab) : null;
+    return entry ? entry.mtime : 0;
+  },
+  set(v) {
+    if (!S.activeTab) return;
+    const entry = S.editors.get(S.activeTab);
+    if (entry) entry.mtime = v;
+  },
+});
 
 // ── API ──
 async function api(method, path, body = null) {
@@ -2354,9 +2483,24 @@ function showRenameModal(node) {
         closeModal();
         setStatus(`${t("renamed")}: ${newName}`, "success");
         await refreshFiles();
-        if (S.currentFile === node.path) {
-          S.currentFile = newPath;
-          await openFile(newPath);
+        // If the renamed file was open in a tab, retire the stale tab and
+        // re-open under its new path so the editor reflects the new name.
+        if (S.tabs.includes(node.path)) {
+          const wasActive = S.activeTab === node.path;
+          const entry = S.editors.get(node.path);
+          if (entry && entry.view) { try { entry.view.destroy(); } catch {} }
+          S.editors.delete(node.path);
+          document.querySelectorAll(`.editor-tab-pane[data-path]`).forEach((p) => {
+            if (p.dataset.path === node.path) p.remove();
+          });
+          const idx = S.tabs.indexOf(node.path);
+          if (idx !== -1) S.tabs.splice(idx, 1);
+          if (S.modified.has(node.path)) {
+            S.modified.delete(node.path);
+            S.modified.add(newPath);
+          }
+          if (wasActive) await openFile(newPath);
+          else { renderTabs(); persistTabs(); }
         }
       } catch (err) {
         setStatus(`Rename error: ${err.message}`, "error");
@@ -2378,7 +2522,31 @@ function confirmDelete(node) {
         await api("DELETE", `/api/projects/${enc(S.projectName)}/files/${enc(node.path)}`);
         closeModal();
         setStatus(`${t("deleted")}: ${node.name}`, "success");
-        if (S.currentFile === node.path) S.currentFile = null;
+        // Drop any open tab(s) for the deleted file
+        if (S.tabs.includes(node.path)) {
+          const entry = S.editors.get(node.path);
+          if (entry && entry.view) { try { entry.view.destroy(); } catch {} }
+          S.editors.delete(node.path);
+          S.modified.delete(node.path);
+          document.querySelectorAll(`.editor-tab-pane[data-path]`).forEach((p) => {
+            if (p.dataset.path === node.path) p.remove();
+          });
+          const idx = S.tabs.indexOf(node.path);
+          if (idx !== -1) S.tabs.splice(idx, 1);
+          if (S.activeTab === node.path) {
+            if (S.tabs.length) switchTab(S.tabs[Math.min(idx, S.tabs.length - 1)]);
+            else {
+              S.activeTab = null;
+              const breadcrumb = document.getElementById("breadcrumb-path");
+              if (breadcrumb) { breadcrumb.textContent = "—"; breadcrumb.title = ""; }
+              document.getElementById("btn-close-file").style.display = "none";
+              renderTabs();
+            }
+          } else {
+            renderTabs();
+          }
+          persistTabs();
+        }
         await refreshFiles();
       } catch (err) {
         setStatus(`Delete error: ${err.message}`, "error");
@@ -2653,6 +2821,9 @@ async function navigateDir(containerId, path) {
 // Open Project
 // ══════════════════════════════════════════
 async function openProject(name) {
+  // Clear any tabs from a previous project before switching
+  if (S.tabs.length) closeAllTabs();
+  S.modified.clear();
   S.projectName = name;
   localStorage.setItem("tinyleaf-project", name);
   document.getElementById("project-name").textContent = name;
@@ -2693,8 +2864,21 @@ async function openProject(name) {
   S.mainFile = config.main_file || _detectMainFile();
   _populateMainFileSelect();
 
-  if (S.files.includes(S.mainFile)) await openFile(S.mainFile);
-  else if (S.files.length > 0) await openFile(S.files[0]);
+  // Restore persisted tabs (drop paths that no longer exist).
+  const persisted = loadPersistedTabs();
+  const validTabs = persisted.tabs.filter((p) => S.files.includes(p));
+  if (validTabs.length > 0) {
+    for (const p of validTabs) {
+      try { await openFile(p); } catch {}
+    }
+    const desiredActive = persisted.active && validTabs.includes(persisted.active)
+      ? persisted.active : validTabs[validTabs.length - 1];
+    if (desiredActive && S.tabs.includes(desiredActive)) switchTab(desiredActive);
+  } else if (S.files.includes(S.mainFile)) {
+    await openFile(S.mainFile);
+  } else if (S.files.length > 0) {
+    await openFile(S.files[0]);
+  }
 
   await refreshGit();
 
@@ -2856,11 +3040,190 @@ function locateInTree() {
 }
 
 // ══════════════════════════════════════════
-// Editor
+// Editor + Tab Manager
 // ══════════════════════════════════════════
-async function openFile(filePath) {
-  if (S.currentFile && S.modified.has(S.currentFile)) await saveCurrentFile();
 
+// Render the tab bar from S.tabs / S.activeTab. Tabs are clickable;
+// each has a dirty marker (•) when modified and a close X.
+function renderTabs() {
+  const bar = document.getElementById("editor-tabs");
+  if (!bar) return;
+  bar.innerHTML = "";
+  for (const path of S.tabs) {
+    const tab = document.createElement("div");
+    const isActive = path === S.activeTab;
+    const isDirty = S.modified.has(path);
+    tab.className = "editor-tab" + (isActive ? " active" : "") + (isDirty ? " dirty" : "");
+    tab.dataset.path = path;
+    tab.title = path;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", isActive ? "true" : "false");
+
+    const label = document.createElement("span");
+    label.className = "editor-tab-label";
+    label.textContent = path.split("/").pop();
+    tab.appendChild(label);
+
+    if (isDirty) {
+      const dot = document.createElement("span");
+      dot.className = "editor-tab-dirty";
+      dot.textContent = "•";
+      dot.setAttribute("aria-label", "unsaved");
+      tab.appendChild(dot);
+    }
+
+    const close = document.createElement("span");
+    close.className = "editor-tab-close";
+    close.textContent = "×";
+    close.title = t("close_tab");
+    close.onclick = (e) => { e.stopPropagation(); closeTab(path); };
+    tab.appendChild(close);
+
+    tab.onclick = () => switchTab(path);
+    tab.onmousedown = (e) => {
+      // Middle-click closes
+      if (e.button === 1) { e.preventDefault(); closeTab(path); }
+    };
+    bar.appendChild(tab);
+  }
+}
+
+// Persist open tabs + active tab per project (drop on project close).
+function persistTabs() {
+  if (!S.projectName) return;
+  const key = `tinyleaf-tabs-${S.projectName}`;
+  try {
+    localStorage.setItem(key, JSON.stringify({ tabs: S.tabs, active: S.activeTab }));
+  } catch {}
+}
+
+// Read persisted tabs for a project; returns {tabs:[], active:null} on miss.
+function loadPersistedTabs() {
+  if (!S.projectName) return { tabs: [], active: null };
+  const key = `tinyleaf-tabs-${S.projectName}`;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return { tabs: [], active: null };
+    const obj = JSON.parse(raw);
+    return {
+      tabs: Array.isArray(obj.tabs) ? obj.tabs : [],
+      active: typeof obj.active === "string" ? obj.active : null,
+    };
+  } catch {
+    return { tabs: [], active: null };
+  }
+}
+
+// Switch the visible editor pane to `path`. No-op if path is not an open tab.
+function switchTab(path) {
+  if (!path || !S.tabs.includes(path)) return;
+  S.activeTab = path;
+  // Show only the matching pane
+  document.querySelectorAll(".editor-tab-pane").forEach((p) => {
+    p.classList.toggle("active", p.dataset.path === path);
+  });
+  // Breadcrumb + close button
+  const breadcrumb = document.getElementById("breadcrumb-path");
+  if (breadcrumb) {
+    breadcrumb.textContent = path;
+    breadcrumb.title = path;
+  }
+  const btnClose = document.getElementById("btn-close-file");
+  if (btnClose) btnClose.style.display = "";
+  document.getElementById("reload-bar")?.remove();
+  // Focus the new view
+  const entry = S.editors.get(path);
+  if (entry && entry.view) {
+    try { entry.view.focus(); entry.view.requestMeasure(); } catch {}
+  }
+  renderTabs();
+  renderFileTree();
+  // Refresh outline if visible (active file changed)
+  const outlineEl = document.getElementById("sidebar-outline");
+  if (outlineEl && outlineEl.style.display !== "none") renderOutline();
+  persistTabs();
+}
+
+// Close a tab. If dirty, prompt to save; aborts on cancel.
+async function closeTab(path) {
+  if (!path || !S.tabs.includes(path)) return;
+  if (S.modified.has(path)) {
+    const msg = (t("tab_unsaved_confirm") || "\"{name}\" has unsaved changes. Close anyway?")
+      .replace("{name}", path.split("/").pop());
+    if (!confirm(msg)) return;
+    // Persist before discarding the view so user's work isn't silently lost
+    try {
+      const entry = S.editors.get(path);
+      if (entry && entry.view) {
+        const content = entry.view.state.doc.toString();
+        await api("PUT", `/api/projects/${enc(S.projectName)}/files/${enc(path)}`, { content });
+      }
+    } catch {}
+    S.modified.delete(path);
+  }
+  // Destroy view + remove pane
+  const entry = S.editors.get(path);
+  if (entry && entry.view) { try { entry.view.destroy(); } catch {} }
+  S.editors.delete(path);
+  document.querySelectorAll(`.editor-tab-pane[data-path]`).forEach((p) => {
+    if (p.dataset.path === path) p.remove();
+  });
+  // Update tab list
+  const idx = S.tabs.indexOf(path);
+  if (idx !== -1) S.tabs.splice(idx, 1);
+  // Pick a new active tab
+  if (S.activeTab === path) {
+    if (S.tabs.length === 0) {
+      S.activeTab = null;
+      const breadcrumb = document.getElementById("breadcrumb-path");
+      if (breadcrumb) { breadcrumb.textContent = "—"; breadcrumb.title = ""; }
+      document.getElementById("btn-close-file").style.display = "none";
+      document.getElementById("reload-bar")?.remove();
+      renderTabs();
+      renderFileTree();
+      const outlineEl = document.getElementById("sidebar-outline");
+      if (outlineEl && outlineEl.style.display !== "none") renderOutline();
+    } else {
+      const nextIdx = Math.min(idx, S.tabs.length - 1);
+      switchTab(S.tabs[nextIdx]);
+    }
+  } else {
+    renderTabs();
+    renderFileTree();
+  }
+  persistTabs();
+}
+
+// Cycle through open tabs by `delta` (+1 next, -1 previous). Wraps around.
+function cycleTabs(delta) {
+  if (S.tabs.length < 2) return;
+  const idx = S.tabs.indexOf(S.activeTab);
+  if (idx === -1) { switchTab(S.tabs[0]); return; }
+  const next = (idx + delta + S.tabs.length) % S.tabs.length;
+  switchTab(S.tabs[next]);
+}
+
+// Destroy every tab + view. Used on project close / home navigation.
+function closeAllTabs() {
+  for (const [, entry] of S.editors) {
+    if (entry && entry.view) { try { entry.view.destroy(); } catch {} }
+  }
+  S.editors.clear();
+  S.tabs = [];
+  S.activeTab = null;
+  const container = document.getElementById("editor-container");
+  if (container) container.innerHTML = "";
+  const bar = document.getElementById("editor-tabs");
+  if (bar) bar.innerHTML = "";
+  const breadcrumb = document.getElementById("breadcrumb-path");
+  if (breadcrumb) { breadcrumb.textContent = "—"; breadcrumb.title = ""; }
+  document.getElementById("btn-close-file").style.display = "none";
+  document.getElementById("reload-bar")?.remove();
+}
+
+// Open `filePath` as a tab. If already open, just focuses it (no re-fetch).
+// PDFs / images / other binaries are routed to preview, not the editor.
+async function openFile(filePath) {
   // PDF files: load in preview panel instead of editor
   if (filePath.endsWith(".pdf")) {
     const url = `/api/projects/${enc(S.projectName)}/output/${enc(filePath)}`;
@@ -2887,15 +3250,19 @@ async function openFile(filePath) {
     return;
   }
 
-  const data = await api("GET", `/api/projects/${enc(S.projectName)}/files/${enc(filePath)}`);
-  S.currentFile = filePath;
-  S.fileMtime = data.mtime || 0;
-  document.getElementById("breadcrumb-path").textContent = filePath;
-  document.getElementById("breadcrumb-path").title = filePath;
-  document.getElementById("btn-close-file").style.display = "";
-  document.getElementById("reload-bar")?.remove();
+  // Already open → just focus it
+  if (S.tabs.includes(filePath) && S.editors.has(filePath)) {
+    switchTab(filePath);
+    return;
+  }
 
-  if (S.editorView) S.editorView.destroy();
+  // Fetch + create a new editor in its own pane
+  const data = await api("GET", `/api/projects/${enc(S.projectName)}/files/${enc(filePath)}`);
+
+  const pane = document.createElement("div");
+  pane.className = "editor-tab-pane";
+  pane.dataset.path = filePath;
+  document.getElementById("editor-container").appendChild(pane);
 
   const extensions = [
     lineNumbers(),
@@ -2916,7 +3283,8 @@ async function openFile(filePath) {
     ]),
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
-        S.modified.add(S.currentFile);
+        S.modified.add(filePath);
+        renderTabs();
         renderFileTree();
         scheduleAutoSave();
         scheduleOutlineRefresh();
@@ -2924,27 +3292,27 @@ async function openFile(filePath) {
     }),
     EditorView.lineWrapping,
   ];
-  const langExt = await getLangExtension(S.currentFile);
+  const langExt = await getLangExtension(filePath);
   if (langExt) extensions.push(langExt);
 
+  let view;
   try {
-    S.editorView = new EditorView({
+    view = new EditorView({
       state: EditorState.create({ doc: data.content, extensions }),
-      parent: document.getElementById("editor-container"),
+      parent: pane,
     });
   } catch {
     // Language extension may conflict with CDN-loaded core modules; retry without it
     extensions.length = extensions.length - (langExt ? 1 : 0);
-    S.editorView = new EditorView({
+    view = new EditorView({
       state: EditorState.create({ doc: data.content, extensions }),
-      parent: document.getElementById("editor-container"),
+      parent: pane,
     });
   }
-  renderFileTree();
-  // Re-render outline if the outline tab is visible
-  if (document.getElementById("sidebar-outline").style.display !== "none") {
-    renderOutline();
-  }
+
+  S.editors.set(filePath, { view, mtime: data.mtime || 0 });
+  if (!S.tabs.includes(filePath)) S.tabs.push(filePath);
+  switchTab(filePath);
 }
 
 function scheduleAutoSave() {
@@ -2974,16 +3342,10 @@ async function saveCurrentFile() {
   }
 }
 
+// Close the active tab (wired to the breadcrumb X button).
 function closeFile() {
-  if (S.currentFile && S.modified.has(S.currentFile)) saveCurrentFile();
-  if (S.editorView) { S.editorView.destroy(); S.editorView = null; }
-  S.currentFile = null;
-  S.fileMtime = 0;
-  document.getElementById("breadcrumb-path").textContent = "—";
-  document.getElementById("breadcrumb-path").title = "";
-  document.getElementById("btn-close-file").style.display = "none";
-  document.getElementById("editor-container").innerHTML = "";
-  document.getElementById("reload-bar")?.remove();
+  if (!S.activeTab) return;
+  closeTab(S.activeTab);
 }
 
 // ══════════════════════════════════════════
@@ -3029,8 +3391,19 @@ function showReloadPrompt() {
 
 async function reloadCurrentFile() {
   document.getElementById("reload-bar")?.remove();
-  S.modified.delete(S.currentFile);
-  await openFile(S.currentFile);
+  const path = S.activeTab;
+  if (!path) return;
+  S.modified.delete(path);
+  // Drop cached view + pane so openFile re-fetches and rebuilds
+  const entry = S.editors.get(path);
+  if (entry && entry.view) { try { entry.view.destroy(); } catch {} }
+  S.editors.delete(path);
+  document.querySelectorAll(`.editor-tab-pane[data-path]`).forEach((p) => {
+    if (p.dataset.path === path) p.remove();
+  });
+  const idx = S.tabs.indexOf(path);
+  if (idx !== -1) S.tabs.splice(idx, 1);
+  await openFile(path);
 }
 window.reloadCurrentFile = reloadCurrentFile;
 
@@ -4042,6 +4415,9 @@ function showShortcutsPopup() {
       { keys: [MOD, "Shift", "G"], desc: t("sc_git_tab") },
       { keys: [MOD, "Shift", "F"], desc: t("sc_search_tab") },
       { keys: [MOD, "Shift", "O"], desc: t("sc_outline_tab") },
+      { keys: [MOD, "Tab"],          desc: t("sc_next_tab") },
+      { keys: [MOD, "Shift", "Tab"], desc: t("sc_prev_tab") },
+      { keys: [MOD, "W"],            desc: t("sc_close_tab") },
     ]},
     { title: t("shortcut_git"), shortcuts: [
       { keys: [MOD, "Shift", "Alt", "C"], desc: t("sc_commit") },
@@ -4095,6 +4471,13 @@ function setupKeybindings() {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "1") { e.preventDefault(); setLayout("editor"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "2") { e.preventDefault(); setLayout("split"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "3") { e.preventDefault(); setLayout("pdf"); }
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "w") {
+      if (S.activeTab) { e.preventDefault(); closeTab(S.activeTab); }
+    }
+    if (e.ctrlKey && !e.altKey && e.key === "Tab") {
+      e.preventDefault();
+      cycleTabs(e.shiftKey ? -1 : 1);
+    }
     if (e.key === "Escape") { closeModal(); closeContextMenu(); document.getElementById("settings-popup").classList.remove("open"); document.getElementById("shortcuts-popup").classList.remove("open"); if (document.getElementById("diff-pane").classList.contains("open")) closeDiffPane(); }
   });
 }
@@ -4104,11 +4487,20 @@ function setupKeybindings() {
 // ══════════════════════════════════════════
 document.getElementById("btn-home").onclick = () => {
   if (S.mode === "multi") {
-    if (S.currentFile && S.modified.has(S.currentFile)) saveCurrentFile();
+    // Flush any dirty tabs synchronously (best effort)
+    for (const path of S.tabs) {
+      if (S.modified.has(path)) {
+        const entry = S.editors.get(path);
+        if (entry && entry.view) {
+          const content = entry.view.state.doc.toString();
+          api("PUT", `/api/projects/${enc(S.projectName)}/files/${enc(path)}`, { content }).catch(() => {});
+        }
+      }
+    }
+    closeAllTabs();
+    S.modified.clear();
     S.projectName = null;
-    S.currentFile = null;
     document.getElementById("project-name").textContent = "\u2014";
-    if (S.editorView) { S.editorView.destroy(); S.editorView = null; }
     showProjectList();
   }
 };
