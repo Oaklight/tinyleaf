@@ -1682,6 +1682,8 @@ const I18N = {
     shortcut_navigation: "Navigation",
     shortcut_general: "General",
     sc_save: "Save file",
+    sc_find: "Find in file",
+    sc_replace: "Find & Replace",
     sc_compile: "Compile",
     sc_files_tab: "Files tab",
     sc_git_tab: "Git tab",
@@ -1864,6 +1866,8 @@ const I18N = {
     shortcut_navigation: "导航",
     shortcut_general: "通用",
     sc_save: "保存文件",
+    sc_find: "文件内查找",
+    sc_replace: "查找与替换",
     sc_compile: "编译",
     sc_files_tab: "文件标签",
     sc_git_tab: "Git 标签",
@@ -2054,7 +2058,7 @@ const [
   { defaultKeymap, history, historyKeymap, indentWithTab },
   { syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldGutter, foldKeymap },
   { closeBrackets, closeBracketsKeymap, autocompletion },
-  { search, searchKeymap, highlightSelectionMatches },
+  { search, searchKeymap, highlightSelectionMatches, openSearchPanel },
 ] = await Promise.all([
   loadMod("cm-view.js", "@codemirror/view@6"),
   loadMod("cm-state.js", "@codemirror/state@6"),
@@ -4650,6 +4654,8 @@ function showShortcutsPopup() {
   const groups = [
     { title: t("shortcut_editing"), shortcuts: [
       { keys: [MOD, "S"], desc: t("sc_save") },
+      { keys: [MOD, "F"], desc: t("sc_find") },
+      { keys: [MOD, "H"], desc: t("sc_replace") },
     ]},
     { title: t("shortcut_compile"), shortcuts: [
       { keys: [MOD, "Enter"], desc: t("sc_compile") },
@@ -4905,6 +4911,11 @@ function setupKeybindings() {
     if ((e.ctrlKey || e.metaKey) && e.key === "/") { e.preventDefault(); showShortcutsPopup(); }
     if ((e.ctrlKey || e.metaKey) && e.key === "`") { e.preventDefault(); toggleLog(); }
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "b") { e.preventDefault(); toggleSidebar(); }
+    // Ctrl+H: prevent browser history and open CM search/replace panel
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "h") {
+      e.preventDefault();
+      if (S.editorView) openSearchPanel(S.editorView);
+    }
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "p") { e.preventDefault(); openQuickOpen(); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "1") { e.preventDefault(); setLayout("editor"); }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "2") { e.preventDefault(); setLayout("split"); }
