@@ -701,6 +701,54 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
 @keyframes synctex-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 #btn-pdf-hd.active { background: var(--accent); color: #fff; }
 
+/* ── PDF Search Bar ── */
+#pdf-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+#pdf-search-bar.hidden { display: none; }
+#pdf-search-input {
+  flex: 1;
+  min-width: 100px;
+  max-width: 260px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  font-family: var(--font);
+  outline: none;
+}
+#pdf-search-input:focus { border-color: var(--accent); }
+#pdf-search-count {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  min-width: 50px;
+}
+.pdf-search-highlight {
+  position: absolute;
+  background: rgba(255, 200, 0, 0.4);
+  pointer-events: none;
+  border-radius: 1px;
+  z-index: 2;
+}
+.pdf-search-highlight.active {
+  background: rgba(255, 120, 0, 0.6);
+  outline: 2px solid rgba(255, 120, 0, 0.8);
+}
+.pdf-page-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
 #pdf-toolbar {
   display: flex;
   align-items: center;
@@ -1142,6 +1190,55 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
 .shortcut-row .shortcut-keys { display: flex; gap: 3px; align-items: center; }
 .shortcut-row .shortcut-keys span { font-size: 10px; color: var(--text-dim); }
 
+/* ── Word count popup ── */
+.wordcount-popup {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+}
+.wordcount-popup.open { display: flex; }
+.wordcount-popup-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  min-width: 300px;
+  max-width: 400px;
+  padding: 24px;
+}
+.wordcount-popup-panel h3 {
+  margin-bottom: 16px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.wordcount-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.wordcount-row:last-child { border-bottom: none; }
+.wordcount-row .wc-label { color: var(--text); }
+.wordcount-row .wc-value {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--accent);
+}
+.wordcount-row.wc-total {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 2px solid var(--border);
+  border-bottom: none;
+  font-weight: 600;
+}
+.wordcount-row.wc-total .wc-value { font-size: 15px; }
+
 /* ── About popup links ── */
 .about-link {
   display: inline-flex;
@@ -1258,6 +1355,7 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
     </label>
     <button id="btn-compile" class="primary" data-i18n="compile">Compile</button>
     <button id="btn-clean" class="sm danger" data-i18n="clean" title="Remove build artifacts" data-i18n-title="clean_title">Clean</button>
+    <button id="btn-export-zip" class="sm" data-i18n="export_zip" title="Export project as ZIP" data-i18n-title="export_zip_title">Export ZIP</button>
     <span class="toolbar-sep"></span>
     <button id="btn-save" class="sm" data-i18n="save">Save</button>
     <button id="btn-commit" class="sm" data-i18n="commit">Commit</button>
@@ -1391,6 +1489,15 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
               <button class="sm" id="btn-pdf-hd" title="Toggle HD/Fast" data-i18n-title="toggle_hd">HD</button>
               <span class="toolbar-sep"></span>
               <button class="sm" id="btn-pdf-refresh" data-i18n="refresh">Refresh</button>
+              <span class="toolbar-sep"></span>
+              <button class="sm" id="btn-pdf-search" title="Search in PDF" data-i18n-title="pdf_search_title">🔍</button>
+            </div>
+            <div id="pdf-search-bar" class="hidden">
+              <input id="pdf-search-input" type="text" placeholder="Search in PDF..." data-i18n-placeholder="pdf_search_placeholder">
+              <span id="pdf-search-count"></span>
+              <button class="sm" id="btn-pdf-search-prev" title="Previous match" data-i18n-title="pdf_search_prev">▲</button>
+              <button class="sm" id="btn-pdf-search-next" title="Next match" data-i18n-title="pdf_search_next">▼</button>
+              <button class="sm" id="btn-pdf-search-close" title="Close search" data-i18n-title="pdf_search_close">×</button>
             </div>
             <div id="pdf-container">
               <div class="pdf-placeholder" data-i18n="compile_to_preview">Compile to see PDF preview</div>
@@ -1428,6 +1535,7 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
     <span id="status-left" data-i18n="ready">Ready</span>
     <span style="flex:1"></span>
     <span id="status-right"></span>
+    <button class="icon-btn" id="btn-wordcount" title="Word count" data-i18n-title="word_count" style="padding:2px 4px;font-size:11px;font-family:var(--mono)">Wc</button>
     <button class="icon-btn" id="btn-log-toggle" title="Toggle compile log (Ctrl+\`)" data-i18n-title="toggle_log" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></button>
     <button class="icon-btn" id="btn-shortcuts" title="Keyboard shortcuts" data-i18n-title="keyboard_shortcuts" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="8" x2="6" y2="8"/><line x1="10" y1="8" x2="10" y2="8"/><line x1="14" y1="8" x2="14" y2="8"/><line x1="18" y1="8" x2="18" y2="8"/><line x1="6" y1="12" x2="6" y2="12"/><line x1="10" y1="12" x2="10" y2="12"/><line x1="14" y1="12" x2="14" y2="12"/><line x1="18" y1="12" x2="18" y2="12"/><line x1="8" y1="16" x2="16" y2="16"/></svg></button>
     <button class="icon-btn" id="btn-settings" title="Settings" data-i18n-title="settings" style="padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
@@ -1525,6 +1633,12 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
   <div class="shortcuts-popup-panel" onclick="event.stopPropagation()">
     <h3 data-i18n="keyboard_shortcuts">Keyboard Shortcuts</h3>
     <div id="shortcuts-content"></div>
+  </div>
+</div>
+<div class="wordcount-popup" id="wordcount-popup" onclick="this.classList.remove('open')">
+  <div class="wordcount-popup-panel" onclick="event.stopPropagation()">
+    <h3 data-i18n="word_count">Word Count</h3>
+    <div id="wordcount-content"></div>
   </div>
 </div>
 
@@ -1744,6 +1858,26 @@ const I18N = {
     quick_open_hint_nav: "navigate",
     quick_open_hint_open: "open",
     quick_open_hint_close: "close",
+    pdf_search_title: "Search in PDF",
+    pdf_search_placeholder: "Search in PDF...",
+    pdf_search_prev: "Previous match",
+    pdf_search_next: "Next match",
+    pdf_search_close: "Close search",
+    pdf_search_no_results: "No results",
+    pdf_search_count: "{current} of {total}",
+    sc_pdf_search: "Search in PDF",
+    word_count: "Word Count",
+    wc_words_in_text: "Words in text",
+    wc_words_in_headers: "Words in headers",
+    wc_words_outside_text: "Words outside text",
+    wc_words_in_captions: "Words in captions",
+    wc_math_inline: "Math inlines",
+    wc_math_display: "Math displayed",
+    wc_total: "Total",
+    wc_loading: "Counting words...",
+    wc_error: "Word count failed",
+    export_zip: "Export ZIP",
+    export_zip_title: "Export project as ZIP",
   },
   zh: {
     compile: "编译",
@@ -1928,6 +2062,26 @@ const I18N = {
     quick_open_hint_nav: "导航",
     quick_open_hint_open: "打开",
     quick_open_hint_close: "关闭",
+    pdf_search_title: "在 PDF 中搜索",
+    pdf_search_placeholder: "在 PDF 中搜索...",
+    pdf_search_prev: "上一个匹配",
+    pdf_search_next: "下一个匹配",
+    pdf_search_close: "关闭搜索",
+    pdf_search_no_results: "无结果",
+    pdf_search_count: "{current} / {total}",
+    sc_pdf_search: "在 PDF 中搜索",
+    word_count: "字数统计",
+    wc_words_in_text: "正文字数",
+    wc_words_in_headers: "标题字数",
+    wc_words_outside_text: "正文外字数",
+    wc_words_in_captions: "图表标题字数",
+    wc_math_inline: "行内公式",
+    wc_math_display: "行间公式",
+    wc_total: "合计",
+    wc_loading: "正在统计字数...",
+    wc_error: "字数统计失败",
+    export_zip: "导出 ZIP",
+    export_zip_title: "导出项目为 ZIP",
   },
 };
 
@@ -2189,6 +2343,9 @@ const S = {
   pdfUrl: null,
   pdfZoom: 1.0,
   pdfRenderHD: true,
+  pdfTextPages: null,
+  pdfSearchMatches: [],
+  pdfSearchIndex: -1,
   autoSaveTimer: null,
   autoSaveInterval: 2000,
   useDocker: true,
@@ -2339,6 +2496,11 @@ function setupSettingsPopup() {
   document.getElementById("btn-shortcuts").onclick = (e) => {
     e.stopPropagation();
     showShortcutsPopup();
+  };
+
+  document.getElementById("btn-wordcount").onclick = (e) => {
+    e.stopPropagation();
+    showWordCount();
   };
 
   document.getElementById("lang-select").onchange = (e) => setLang(e.target.value);
@@ -3021,6 +3183,10 @@ async function openProject(name) {
 
   // Clear previous project state
   S.pdfDoc = null;
+  S.pdfTextPages = null;
+  S.pdfSearchMatches = [];
+  S.pdfSearchIndex = -1;
+  closePdfSearch();
   const pdfContainer = document.getElementById("pdf-container");
   pdfContainer.innerHTML = `<div class="pdf-placeholder" data-i18n="compile_to_preview">${t("compile_to_preview")}</div>`;
   setPdfStatus(t("no_pdf"));
@@ -3707,8 +3873,13 @@ async function loadPDF(url) {
     const doc = await pdfjsLib.getDocument(pdfUrl).promise;
     S.pdfDoc = doc;
     S.pdfZoom = 1.0;
+    S.pdfTextPages = null;
+    S.pdfSearchMatches = [];
+    S.pdfSearchIndex = -1;
     updateZoomLabel();
     await renderPDF();
+    // Extract text in the background for PDF search
+    extractPdfText().catch(() => {});
   } catch (err) {
     container.innerHTML = `<div class="pdf-placeholder">${t("pdf_error")}: ${esc(err.message)}</div>`;
     setPdfStatus(t("pdf_error"));
@@ -3805,12 +3976,21 @@ async function renderPDF() {
       const pdfY = (e.clientY - rect.top) / parseFloat(canvas.dataset.scale);
       syncTexInverseSearch(parseInt(canvas.dataset.pageNum), pdfX, pdfY);
     });
-    container.appendChild(canvas);
+    // Wrap canvas in a positioned container for search highlight overlays
+    const wrapper = document.createElement("div");
+    wrapper.className = "pdf-page-wrapper";
+    wrapper.dataset.pageNum = i;
+    wrapper.appendChild(canvas);
+    container.appendChild(wrapper);
     const ctx = canvas.getContext("2d");
     ctx.scale(dpr, dpr);
     await page.render({ canvasContext: ctx, viewport }).promise;
   }
   setupPdfPageObserver();
+  // Re-apply search highlights after re-render (e.g. zoom change)
+  if (S.pdfSearchMatches.length > 0) {
+    renderPdfSearchHighlights();
+  }
 }
 
 function updateZoomLabel() {
@@ -3855,12 +4035,14 @@ async function syncTexForwardSearch() {
     if (!canvas) return;
     const scale = parseFloat(canvas.dataset.scale);
     const cssY = data.y * scale;
-    container.scrollTop = canvas.offsetTop + cssY - container.clientHeight / 2;
+    const wrapper = canvas.closest(".pdf-page-wrapper") || canvas;
+    const wrapperTop = wrapper.offsetTop;
+    container.scrollTop = wrapperTop + cssY - container.clientHeight / 2;
     // Flash highlight
     const marker = document.createElement("div");
     marker.className = "synctex-highlight";
-    marker.style.top = `${canvas.offsetTop + cssY - 10}px`;
-    marker.style.left = `${canvas.offsetLeft}px`;
+    marker.style.top = `${wrapperTop + cssY - 10}px`;
+    marker.style.left = `${wrapper.offsetLeft}px`;
     marker.style.width = `${canvas.width / (window.devicePixelRatio || 1)}px`;
     container.appendChild(marker);
     setTimeout(() => marker.remove(), 1500);
@@ -3882,6 +4064,209 @@ function showImagePreview(url, filePath) {
     container.innerHTML = `<div class="pdf-placeholder">${t("image_error")}</div>`;
   };
   container.appendChild(img);
+}
+
+// ══════════════════════════════════════════
+// PDF Search
+// ══════════════════════════════════════════
+
+// Extract text content from all pages of the current PDF document.
+// Each page entry contains the page number and an array of text items
+// with their position transforms. Called once after PDF loads.
+async function extractPdfText() {
+  if (!S.pdfDoc) return;
+  const pages = [];
+  for (let i = 1; i <= S.pdfDoc.numPages; i++) {
+    const page = await S.pdfDoc.getPage(i);
+    const content = await page.getTextContent();
+    pages.push({ pageNum: i, items: content.items });
+  }
+  S.pdfTextPages = pages;
+}
+
+// Search extracted text for query string (case-insensitive).
+// Returns an array of match objects with page, item index, and
+// character offset within the item string.
+function searchPdfText(query) {
+  if (!S.pdfTextPages || !query) return [];
+  const matches = [];
+  const q = query.toLowerCase();
+  const qLen = q.length;
+
+  for (const page of S.pdfTextPages) {
+    // Build a concatenated text for the page so we can find matches
+    // that span across text items. Track item boundaries.
+    const items = page.items.filter((it) => it.str.length > 0);
+    let fullText = "";
+    const itemBounds = []; // {start, end, itemIdx}
+    for (let idx = 0; idx < items.length; idx++) {
+      const start = fullText.length;
+      fullText += items[idx].str;
+      itemBounds.push({ start, end: fullText.length, itemIdx: idx });
+    }
+
+    const lowerText = fullText.toLowerCase();
+    let pos = 0;
+    while ((pos = lowerText.indexOf(q, pos)) !== -1) {
+      // Find which items this match spans
+      const matchEnd = pos + qLen;
+      const spannedItems = [];
+      for (const bound of itemBounds) {
+        if (bound.end > pos && bound.start < matchEnd) {
+          spannedItems.push({
+            item: items[bound.itemIdx],
+            itemIdx: bound.itemIdx,
+            // Character range within this item that is part of the match
+            charStart: Math.max(0, pos - bound.start),
+            charEnd: Math.min(bound.end - bound.start, matchEnd - bound.start),
+          });
+        }
+      }
+      matches.push({ pageNum: page.pageNum, pos, spannedItems });
+      pos++;
+    }
+  }
+  return matches;
+}
+
+// Calculate CSS position and size for a text match highlight on a canvas.
+// Uses pdf.js text item transforms to map PDF coordinates to canvas pixels.
+function calcHighlightRect(item, charStart, charEnd, scale, viewportHeight) {
+  // item.transform = [scaleX, skewY, skewX, scaleY, translateX, translateY]
+  const tx = item.transform;
+  const fontSize = Math.sqrt(tx[0] * tx[0] + tx[1] * tx[1]);
+  const x = tx[4];
+  const y = tx[5];
+
+  // Approximate character width — use item.width / item.str.length
+  const avgCharW = item.str.length > 0 ? (item.width || 0) / item.str.length : 0;
+  const hlX = x + avgCharW * charStart;
+  const hlW = avgCharW * (charEnd - charStart);
+
+  // PDF coordinates have origin at bottom-left; canvas CSS has origin at top-left
+  const cssX = hlX * scale;
+  const cssY = (viewportHeight - y - fontSize) * scale;
+  const cssW = hlW * scale;
+  const cssH = fontSize * scale * 1.2; // slight padding
+
+  return { left: cssX, top: cssY, width: cssW, height: cssH };
+}
+
+// Remove all search highlight elements from the PDF container.
+function clearPdfSearchHighlights() {
+  const container = document.getElementById("pdf-container");
+  container.querySelectorAll(".pdf-search-highlight").forEach((el) => el.remove());
+}
+
+// Render highlight overlays for all current matches on the correct page wrappers.
+function renderPdfSearchHighlights() {
+  clearPdfSearchHighlights();
+  const container = document.getElementById("pdf-container");
+
+  for (let mi = 0; mi < S.pdfSearchMatches.length; mi++) {
+    const match = S.pdfSearchMatches[mi];
+    const wrapper = container.querySelector(`.pdf-page-wrapper[data-page-num="${match.pageNum}"]`);
+    if (!wrapper) continue;
+    const canvas = wrapper.querySelector("canvas");
+    if (!canvas) continue;
+    const scale = parseFloat(canvas.dataset.scale);
+    // Get the viewport height for coordinate conversion
+    const viewportHeight = parseFloat(canvas.style.height) / scale;
+
+    for (const span of match.spannedItems) {
+      const rect = calcHighlightRect(span.item, span.charStart, span.charEnd, scale, viewportHeight);
+      if (rect.width <= 0) continue;
+      const hl = document.createElement("div");
+      hl.className = "pdf-search-highlight" + (mi === S.pdfSearchIndex ? " active" : "");
+      hl.style.left = rect.left + "px";
+      hl.style.top = rect.top + "px";
+      hl.style.width = rect.width + "px";
+      hl.style.height = rect.height + "px";
+      hl.dataset.matchIndex = mi;
+      wrapper.appendChild(hl);
+    }
+  }
+}
+
+// Update the match count display in the search bar.
+function updatePdfSearchCount() {
+  const countEl = document.getElementById("pdf-search-count");
+  const total = S.pdfSearchMatches.length;
+  if (total === 0) {
+    const query = document.getElementById("pdf-search-input").value;
+    countEl.textContent = query ? t("pdf_search_no_results") : "";
+  } else {
+    countEl.textContent = t("pdf_search_count")
+      .replace("{current}", S.pdfSearchIndex + 1)
+      .replace("{total}", total);
+  }
+}
+
+// Scroll to the currently active match in the PDF container.
+function scrollToPdfMatch(index) {
+  if (index < 0 || index >= S.pdfSearchMatches.length) return;
+  S.pdfSearchIndex = index;
+  const match = S.pdfSearchMatches[index];
+  const container = document.getElementById("pdf-container");
+  const wrapper = container.querySelector(`.pdf-page-wrapper[data-page-num="${match.pageNum}"]`);
+  if (wrapper) {
+    // Scroll so the match is visible
+    const activeHl = wrapper.querySelector(`.pdf-search-highlight[data-match-index="${index}"]`);
+    if (activeHl) {
+      activeHl.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      wrapper.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+  // Update page input
+  document.getElementById("pdf-page-input").value = match.pageNum;
+  // Re-render highlights to update active state
+  renderPdfSearchHighlights();
+  updatePdfSearchCount();
+}
+
+// Run a PDF search with the given query string.
+function executePdfSearch(query) {
+  S.pdfSearchMatches = searchPdfText(query);
+  S.pdfSearchIndex = S.pdfSearchMatches.length > 0 ? 0 : -1;
+  renderPdfSearchHighlights();
+  updatePdfSearchCount();
+  if (S.pdfSearchIndex >= 0) {
+    scrollToPdfMatch(0);
+  }
+}
+
+// Navigate to the next or previous match.
+function pdfSearchNext() {
+  if (S.pdfSearchMatches.length === 0) return;
+  const next = (S.pdfSearchIndex + 1) % S.pdfSearchMatches.length;
+  scrollToPdfMatch(next);
+}
+
+function pdfSearchPrev() {
+  if (S.pdfSearchMatches.length === 0) return;
+  const prev = (S.pdfSearchIndex - 1 + S.pdfSearchMatches.length) % S.pdfSearchMatches.length;
+  scrollToPdfMatch(prev);
+}
+
+// Open the PDF search bar and focus the input.
+function openPdfSearch() {
+  const bar = document.getElementById("pdf-search-bar");
+  bar.classList.remove("hidden");
+  const input = document.getElementById("pdf-search-input");
+  input.focus();
+  input.select();
+}
+
+// Close the PDF search bar and clear highlights.
+function closePdfSearch() {
+  const bar = document.getElementById("pdf-search-bar");
+  bar.classList.add("hidden");
+  document.getElementById("pdf-search-input").value = "";
+  document.getElementById("pdf-search-count").textContent = "";
+  S.pdfSearchMatches = [];
+  S.pdfSearchIndex = -1;
+  clearPdfSearchHighlights();
 }
 
 // ══════════════════════════════════════════
@@ -4679,6 +5064,7 @@ function showShortcutsPopup() {
     { title: t("shortcut_pdf"), shortcuts: [
       { keys: [MOD, "Click"], desc: t("sc_synctex") },
       { keys: [MOD, "Shift", "Enter"], desc: t("sc_forward_search") },
+      { keys: [MOD, "F"], desc: t("sc_pdf_search") },
     ]},
     { title: t("shortcut_layout"), shortcuts: [
       { keys: [MOD, "Shift", "1"], desc: t("sc_layout_editor") },
@@ -4705,6 +5091,42 @@ function showShortcutsPopup() {
   `).join("");
 
   document.getElementById("shortcuts-popup").classList.add("open");
+}
+
+// ══════════════════════════════════════════
+// Word Count
+// ══════════════════════════════════════════
+async function showWordCount() {
+  if (!S.projectName) return;
+
+  const container = document.getElementById("wordcount-content");
+  container.innerHTML = `<div style="text-align:center;padding:16px;color:var(--text-dim)">${t("wc_loading")}</div>`;
+  document.getElementById("wordcount-popup").classList.add("open");
+
+  try {
+    const stats = await api("GET", `/api/projects/${enc(S.projectName)}/wordcount`);
+    const rows = [
+      { label: t("wc_words_in_text"), value: stats.words_in_text },
+      { label: t("wc_words_in_headers"), value: stats.words_in_headers },
+      { label: t("wc_words_outside_text"), value: stats.words_outside_text },
+      { label: t("wc_words_in_captions"), value: stats.words_in_captions },
+      { label: t("wc_math_inline"), value: stats.math_inline },
+      { label: t("wc_math_display"), value: stats.math_display },
+    ];
+    container.innerHTML = rows.map(r => `
+      <div class="wordcount-row">
+        <span class="wc-label">${r.label}</span>
+        <span class="wc-value">${r.value.toLocaleString()}</span>
+      </div>
+    `).join("") + `
+      <div class="wordcount-row wc-total">
+        <span class="wc-label">${t("wc_total")}</span>
+        <span class="wc-value">${stats.total.toLocaleString()}</span>
+      </div>
+    `;
+  } catch (err) {
+    container.innerHTML = `<div style="text-align:center;padding:16px;color:var(--red)">${t("wc_error")}: ${esc(err.message)}</div>`;
+  }
 }
 
 // ══════════════════════════════════════════
@@ -4927,7 +5349,20 @@ function setupKeybindings() {
       e.preventDefault();
       cycleTabs(e.shiftKey ? -1 : 1);
     }
-    if (e.key === "Escape") { closeModal(); closeContextMenu(); closeQuickOpen(); document.getElementById("settings-popup").classList.remove("open"); document.getElementById("shortcuts-popup").classList.remove("open"); if (document.getElementById("diff-pane").classList.contains("open")) closeDiffPane(); }
+    // Ctrl+F: open PDF search when focus is in PDF pane or PDF-only layout
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "f") {
+      const pdfPane = document.getElementById("pdf-pane");
+      const editorPane = document.getElementById("editor-pane");
+      const inPdfPane = pdfPane && pdfPane.contains(document.activeElement);
+      const pdfOnly = editorPane && editorPane.classList.contains("hidden");
+      if (inPdfPane || pdfOnly) {
+        e.preventDefault();
+        e.stopPropagation();
+        openPdfSearch();
+        return;
+      }
+    }
+    if (e.key === "Escape") { closePdfSearch(); closeModal(); closeContextMenu(); closeQuickOpen(); document.getElementById("settings-popup").classList.remove("open"); document.getElementById("shortcuts-popup").classList.remove("open"); document.getElementById("wordcount-popup").classList.remove("open"); if (document.getElementById("diff-pane").classList.contains("open")) closeDiffPane(); }
   });
 }
 
@@ -4955,6 +5390,15 @@ document.getElementById("btn-home").onclick = () => {
 };
 document.getElementById("btn-compile").onclick = compile;
 document.getElementById("btn-clean").onclick = doClean;
+document.getElementById("btn-export-zip").onclick = () => {
+  if (!S.projectName) return;
+  const a = document.createElement("a");
+  a.href = `/api/projects/${enc(S.projectName)}/export`;
+  a.download = "";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
 document.getElementById("btn-save").onclick = saveCurrentFile;
 document.getElementById("main-file-select").onchange = (e) => {
   S.mainFile = e.target.value;
@@ -5059,6 +5503,32 @@ document.getElementById("pdf-page-input").addEventListener("keydown", (e) => {
 document.getElementById("pdf-page-input").addEventListener("blur", (e) => {
   if (S.pdfDoc) {
     jumpToPdfPage(parseInt(e.target.value) || 1);
+  }
+});
+
+// ── PDF search bar ──
+document.getElementById("btn-pdf-search").onclick = openPdfSearch;
+document.getElementById("btn-pdf-search-close").onclick = closePdfSearch;
+document.getElementById("btn-pdf-search-prev").onclick = pdfSearchPrev;
+document.getElementById("btn-pdf-search-next").onclick = pdfSearchNext;
+{
+  let pdfSearchTimer = null;
+  document.getElementById("pdf-search-input").addEventListener("input", (e) => {
+    clearTimeout(pdfSearchTimer);
+    const query = e.target.value.trim();
+    // Debounce search to avoid lag on fast typing
+    pdfSearchTimer = setTimeout(() => executePdfSearch(query), 200);
+  });
+}
+document.getElementById("pdf-search-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    if (e.shiftKey) pdfSearchPrev();
+    else pdfSearchNext();
+  }
+  if (e.key === "Escape") {
+    e.preventDefault();
+    closePdfSearch();
   }
 });
 
