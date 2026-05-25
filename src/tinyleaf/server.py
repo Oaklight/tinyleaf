@@ -26,6 +26,8 @@ class TexliveHandler(BaseHTTPRequestHandler):
 
         if path == "/" or path == "/index.html":
             self._serve_static("index.html", "text/html")
+        elif path.startswith("/static/"):
+            self._serve_static_path(path[len("/static/") :])
         elif path.startswith("/vendor/"):
             self._serve_vendor(path[8:])
         elif path == "/api/mode":
@@ -244,6 +246,27 @@ class TexliveHandler(BaseHTTPRequestHandler):
             self.wfile.write(content)
         except FileNotFoundError:
             self._send_error(404, f"Static file not found: {filename}")
+
+    # Extension → MIME type mapping for static assets
+    _MIME_TYPES = {
+        ".html": "text/html",
+        ".css": "text/css",
+        ".js": "application/javascript",
+        ".json": "application/json",
+        ".svg": "image/svg+xml",
+        ".png": "image/png",
+        ".ico": "image/x-icon",
+    }
+
+    def _serve_static_path(self, rel_path):
+        """Serve a file from the static directory with auto-detected MIME type."""
+        rel_path = os.path.normpath(rel_path)
+        if rel_path.startswith("..") or os.path.isabs(rel_path):
+            self._send_error(403, "Forbidden")
+            return
+        ext = os.path.splitext(rel_path)[1].lower()
+        ct = self._MIME_TYPES.get(ext, "application/octet-stream")
+        self._serve_static(rel_path, ct)
 
     def _serve_vendor(self, filename):
         """Serve a file from the vendor directory."""
