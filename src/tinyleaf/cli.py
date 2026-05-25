@@ -6,7 +6,7 @@ import shutil
 import sys
 import webbrowser
 
-from tinyleaf import registry
+from tinyleaf import __version__, registry
 from tinyleaf.server import run_server
 
 DEFAULT_CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", "tinyleaf")
@@ -14,10 +14,53 @@ DEFAULT_PORT = 14159
 DEFAULT_HOST = "127.0.0.1"
 
 
+def _get_pypi_latest(pkg: str = "tinyleaf") -> str | None:
+    """Query PyPI for the latest stable version of a package.
+
+    Returns:
+        Version string or None if the query fails.
+    """
+    import json
+    import urllib.request
+
+    try:
+        url = f"https://pypi.org/pypi/{pkg}/json"
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+            return data.get("info", {}).get("version")
+    except Exception:
+        return None
+
+
+def _parse_version(v: str) -> tuple[int, ...]:
+    """Parse a version string like '0.4.0' into a comparable tuple."""
+    return tuple(int(x) for x in v.split(".") if x.isdigit())
+
+
+def _print_version():
+    """Print version with update check."""
+    print(f"tinyleaf {__version__}")
+    latest = _get_pypi_latest()
+    if latest is None:
+        print("  (could not check for updates)")
+    elif _parse_version(latest) > _parse_version(__version__):
+        print(f"  Update available: {__version__} → {latest}")
+        print("  Run: pip install --upgrade tinyleaf")
+    else:
+        print("  ✓ up to date")
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="tinyleaf",
         description="Lightweight web-based LaTeX editor",
+    )
+    parser.add_argument(
+        "-V",
+        "--version",
+        action="store_true",
+        help="Show version and check for updates",
     )
     parser.add_argument(
         "project_path",
@@ -64,6 +107,10 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.version:
+        _print_version()
+        sys.exit(0)
 
     # Validate
     if args.project_path and args.projects_dir:
