@@ -173,6 +173,8 @@ class TexliveHandler(BaseHTTPRequestHandler):
         elif sub == "search":
             qs = urllib.parse.parse_qs(query_string)
             self._handle_api("search_files", name=name, qs=qs)
+        elif sub == "symbols":
+            self._handle_api("project_symbols", name=name)
         else:
             self._send_error(404, "Not found")
 
