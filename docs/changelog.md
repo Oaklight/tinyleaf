@@ -5,6 +5,40 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [0.4.0] - 2026-05-25
+
+### 新增
+
+- **\ref/\cite/\label 自动补全** — 输入 `\ref{`、`\cite{`、`\label{` 时自动提供来自 `.tex` 和 `.bib` 文件的符号补全
+- **PDF 文字搜索**（PDF 区域 `Ctrl+F`）— 在渲染的 PDF 中搜索，高亮匹配并支持上下翻页
+- **导出项目为 ZIP** — 将整个项目打包下载为 `.zip` 文件
+- **字数/页数统计** — 基于 `texcount` 的字数和页数统计，显示在状态栏
+- **PDF 页码导航** — PDF 工具栏中的页码输入框和上下翻页按钮
+- **自动配对 `\begin{env}` → `\end{env}`** — 输入 `\begin{...}` 自动插入匹配的 `\end{...}`
+- **快速打开**（`Ctrl+P`）— 模糊文件切换器
+- **多标签编辑器** — 在标签页中打开多个文件，`Ctrl+W` 关闭，`Ctrl+Tab` 切换
+- **Git 差异查看器** — 生产级的暂存/未暂存分栏差异视图
+- **LaTeX 大纲**侧边栏标签页 — 从 `\section`、`\subsection` 等提取文档结构，支持 `\input`/`\include` 递归
+- **可点击编译日志** — 日志中的 `文件名:行号` 引用可点击跳转到源码位置
+- **SyncTeX 提示** — PDF 页面悬停显示"Ctrl+点击跳转到源码"
+- **`--version` / `-V` 参数** — 显示当前版本并检查 PyPI 更新
+- **翡翠绿主题** — 浅色主题的强调色从蓝色更改为翡翠绿（#059669）
+- **SVG 叶子 logo** — 自定义 favicon 和工具栏品牌图标
+
+### 变更
+
+- 默认端口从 `8080` 更改为 `14159`（π）
+- 工具栏中移除重复的 Commit/Push 按钮（保留在 Git 侧边栏中）
+- PDF 搜索按钮使用 SVG 图标替代 emoji
+- 复选框通过 `accent-color` 跟随主题色
+- `Ctrl+H` 拦截为打开编辑器查找/替换面板而非浏览器历史
+
+### 内部
+
+- **前端拆分** — 单体 `index.html`（约 5700 行）拆分为 `index.html` + `css/app.css` + `js/app.js`
+- 新增 `/static/` 路由的静态文件服务，支持 MIME 类型检测和路径遍历防护
+- 内联 `onclick` 处理器迁移为 `addEventListener`，兼容 ES 模块
+
 ## [0.3.0] - 2026-05-18
 
 ### 新增
@@ -142,6 +176,7 @@ tinyleaf 首次发布（前身为 texlive-web）。
 - 更新了 CLI 入口、配置目录和程序名称
 - 默认编译后端改为 Docker（使用 `--no-docker` 切换为本地编译）
 
+[0.4.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.1.0

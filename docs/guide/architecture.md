@@ -42,7 +42,7 @@ graph TB
 ## 关键设计决策
 
 - **零依赖** — 后端仅使用 Python 标准库
-- **单 HTML 文件** — 整个前端（HTML + CSS + JS）由一个 `index.html` 提供
+- **精简前端** — HTML 标记、CSS 和 JS 分别拆分为 `index.html`、`css/app.css` 和 `js/app.js`，无需构建步骤
 - **SSE 编译流** — 通过 Server-Sent Events 实时推送编译日志
 - **注册表模式** — 项目通过名称到路径的映射存储在 JSON 文件中，而非目录列举
 - **线程安全** — 使用 `threading.Lock` + 原子 `os.replace` 确保并发安全
