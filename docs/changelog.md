@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-05-25
+
+### Added
+
+- **\ref/\cite/\label autocomplete** — context-aware completions triggered by `\ref{`, `\cite{`, `\label{` with symbols scanned from `.tex` and `.bib` files
+- **PDF text search** (`Ctrl+F` in PDF pane) — search within rendered PDF with match highlighting and prev/next navigation
+- **Export project as ZIP** — download the entire project as a `.zip` archive
+- **Word/page count** — `texcount`-based word and page statistics displayed in the status bar
+- **PDF page navigation** — page input field and prev/next buttons in the PDF toolbar
+- **Auto-pair `\begin{env}` → `\end{env}`** — typing `\begin{...}` automatically inserts matching `\end{...}`
+- **Quick Open** (`Ctrl+P`) — fuzzy file switcher palette
+- **Multi-tab editor** — open multiple files in tabs with `Ctrl+W` to close and `Ctrl+Tab` to cycle
+- **Git diff viewer** — production-quality staged/unstaged split diff view
+- **LaTeX outline** sidebar tab — document structure from `\section`, `\subsection`, etc. with `\input`/`\include` recursion
+- **Clickable compile log** — `filename:line` references in log output jump to the source location
+- **SyncTeX tooltip** — hover text on PDF pages showing `Ctrl+Click to jump to source`
+- **`--version` / `-V` flag** — shows current version with PyPI update check
+- **Emerald theme** — light theme accent changed from blue to emerald green (#059669)
+- **SVG leaf logo** — custom favicon and toolbar brand icon
+
+### Changed
+
+- Default port changed from `8080` to `14159` (π)
+- Duplicate Commit/Push buttons removed from toolbar (kept in Git sidebar)
+- PDF search button uses SVG icon instead of emoji
+- Checkboxes follow theme accent color via `accent-color`
+- `Ctrl+H` intercepted to open editor find/replace panel instead of browser history
+
+### Internal
+
+- **Frontend sharding** — monolithic `index.html` (~5700 lines) split into `index.html` + `css/app.css` + `js/app.js`
+- Static file serving with `/static/` route, MIME type detection, and path traversal protection
+- Inline `onclick` handlers migrated to `addEventListener` for ES module compatibility
+
 ## [0.3.0] - 2026-05-18
 
 ### Added
@@ -142,6 +176,7 @@ Initial release of tinyleaf (formerly texlive-web).
 - Updated CLI entry point, config directory, and program name
 - Default compilation backend changed to Docker (use `--no-docker` for local)
 
+[0.4.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.1.0

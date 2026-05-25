@@ -42,7 +42,7 @@ graph TB
 ## Key Design Decisions
 
 - **Zero dependencies** — only Python stdlib on the backend
-- **Single HTML file** — the entire frontend (HTML + CSS + JS) is served from one `index.html`
+- **Minimal frontend** — HTML markup, CSS, and JS are split into `index.html`, `css/app.css`, and `js/app.js` with no build step
 - **SSE for compilation** — real-time log streaming via Server-Sent Events
 - **Registry pattern** — projects are tracked by name-to-path mapping in a JSON file, not by directory listing
 - **Thread safety** — `threading.Lock` + atomic `os.replace` for concurrent registry access

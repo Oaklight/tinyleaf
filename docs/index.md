@@ -17,9 +17,11 @@ Tinyleaf is a CLI-first LaTeX editor that runs in your browser. It requires no P
 - **Two modes** — single project or multi-project with a persistent registry
 - **Two compilation backends** — local `latexmk` or Docker containers (default)
 - **CodeMirror 6** editor with multi-language syntax highlighting
-- **PDF.js** preview with zoom controls and HD rendering
+- **PDF.js** preview with zoom, HD rendering, text search, and page navigation
+- **LaTeX autocomplete** — `\ref{}`, `\cite{}`, `\label{}` with project symbol scanning
 - **Git integration** — status, diff, commit, push, pull from the UI
-- **7 themes** with dark/light toggle
+- **Multi-tab editor** with quick-open (`Ctrl+P`) and auto-pair `\begin`/`\end`
+- **7 themes** with dark/light toggle (emerald accent)
 - **i18n** — English and Chinese
 - **Keyboard shortcuts** — full shortcut help panel (`Ctrl+/`)
 
