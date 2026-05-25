@@ -61,6 +61,7 @@ def handle_request(handler, action, **kwargs):
         "git_log": _git_log,
         "word_count": _word_count,
         "export_zip": _export_zip,
+        "project_symbols": _project_symbols,
     }
     fn = dispatch.get(action)
     if fn:
@@ -1321,6 +1322,79 @@ def _search_files(handler, name, qs=None):
             "truncated": total >= max_results,
         }
     )
+
+
+# ── Symbols (labels & citations) ──
+
+# Directories to skip when scanning for symbols
+_SYMBOLS_SKIP_DIRS = {".git", "__pycache__", ".ruff_cache", "node_modules"}
+
+
+def _project_symbols(handler, name=""):
+    """Scan project .tex and .bib files for labels and citation keys.
+
+    Walks all .tex files to extract ``\\label{...}`` definitions and all .bib
+    files to extract BibTeX entry keys with optional title/author/year metadata.
+
+    Args:
+        handler: The HTTP request handler.
+        name: Project name.
+    """
+    project_dir = _get_project_dir(handler, name)
+    if not project_dir:
+        return
+
+    labels = []
+    citations = []
+
+    for root, dirs, files in os.walk(project_dir):
+        dirs[:] = [d for d in dirs if d not in _SYMBOLS_SKIP_DIRS]
+        for fname in files:
+            full = os.path.join(root, fname)
+            rel = os.path.relpath(full, project_dir)
+
+            if fname.endswith(".tex"):
+                try:
+                    with open(full, encoding="utf-8", errors="replace") as fh:
+                        for i, line in enumerate(fh, 1):
+                            for m in re.finditer(r"\\label\{([^}]+)\}", line):
+                                labels.append(
+                                    {
+                                        "key": m.group(1),
+                                        "file": rel,
+                                        "line": i,
+                                        "context": line.strip()[:80],
+                                    }
+                                )
+                except OSError:
+                    continue
+
+            elif fname.endswith(".bib"):
+                try:
+                    with open(full, encoding="utf-8", errors="replace") as fh:
+                        content = fh.read()
+                except OSError:
+                    continue
+
+                for m in re.finditer(r"@\w+\{([^,\s]+),", content):
+                    key = m.group(1)
+                    # Search a window after the entry key for metadata fields
+                    pos = m.end()
+                    window = content[pos : pos + 500]
+                    title_m = re.search(r"title\s*=\s*[{\"]([^}\"]+)", window)
+                    author_m = re.search(r"author\s*=\s*[{\"]([^}\"]+)", window)
+                    year_m = re.search(r"year\s*=\s*[{\"](\d{4})", window)
+                    citations.append(
+                        {
+                            "key": key,
+                            "title": title_m.group(1).strip() if title_m else "",
+                            "author": author_m.group(1).strip()[:50] if author_m else "",
+                            "year": year_m.group(1) if year_m else "",
+                            "file": rel,
+                        }
+                    )
+
+    handler.send_json({"labels": labels, "citations": citations})
 
 
 # ── Git ──
