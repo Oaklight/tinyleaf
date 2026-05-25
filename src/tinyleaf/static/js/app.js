@@ -445,7 +445,7 @@ const THEMES = {
   light: {
     "--bg": "#ffffff", "--bg-card": "#f6f8fa", "--bg-hover": "#eef1f5",
     "--border": "#d1d9e0", "--text": "#1f2328", "--text-dim": "#656d76",
-    "--accent": "#0969da", "--accent-hover": "#0550ae",
+    "--accent": "#059669", "--accent-hover": "#047857",
     "--green": "#1a7f37", "--red": "#cf222e", "--orange": "#bf8700", "--blue": "#0969da",
   },
   "indigo-dark": {
@@ -3793,7 +3793,6 @@ document.getElementById("auto-compile-toggle").onchange = (e) => {
   S.autoCompile = e.target.checked;
   api("PUT", `/api/projects/${enc(S.projectName)}/config`, { auto_compile: S.autoCompile });
 };
-document.getElementById("btn-commit").onclick = doCommit;
 document.getElementById("btn-git-commit-selected").onclick = doCommit;
 document.getElementById("btn-git-push").onclick = doPush;
 document.getElementById("btn-git-refresh").onclick = refreshGit;
@@ -3828,7 +3827,6 @@ document.getElementById("search-results").addEventListener("click", (e) => {
   const match = e.target.closest(".search-match[data-file]");
   if (match) openFileAtLine(match.dataset.file, parseInt(match.dataset.line, 10));
 });
-document.getElementById("btn-push").onclick = doPush;
 document.getElementById("btn-log-toggle").onclick = toggleLog;
 document.getElementById("btn-log-copy").addEventListener("click", (e) => { e.stopPropagation(); copyLog(); });
 document.getElementById("btn-new-file").onclick = showNewFileModal;

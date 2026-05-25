@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tinyleaf</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍃</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M6 26C6 26 8 4 26 4C26 4 28 20 16 24C12 25.3 8.5 24.5 6 26Z' fill='%23059669'/><path d='M26 4C16 10 12 18 6 26' fill='none' stroke='%23047857' stroke-width='1.5' stroke-linecap='round'/><path d='M18 10C15 14 12.5 17 10 20' fill='none' stroke='%23047857' stroke-width='1' stroke-linecap='round' opacity='.5'/><path d='M22 9C19 13 17 16 14.5 19' fill='none' stroke='%23047857' stroke-width='1' stroke-linecap='round' opacity='.5'/></svg>">
 <link rel="stylesheet" href="/static/css/app.css">
 </head>
 <body>
@@ -14,7 +14,7 @@
 <div id="app">
   <!-- Toolbar -->
   <div id="toolbar">
-    <span class="toolbar-brand" id="btn-home" style="cursor:pointer">Tinyleaf</span>
+    <span class="toolbar-brand" id="btn-home" style="cursor:pointer"><svg viewBox="0 0 32 32" style="width:18px;height:18px;vertical-align:-3px;margin-right:4px"><path d="M6 26C6 26 8 4 26 4C26 4 28 20 16 24C12 25.3 8.5 24.5 6 26Z" fill="#059669"/><path d="M26 4C16 10 12 18 6 26" fill="none" stroke="#047857" stroke-width="1.5" stroke-linecap="round"/><path d="M18 10C15 14 12.5 17 10 20" fill="none" stroke="#047857" stroke-width="1" stroke-linecap="round" opacity=".5"/><path d="M22 9C19 13 17 16 14.5 19" fill="none" stroke="#047857" stroke-width="1" stroke-linecap="round" opacity=".5"/></svg>Tinyleaf</span>
     <span id="toolbar-project-name" style="display:none;align-items:center;gap:8px">
     <span class="toolbar-sep"></span>
     <span id="project-name" style="font-size: 13px; color: var(--text-dim);">&mdash;</span>
@@ -39,9 +39,6 @@
     <button id="btn-export-zip" class="sm" data-i18n="export_zip" title="Export project as ZIP" data-i18n-title="export_zip_title">Export ZIP</button>
     <span class="toolbar-sep"></span>
     <button id="btn-save" class="sm" data-i18n="save">Save</button>
-    <button id="btn-commit" class="sm" data-i18n="commit">Commit</button>
-    <button id="btn-push" class="sm" data-i18n="push">Push</button>
-    <span class="toolbar-sep"></span>
     </span>
   </div>
 
@@ -171,7 +168,7 @@
               <span class="toolbar-sep"></span>
               <button class="sm" id="btn-pdf-refresh" data-i18n="refresh">Refresh</button>
               <span class="toolbar-sep"></span>
-              <button class="sm" id="btn-pdf-search" title="Search in PDF" data-i18n-title="pdf_search_title">🔍</button>
+              <button class="sm" id="btn-pdf-search" title="Search in PDF" data-i18n-title="pdf_search_title"><svg viewBox="0 0 24 24" style="width:14px;height:14px;vertical-align:-2px" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
             </div>
             <div id="pdf-search-bar" class="hidden">
               <input id="pdf-search-input" type="text" placeholder="Search in PDF..." data-i18n-placeholder="pdf_search_placeholder">

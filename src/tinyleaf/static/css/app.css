@@ -6,8 +6,8 @@
   --border: #d1d9e0;
   --text: #1f2328;
   --text-dim: #656d76;
-  --accent: #0969da;
-  --accent-hover: #0550ae;
+  --accent: #059669;
+  --accent-hover: #047857;
   --green: #1a7f37;
   --red: #cf222e;
   --orange: #bf8700;
@@ -243,6 +243,7 @@ select {
   cursor: pointer;
 }
 select:focus { border-color: var(--accent); outline: none; }
+input[type="checkbox"] { accent-color: var(--accent); }
 #main-file-select {
   max-width: 200px;
   text-overflow: ellipsis;
