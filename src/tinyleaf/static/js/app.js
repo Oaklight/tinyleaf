@@ -133,6 +133,7 @@ const I18N = {
     sc_close: "Close dialog / Escape",
     sc_shortcuts: "Show shortcuts",
     sc_synctex: "Jump to source (click on PDF)",
+    pdf_canvas_title: "Ctrl+Click to jump to source",
     sc_forward_search: "Jump to PDF",
     shortcut_pdf: "PDF Preview",
     search_files_title: "Search files",
@@ -337,6 +338,7 @@ const I18N = {
     sc_close: "关闭对话框 / 退出",
     sc_shortcuts: "显示快捷键",
     sc_synctex: "跳转到源码（点击 PDF）",
+    pdf_canvas_title: "Ctrl+点击跳转到源码",
     sc_forward_search: "跳转到 PDF",
     shortcut_pdf: "PDF 预览",
     search_files_title: "搜索文件",
@@ -2353,6 +2355,7 @@ async function renderPDF() {
     canvas.style.height = viewport.height + "px";
     canvas.dataset.pageNum = i;
     canvas.dataset.scale = scale;
+    canvas.title = t("pdf_canvas_title");
     canvas.addEventListener("click", (e) => {
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
