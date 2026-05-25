@@ -1,8 +1,20 @@
 # tinyleaf
 
-[English Version](./README.md)
+[![PyPI](https://img.shields.io/pypi/v/tinyleaf)](https://pypi.org/project/tinyleaf/)
+[![Python](https://img.shields.io/pypi/pyversions/tinyleaf)](https://pypi.org/project/tinyleaf/)
+[![License](https://img.shields.io/github/license/Oaklight/tinyleaf)](./LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-readthedocs-blue)](https://tinyleaf.readthedocs.io)
 
-轻量级、零依赖的 Web LaTeX 编辑器。基于 [TeX Live Docker 镜像](https://github.com/Oaklight/texlive)。
+[English Version](./README.md) | [文档](https://tinyleaf.readthedocs.io)
+
+轻量级、可自托管的 **Overleaf 替代方案**，只需一条 `pip install` 即可运行。无需数据库、无需 Node.js、无需 Docker——仅依赖 Python 标准库和 TeX Live。一条命令即可在浏览器中编辑 LaTeX。
+
+```bash
+pip install tinyleaf && tinyleaf /path/to/my-thesis
+```
+
+<!-- 截图 / 演示 GIF 占位 — 替换为实际素材 -->
+<!-- ![tinyleaf 截图](docs/images/screenshot.png) -->
 
 ## 功能
 
@@ -81,6 +93,20 @@ docker compose up
 ```
 
 Web 编辑器将在 `http://localhost:14159` 启动，并使用持久化的 TeX Live 容器进行编译。
+
+## 为什么选择 tinyleaf？
+
+| | tinyleaf | Overleaf CE |
+|---|---------|-------------|
+| 安装 | `pip install tinyleaf` | Docker Compose（MongoDB + Redis + Node + CLSI + …） |
+| 依赖 | **零**（仅 Python 标准库） | 6+ 个服务 |
+| 内存占用 | ~30 MB | ~1 GB+ |
+| 启动速度 | 即时 | 数分钟 |
+| 编译方式 | 本地 `latexmk` 或 Docker | 内置 CLSI |
+| Git 集成 | 内置 UI | 服务端 Git Bridge |
+| 协作 | 单用户 | 多用户 |
+
+tinyleaf 专为**个人用户**设计，提供浏览器内的 LaTeX 编辑体验，无需承担完整 Overleaf 部署的运维开销。
 
 ## 许可证
 

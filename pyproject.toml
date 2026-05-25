@@ -6,12 +6,37 @@ build-backend = "setuptools.build_meta"
 name = "tinyleaf"
 dynamic = ["version"]
 authors = [{ name = "Oaklight", email = "oaklight@users.noreply.github.com" }]
-description = "Lightweight web-based LaTeX editor powered by TeX Live"
+description = "A lightweight, self-hosted Overleaf alternative — zero-dependency LaTeX web editor"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
+keywords = [
+    "latex",
+    "editor",
+    "overleaf",
+    "texlive",
+    "self-hosted",
+    "web-editor",
+    "pdf",
+    "codemirror",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Education",
+    "Topic :: Text Processing :: Markup :: LaTeX",
+    "Topic :: Text Editors",
+    "Framework :: AsyncIO",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
 
 [project.urls]
+Documentation = "https://tinyleaf.readthedocs.io"
 Repository = "https://github.com/Oaklight/tinyleaf"
 Issues = "https://github.com/Oaklight/tinyleaf/issues"
 

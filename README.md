@@ -1,8 +1,20 @@
 # tinyleaf
 
-[中文版](./README_zh.md)
+[![PyPI](https://img.shields.io/pypi/v/tinyleaf)](https://pypi.org/project/tinyleaf/)
+[![Python](https://img.shields.io/pypi/pyversions/tinyleaf)](https://pypi.org/project/tinyleaf/)
+[![License](https://img.shields.io/github/license/Oaklight/tinyleaf)](./LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-readthedocs-blue)](https://tinyleaf.readthedocs.io)
 
-Lightweight, zero-dependency web-based LaTeX editor. Powered by [TeX Live Docker images](https://github.com/Oaklight/texlive).
+[中文版](./README_zh.md) | [Documentation](https://tinyleaf.readthedocs.io)
+
+A lightweight, self-hosted **Overleaf alternative** that runs entirely from a single `pip install`. No database, no Node.js, no Docker required — just Python's standard library and a TeX Live installation. One command to start editing LaTeX in your browser.
+
+```bash
+pip install tinyleaf && tinyleaf /path/to/my-thesis
+```
+
+<!-- Screenshot / demo GIF placeholder — replace with actual media -->
+<!-- ![tinyleaf screenshot](docs/images/screenshot.png) -->
 
 ## Features
 
@@ -81,6 +93,20 @@ docker compose up
 ```
 
 This starts the web editor on `http://localhost:14159` with a persistent TeX Live container for compilation.
+
+## Why tinyleaf?
+
+| | tinyleaf | Overleaf CE |
+|---|---------|-------------|
+| Install | `pip install tinyleaf` | Docker Compose (MongoDB + Redis + Node + CLSI + …) |
+| Dependencies | **Zero** (Python stdlib only) | 6+ services |
+| Memory | ~30 MB | ~1 GB+ |
+| Startup | Instant | Minutes |
+| Compilation | Local `latexmk` or Docker | Built-in CLSI |
+| Git | Built-in UI | Server-side Git bridge |
+| Collaboration | Single-user | Multi-user |
+
+tinyleaf is designed for **individual users** who want a browser-based LaTeX editing experience without the operational overhead of a full Overleaf deployment.
 
 ## License
 
