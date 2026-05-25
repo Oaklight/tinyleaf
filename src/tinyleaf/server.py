@@ -164,6 +164,10 @@ class TexliveHandler(BaseHTTPRequestHandler):
             self._handle_api("git_diff_file", name=name, file_path=file_path, qs=qs)
         elif sub == "git/log":
             self._handle_api("git_log", name=name)
+        elif sub == "wordcount":
+            self._handle_api("word_count", name=name)
+        elif sub == "export":
+            self._handle_api("export_zip", name=name)
         elif sub == "search":
             qs = urllib.parse.parse_qs(query_string)
             self._handle_api("search_files", name=name, qs=qs)

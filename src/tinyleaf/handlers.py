@@ -1,10 +1,12 @@
 """API request handlers for tinyleaf."""
 
+import io
 import json
 import os
 import re
 import subprocess
 import time
+import zipfile
 
 from tinyleaf import compiler, git_ops, registry, vendor
 from tinyleaf._vendor import synctex
@@ -57,6 +59,8 @@ def handle_request(handler, action, **kwargs):
         "git_push": _git_push,
         "git_pull": _git_pull,
         "git_log": _git_log,
+        "word_count": _word_count,
+        "export_zip": _export_zip,
     }
     fn = dispatch.get(action)
     if fn:
@@ -1021,6 +1025,185 @@ def _clean(handler, name):
                     pass
 
     handler.send_json({"removed": removed, "count": len(removed)})
+
+
+# ── Word Count ──
+
+
+def _word_count(handler, name=""):
+    """Run texcount on the project's main file and return word statistics.
+
+    Tries to run texcount via Docker (same pattern as compilation) if Docker
+    is enabled, otherwise falls back to a local texcount binary.
+    """
+    project_dir = _get_project_dir(handler, name)
+    if not project_dir:
+        return
+
+    config_data = _read_project_config(project_dir)
+    main_file = config_data.get("main_file") or _detect_main_file(project_dir)
+
+    server_config = handler.config
+    use_docker = config_data.get("use_docker", server_config["use_docker"])
+    docker_image = config_data.get("docker_image") or server_config["docker_image"]
+
+    texcount_cmd = ["texcount", "-inc", "-sum", "-merge", main_file]
+
+    if use_docker:
+        cmd = [
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            f"{project_dir}:/workspace",
+            "-w",
+            "/workspace",
+            docker_image,
+        ] + texcount_cmd
+        cwd = None
+    else:
+        cmd = texcount_cmd
+        cwd = project_dir
+
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except FileNotFoundError:
+        handler.send_json(
+            {"error": "texcount not found. Enable Docker or install texcount locally."},
+            status=500,
+        )
+        return
+    except subprocess.TimeoutExpired:
+        handler.send_json({"error": "texcount timed out"}, status=500)
+        return
+
+    if result.returncode != 0:
+        stderr = result.stderr.strip() or result.stdout.strip()
+        handler.send_json({"error": f"texcount failed: {stderr}"}, status=500)
+        return
+
+    stats = _parse_texcount_output(result.stdout)
+    handler.send_json(stats)
+
+
+def _parse_texcount_output(output):
+    """Parse texcount output into a structured dict.
+
+    Args:
+        output: Raw stdout from texcount with -sum -merge flags.
+
+    Returns:
+        Dict with word/count statistics.
+    """
+    stats = {
+        "words_in_text": 0,
+        "words_in_headers": 0,
+        "words_outside_text": 0,
+        "words_in_captions": 0,
+        "math_inline": 0,
+        "math_display": 0,
+    }
+
+    # texcount -sum -merge output lines look like:
+    #   Words in text: 1234
+    #   Words in headers: 56
+    #   Words outside text (captions, etc.): 78
+    #   Number of headers: 12
+    #   Number of floats/tables/figures: 3
+    #   Number of math inlines: 45
+    #   Number of math displayed: 6
+    patterns = {
+        "words_in_text": r"Words in text:\s*(\d+)",
+        "words_in_headers": r"Words in headers:\s*(\d+)",
+        "words_outside_text": r"Words outside text.*?:\s*(\d+)",
+        "words_in_captions": r"Words in float captions:\s*(\d+)",
+        "math_inline": r"Number of math inlines:\s*(\d+)",
+        "math_display": r"Number of math displayed:\s*(\d+)",
+    }
+
+    for key, pattern in patterns.items():
+        match = re.search(pattern, output)
+        if match:
+            stats[key] = int(match.group(1))
+
+    # Total = text + headers + captions (outside text)
+    stats["total"] = (
+        stats["words_in_text"] + stats["words_in_headers"] + stats["words_outside_text"]
+    )
+
+    return stats
+
+
+# ── Export ──
+
+# Directories to skip when building the export zip
+_EXPORT_SKIP_DIRS = {".git", "__pycache__", ".tinyleaf"}
+
+# File extensions for LaTeX build artifacts to exclude from export
+_EXPORT_SKIP_EXTS = {
+    ".aux",
+    ".log",
+    ".out",
+    ".bbl",
+    ".blg",
+    ".fls",
+    ".fdb_latexmk",
+    ".synctex.gz",
+    ".toc",
+    ".lof",
+    ".lot",
+}
+
+
+def _export_zip(handler, name=""):
+    """Export a project directory as a downloadable zip file.
+
+    Creates an in-memory zip archive of the project, excluding version control
+    directories, build artifacts, and the internal config file. The compiled
+    PDF is included if present.
+
+    Args:
+        handler: The HTTP request handler.
+        name: Project name.
+    """
+    project_dir = _get_project_dir(handler, name)
+    if not project_dir:
+        return
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(project_dir):
+            # Skip excluded directories in-place
+            dirs[:] = [d for d in dirs if d not in _EXPORT_SKIP_DIRS]
+            for fname in files:
+                # Skip internal config
+                if fname == CONFIG_FILE:
+                    continue
+                # Skip build artifacts (handle compound .synctex.gz extension)
+                if fname.endswith(".synctex.gz"):
+                    continue
+                ext = os.path.splitext(fname)[1].lower()
+                if ext in _EXPORT_SKIP_EXTS:
+                    continue
+                full = os.path.join(root, fname)
+                arcname = os.path.relpath(full, project_dir)
+                zf.write(full, arcname)
+
+    data = buf.getvalue()
+    safe_name = name.replace(" ", "_") if name else "project"
+    handler.send_response(200)
+    handler.send_header("Content-Type", "application/zip")
+    handler.send_header("Content-Disposition", f'attachment; filename="{safe_name}.zip"')
+    handler.send_header("Content-Length", str(len(data)))
+    handler._send_cors_headers()
+    handler.end_headers()
+    handler.wfile.write(data)
 
 
 # ── Search ──
