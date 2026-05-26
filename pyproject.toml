@@ -60,7 +60,7 @@ version = { attr = "tinyleaf.__version__" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-"tinyleaf" = ["static/*.html"]
+"tinyleaf" = ["static/*.html", "static/css/*.css", "static/js/*.js"]
 
 [tool.ruff]
 line-length = 100
