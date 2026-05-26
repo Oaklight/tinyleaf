@@ -22,6 +22,9 @@ env/
 *.lof
 *.lot
 
+# Playwright MCP artifacts
+.playwright-mcp/
+
 # Documentation worktrees
 docs_en/
 docs_zh/
