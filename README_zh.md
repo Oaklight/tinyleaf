@@ -10,108 +10,158 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Documentation](https://img.shields.io/badge/docs-readthedocs-blue)](https://tinyleaf.readthedocs.io)
 
-[English Version](./README.md) | [文档](https://tinyleaf.readthedocs.io)
+[English Version](./README.md) | [文档](https://tinyleaf.readthedocs.io) | [品牌资产](./BRAND.md)
 
-轻量级、可自托管的 **Overleaf 替代方案**，只需一条 `pip install` 即可运行。无需数据库、无需 Node.js、无需 Docker——仅依赖 Python 标准库和 TeX Live。一条命令即可在浏览器中编辑 LaTeX。
+**Tinyleaf 是一个 tiny、local-first 的 TeX Web 编辑器。**
 
-```bash
-pip install tinyleaf && tinyleaf /path/to/my-thesis
-```
-
-<!-- 截图 / 演示 GIF 占位 — 替换为实际素材 -->
-<!-- ![tinyleaf 截图](docs/images/screenshot.png) -->
-
-## 功能
-
-* **CLI 优先** — `pip install tinyleaf && tinyleaf /path` 即可开始编辑
-* **两种模式** — 单项目或基于注册表的多项目模式（`~/.config/tinyleaf/projects.json`）
-* **两种编译后端** — 本地 `latexmk`（默认）或 Docker
-* **CodeMirror 6** 编辑器 + LaTeX 语法高亮
-* **PDF.js** 预览，编译后自动刷新
-* **SSE** 实时编译日志推送
-* **Git 集成** — 自动发现 `.git`，支持 UI 内 commit/push
-* **零 Python 依赖** — 仅使用标准库（`http.server` + `threading` + `subprocess`）
-* **7 套主题**，支持明暗切换
-* **国际化** — 中英双语
-
-## 快速开始
+它面向想要 Overleaf 式浏览器编辑体验、但不想部署完整 Overleaf 服务栈的用户。安装一个 Python 包，指向一个 LaTeX 项目目录，就可以在浏览器里编辑、预览 PDF、查看编译日志、使用 Git、搜索、查看大纲和多标签编辑。
 
 ```bash
 pip install tinyleaf
 
-# 单项目模式（本地编译）
+# 打开单个项目。默认使用 Docker 中的 TeX Live 编译。
 tinyleaf /path/to/my-thesis
 
-# 单项目模式（Docker 编译）
-tinyleaf /path/to/my-thesis --docker
+# 或者使用本机 TeX / latexmk。
+tinyleaf /path/to/my-thesis --no-docker
 
-# 多项目模式（注册表）
+# 启动项目注册表。
 tinyleaf
 ```
 
+## 为什么是 Tinyleaf？
+
+Tinyleaf 位于本地编辑器和完整协作 LaTeX 平台之间：
+
+- **Local-first** — 项目文件保留在你的文件系统中
+- **可自托管** — 可运行在笔记本、工作站、实验室服务器或 VPS 上
+- **运行时很小** — 无需数据库、Node.js 服务、Redis 或 MongoDB
+- **浏览器界面** — CodeMirror 编辑器、PDF 预览、文件树、Git 面板和设置界面
+- **编译方式灵活** — 默认使用 Docker 化 TeX Live，也可用 `--no-docker` 调用本机 `latexmk`
+- **单用户优先** — 面向个人写作工作流，而不是完整多人 SaaS 克隆
+
+## 功能
+
+### 编辑
+
+- CodeMirror 6 编辑器和 LaTeX 语法高亮
+- 多标签编辑和快速打开（`Ctrl+P`）
+- 自动配对 `\begin{...}` / `\end{...}`
+- 项目级全文搜索
+- LaTeX 大纲侧边栏，支持递归解析 `\input` / `\include`
+- 从项目符号中补全 `\ref{}`、`\cite{}` 和 `\label{}`
+
+### PDF 与编译
+
+- PDF.js 预览，编译后自动刷新
+- 页码导航、缩放控制和 PDF 文本搜索
+- 基于 SSE 的实时编译日志
+- 编译输出中的 `file.tex:line` 可点击跳转
+- SyncTeX 正向/反向搜索
+- 基于 `texcount` 的字数/页数统计
+- 导出项目为 ZIP
+
+### 项目与工作流
+
+- 单项目模式：直接打开任意目录
+- 多项目注册表：存储在 `~/.config/tinyleaf/projects.json`
+- 文件树：新建、上传、重命名、删除和搜索
+- Git 状态、差异、提交、推送、拉取和日志
+- 7 套主题，支持明暗模式
+- 中英文界面
+
+## 安装
+
+```bash
+pip install tinyleaf
+```
+
+Tinyleaf **没有额外 Python 运行时依赖**，仅使用标准库。Web 编辑器资源随包一起分发。
+
+编译后端可二选一：
+
+| 后端 | 命令 | 要求 |
+|---|---|---|
+| Docker TeX Live | `tinyleaf /path/to/project` | 已安装 Docker |
+| 本机 TeX Live | `tinyleaf /path/to/project --no-docker` | `PATH` 中可用 `latexmk` |
+
 ## 使用方法
 
+```text
+usage: tinyleaf [-h] [-V] [--projects-dir DIR] [--config-dir DIR]
+                [--docker | --no-docker] [--image IMAGE] [--port PORT]
+                [--host HOST] [--no-browser]
+                [project_path]
 ```
-用法: tinyleaf [-h] [--projects-dir DIR] [--config-dir DIR] [--docker]
-               [--image IMAGE] [--port PORT] [--host HOST] [--no-browser]
-               [project_path]
 
-位置参数:
-  project_path          要打开的单项目目录
+常见示例：
 
-选项:
-  --config-dir DIR      项目注册表的配置目录
-                        （默认：~/.config/tinyleaf）
-  --projects-dir DIR    旧版：将子目录迁移到注册表
-  --docker              使用 Docker 编译（默认：本地 latexmk）
-  --image IMAGE         Docker 镜像（默认：oaklight/texlive:latest）
-  --port PORT           服务端口（默认：14159，环境变量：TINYLEAF_PORT）
-  --host HOST           服务地址（默认：127.0.0.1）
-  --no-browser          启动时不自动打开浏览器
+```bash
+# 打开项目并使用 Docker 编译。
+tinyleaf ~/papers/my-paper
+
+# 使用本机 latexmk，而不是 Docker。
+tinyleaf ~/papers/my-paper --no-docker
+
+# 在服务器上监听所有网卡。
+tinyleaf ~/papers/my-paper --host 0.0.0.0 --port 14159
+
+# 打开多项目注册表。
+tinyleaf
 ```
 
 ## 多项目注册表
 
-不带 `project_path` 参数启动时，tinyleaf 进入**多项目模式**。项目在 `~/.config/tinyleaf/projects.json` 中跟踪——每个条目将名称映射到文件系统上的绝对路径。
+不传 `project_path` 时，Tinyleaf 会打开项目注册表。注册表将项目名称映射到文件系统任意位置的绝对路径。
 
 在项目页面你可以：
 
-- **打开文件夹** — 浏览服务器文件系统，注册已有目录
+- **打开文件夹** — 注册已有目录
 - **新建项目** — 在指定位置创建新项目
-- **移除** — 取消注册项目（可选择同时删除文件）
+- **移除** — 取消注册项目，可选择删除文件
+- **切换视图** — 网格/列表布局，并持久化偏好
 
 ## 快捷键
 
 | 快捷键 | 操作 |
-|--------|------|
+|---|---|
 | `Ctrl+S` | 保存当前文件 |
 | `Ctrl+Enter` | 编译 |
+| `Ctrl+P` | 快速打开 |
+| `Ctrl+Shift+F` | 项目搜索 |
 | `Ctrl+Shift+C` | Git 提交 |
 | `Ctrl+Shift+P` | Git 推送 |
+| `Ctrl+/` | 快捷键帮助 |
 
 ## Docker Compose
 
-使用 Docker Compose 一键部署：
+使用 Docker Compose 快速启动：
 
 ```bash
 docker compose up
 ```
 
-Web 编辑器将在 `http://localhost:14159` 启动，并使用持久化的 TeX Live 容器进行编译。
+Tinyleaf 会运行在 `http://localhost:14159`。
 
-## 为什么选择 tinyleaf？
+## Tinyleaf vs. Overleaf CE
 
-| | tinyleaf | Overleaf CE |
-|---|---------|-------------|
-| 安装 | `pip install tinyleaf` | Docker Compose（MongoDB + Redis + Node + CLSI + …） |
-| 依赖 | **零**（仅 Python 标准库） | 6+ 个服务 |
-| 内存占用 | ~30 MB | ~1 GB+ |
-| 启动速度 | 即时 | 数分钟 |
-| 编译方式 | 本地 `latexmk` 或 Docker | 内置 CLSI |
-| Git 集成 | 内置 UI | 服务端 Git Bridge |
-| 协作 | 单用户 | 多用户 |
+| | Tinyleaf | Overleaf CE |
+|---|---|---|
+| 主要场景 | 个人/本地 TeX 编辑 | 多用户协作平台 |
+| 安装 | `pip install tinyleaf` | Docker Compose 服务栈 |
+| 运行服务 | Python 标准库服务器 | MongoDB、Redis、Node.js、CLSI 等 |
+| 项目存储 | 你的文件系统 | 应用托管的存储 |
+| 编译方式 | Docker TeX Live 或本机 `latexmk` | CLSI 服务 |
+| Git 工作流 | 内置轻量 UI | Git Bridge |
+| 协作 | 单用户优先 | 多用户 |
 
-tinyleaf 专为**个人用户**设计，提供浏览器内的 LaTeX 编辑体验，无需承担完整 Overleaf 部署的运维开销。
+Tinyleaf 不试图复刻完整的 Overleaf 协作模型。它服务于想要快速、自托管、浏览器化 TeX 编辑体验的个人写作者。
+
+## 文档
+
+- [文档](https://tinyleaf.readthedocs.io)
+- [品牌资产](./BRAND.md)
+- [商标与命名政策](./TRADEMARKS.md)
 
 ## 许可证
 
