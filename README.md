@@ -1,8 +1,9 @@
 # tinyleaf
 
-[![PyPI](https://img.shields.io/pypi/v/tinyleaf)](https://pypi.org/project/tinyleaf/)
-[![Python](https://img.shields.io/pypi/pyversions/tinyleaf)](https://pypi.org/project/tinyleaf/)
-[![License](https://img.shields.io/github/license/Oaklight/tinyleaf)](./LICENSE)
+[![PyPI version](https://img.shields.io/pypi/v/tinyleaf?color=green)](https://pypi.org/project/tinyleaf/)
+[![GitHub release](https://img.shields.io/github/v/release/Oaklight/tinyleaf?color=green)](https://github.com/Oaklight/tinyleaf/releases/latest)
+[![CI](https://github.com/Oaklight/tinyleaf/actions/workflows/lint.yml/badge.svg)](https://github.com/Oaklight/tinyleaf/actions/workflows/lint.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Documentation](https://img.shields.io/badge/docs-readthedocs-blue)](https://tinyleaf.readthedocs.io)
 
 [中文版](./README_zh.md) | [Documentation](https://tinyleaf.readthedocs.io)
