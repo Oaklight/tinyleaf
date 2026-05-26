@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-05-25
+
+### Added
+
+- New Tinyleaf leaf-pen brand system, with logo assets integrated into README and documentation sites
+- Brand assets page for the documentation site
+
+### Changed
+
+- Project license changed from MIT to AGPL-3.0-or-later for 0.5.0 and later; previously published releases remain under the license terms under which they were originally published
+- Default wordmark updated to STIX Two Text
+- Leaf-pen spine and pen tip unified with Pale Mint (`#d1fae5`)
+
 ## [0.4.0] - 2026-05-25
 
 ### Added

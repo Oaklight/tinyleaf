@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 72" width="240" height="72">
+  <defs>
+    <style><![CDATA[
+@import url('https://fonts.googleapis.com/css2?family=STIX+Two+Text:wght@400;500;600;700&display=swap');
+.brand-wordmark { font-family: 'STIX Two Text', Georgia, serif; font-size: 34px; font-weight: 600; letter-spacing: -.95px; }
+]]></style>
+    <linearGradient id="quillGrad" x1="12" y1="6" x2="54" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6ee7b7"/>
+      <stop offset=".52" stop-color="#10b981"/>
+      <stop offset="1" stop-color="#047857"/>
+    </linearGradient>
+    <g id="quill-leaf-mark">
+      <g transform="translate(1.15 1.45)" opacity=".28">
+        <path d="M15.7 47.3C19.7 34 29 17.7 48.7 12C48.5 27.5 39.9 43 24.5 50.2C20 52.3 17 51.1 15.7 47.3Z" fill="#065f46"/>
+        <path d="M15.7 47.3L12.8 54.4L22.1 50.5L25.9 46.1C22.4 48.7 18.9 49.3 15.7 47.3Z" fill="#065f46"/>
+      </g>
+      <path d="M15.7 47.3C19.7 34 29 17.7 48.7 12C48.5 27.5 39.9 43 24.5 50.2C20 52.3 17 51.1 15.7 47.3Z" fill="url(#quillGrad)"/>
+      <path d="M19.2 45.2C25.5 33.5 36.1 20.9 48.7 12" fill="none" stroke="#d1fae5" stroke-width="3" stroke-linecap="round" opacity=".98"/>
+      <path d="M15.7 47.3L12.8 54.4L22.1 50.5L25.9 46.1C22.4 48.7 18.9 49.3 15.7 47.3Z" fill="#d1fae5"/>
+    </g>
+    <g id="word-k-dark">
+      <g transform="translate(5 3)"><use href="#quill-leaf-mark"/></g>
+      <text class="brand-wordmark" x="78" y="46" fill="#e5e7eb">Tinyleaf</text>
+    </g>
+    <g id="word-k-light">
+      <g transform="translate(5 3)"><use href="#quill-leaf-mark"/></g>
+      <text class="brand-wordmark" x="78" y="46" fill="#1f2937">Tinyleaf</text>
+    </g>
+  </defs>
+  <use href="#word-k-dark"/>
+</svg>

@@ -5,6 +5,8 @@ hide:
 
 # Tinyleaf
 
+![Tinyleaf logo](assets/brand/tinyleaf-leafpen-readme-light.svg)
+
 **Lightweight, zero-dependency web-based LaTeX editor.**
 
 Tinyleaf is a CLI-first LaTeX editor that runs in your browser. It requires no Python dependencies beyond the standard library, and supports both local and Docker-based compilation.

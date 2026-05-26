@@ -8,6 +8,8 @@ copyright: Copyright &copy; 2025 Peng Ding
 
 theme:
   name: material
+  logo: assets/brand/tinyleaf-leafpen-icon.svg
+  favicon: assets/brand/tinyleaf-leafpen-icon.svg
   custom_dir: overrides
   language: en
   palette:
@@ -106,4 +108,5 @@ nav:
   - API Reference:
       - api/index.md
   - Screenshots: screenshots.md
+  - Brand: brand.md
   - Changelog: changelog.md
