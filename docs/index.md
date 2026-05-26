@@ -5,6 +5,8 @@ hide:
 
 # Tinyleaf
 
+![Tinyleaf 标志](assets/brand/tinyleaf-leafpen-readme-light.svg)
+
 **轻量级、零依赖的 Web LaTeX 编辑器。**
 
 Tinyleaf 是一个 CLI 优先的 LaTeX 编辑器，运行在浏览器中。后端仅依赖 Python 标准库，支持本地和 Docker 两种编译方式。

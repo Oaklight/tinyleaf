@@ -5,6 +5,19 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [0.5.0] - 2026-05-25
+
+### 新增
+
+- 新的 Tinyleaf 叶子笔品牌系统，并将 logo 系列导入 README 与文档站点
+- 文档站点新增品牌资产页面
+
+### 变更
+
+- 自 0.5.0 起项目许可证从 MIT 更改为 AGPL-3.0-or-later；此前已发布版本仍按其发布时的许可证条款授权
+- 默认字标更新为 STIX Two Text
+- 叶子笔主脉和笔头统一为 Pale Mint (`#d1fae5`)
+
 ## [0.4.0] - 2026-05-25
 
 ### 新增
