@@ -1,9 +1,13 @@
 # tinyleaf
 
+<p align="center">
+  <img src="assets/brand/tinyleaf-leafpen-readme-light.svg" alt="Tinyleaf" width="560">
+</p>
+
 [![PyPI version](https://img.shields.io/pypi/v/tinyleaf?color=green)](https://pypi.org/project/tinyleaf/)
 [![GitHub release](https://img.shields.io/github/v/release/Oaklight/tinyleaf?color=green)](https://github.com/Oaklight/tinyleaf/releases/latest)
 [![CI](https://github.com/Oaklight/tinyleaf/actions/workflows/lint.yml/badge.svg)](https://github.com/Oaklight/tinyleaf/actions/workflows/lint.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Documentation](https://img.shields.io/badge/docs-readthedocs-blue)](https://tinyleaf.readthedocs.io)
 
 [中文版](./README_zh.md) | [Documentation](https://tinyleaf.readthedocs.io)
@@ -111,4 +115,4 @@ tinyleaf is designed for **individual users** who want a browser-based LaTeX edi
 
 ## License
 
-MIT
+AGPL-3.0-or-later

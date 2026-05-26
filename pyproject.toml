@@ -9,7 +9,7 @@ authors = [{ name = "Oaklight", email = "oaklight@users.noreply.github.com" }]
 description = "A lightweight, self-hosted Overleaf alternative — zero-dependency LaTeX web editor"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT"
+license = "AGPL-3.0-or-later"
 keywords = [
     "latex",
     "editor",
@@ -60,7 +60,7 @@ version = { attr = "tinyleaf.__version__" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-"tinyleaf" = ["static/*.html", "static/css/*.css", "static/js/*.js"]
+"tinyleaf" = ["static/*.html", "static/css/*.css", "static/js/*.js", "static/assets/*.svg"]
 
 [tool.ruff]
 line-length = 100

@@ -1317,3 +1317,28 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* ── Brand assets ── */
+.toolbar-logo {
+  width: 22px;
+  height: 22px;
+  display: inline-block;
+  vertical-align: -5px;
+  margin-right: 5px;
+}
+
+.about-brand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.about-logo {
+  width: 26px;
+  height: 26px;
+  display: block;
+}

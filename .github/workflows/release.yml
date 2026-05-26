@@ -49,7 +49,7 @@ jobs:
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: twine upload dist/*
+        run: twine upload dist/*.whl dist/*.tar.gz
 
       - name: Commit and tag
         run: |
@@ -57,7 +57,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add src/tinyleaf/__init__.py
-          git commit -m "chore: bump version to ${VER}"
+          git diff --cached --quiet || git commit -m "chore: bump version to ${VER}"
           git tag "v${VER}"
           git push origin HEAD --tags
 
