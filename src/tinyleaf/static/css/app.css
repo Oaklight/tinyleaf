@@ -1114,12 +1114,21 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
 .settings-popup-item select, .settings-popup-item input[type="text"] {
   flex: 1;
   min-width: 0;
-  padding: 4px 8px;
+  padding: 5px 8px;
   font-size: 12px;
+  line-height: 1.5;
   background: var(--bg);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 4px;
+}
+
+.settings-popup-item select {
+  min-height: 34px;
+  font-family: var(--font);
+}
+
+.settings-popup-item input[type="text"] {
   font-family: var(--mono);
 }
 .settings-popup-item input[type="checkbox"] { cursor: pointer; margin-left: auto; }
