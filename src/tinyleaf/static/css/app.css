@@ -1141,23 +1141,42 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.2);
-  min-width: 380px;
-  max-width: 480px;
+  width: min(1120px, calc(100vw - 48px));
+  max-height: min(720px, calc(100vh - 48px));
   padding: 24px;
+  overflow: auto;
 }
 .shortcuts-popup-panel h3 {
   margin-bottom: 16px;
   font-size: 16px;
   font-weight: 600;
 }
-.shortcut-group { margin-bottom: 14px; }
+#shortcuts-content {
+  column-width: clamp(240px, 28vw, 300px);
+  column-gap: clamp(24px, 3vw, 36px);
+}
+
+.shortcut-group {
+  margin-bottom: 18px;
+  padding: 10px 12px 12px;
+  break-inside: avoid;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg) 58%, var(--bg-card));
+}
 .shortcut-group-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  margin: -2px 0 10px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: white;
+  background: var(--accent);
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 6px;
+  letter-spacing: 0.7px;
 }
 .shortcut-row {
   display: flex;
@@ -1326,6 +1345,7 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
   vertical-align: -5px;
   margin-right: 5px;
 }
+
 
 .about-brand {
   display: inline-flex;
