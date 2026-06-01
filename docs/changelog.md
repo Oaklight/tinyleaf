@@ -10,6 +10,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.5.1](https://github.com/Oaklight/tinyleaf/releases/tag/v0.5.1) - 2026-06-01
+
+### Added
+
+- Selectable editor syntax highlight schemas: Tinyleaf, Solarized, Gruvbox, and Dracula
+- Status bar sidebar toggle for folding and restoring the left sidebar
+- Local vendor module support in single-project mode
+
+### Changed
+
+- Refined editor visual design with Tinyleaf wordmark integration, updated UI typography, and grouped light/dark theme selection
+- Added Paper and Mint light editor themes and streamlined dark theme choices
+- Improved toolbar behavior on narrow layouts by using horizontal scrolling instead of compressing controls
+- Completed missing hover-title i18n coverage for toolbar and layout controls
+- Updated Tinyleaf highlight colors to make emerald the primary editor accent
+
+### Fixed
+
+- Restored LaTeX syntax highlighting by using the language extension without conflicting completion overrides
+- Fixed settings select rendering for Chinese UI text
+- Added static and vendor cache headers, ETags, and 304 revalidation
+
 ## [0.5.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.5.0) - 2026-05-25
 
 ### Added
