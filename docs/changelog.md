@@ -10,6 +10,30 @@ hide:
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [Unreleased]
+
+## [0.5.1](https://github.com/Oaklight/tinyleaf/releases/tag/v0.5.1) - 2026-06-01
+
+### 新增
+
+- 编辑器新增可选语法高亮方案：Tinyleaf、Solarized、Gruvbox 和 Dracula
+- 状态栏新增侧边栏折叠/展开按钮
+- 单项目模式支持使用本地 vendor 模块
+
+### 变更
+
+- 优化编辑器视觉设计，集成 Tinyleaf 字标，更新 UI 字体，并将主题选择分为明亮/深色两组
+- 新增 Paper 和 Mint 两个明亮编辑器主题，并精简深色主题选项
+- 窄布局下工具栏改为横向滚动，避免控件被压缩
+- 补齐工具栏和布局控件的 hover title 国际化
+- 调整 Tinyleaf 高亮配色，使翡翠绿成为编辑器主强调色
+
+### 修复
+
+- 使用无补全冲突的语言扩展恢复 LaTeX 语法高亮
+- 修复中文界面中设置下拉框文字被裁切的问题
+- 为静态资源和 vendor 模块添加缓存头、ETag 与 304 重新验证
+
 ## [0.5.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.5.0) - 2026-05-25
 
 ### 新增
