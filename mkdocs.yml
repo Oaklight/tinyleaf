@@ -8,7 +8,7 @@ copyright: Copyright &copy; 2025 Peng Ding
 
 theme:
   name: material
-  logo: assets/brand/tinyleaf-leafpen-icon.svg
+  logo: assets/brand/tinyleaf-leafpen-wordmark-light.svg
   favicon: assets/brand/tinyleaf-leafpen-icon.svg
   custom_dir: overrides
   language: en
@@ -30,14 +30,26 @@ theme:
   features:
     - navigation.tabs
     - navigation.sections
-    - navigation.expand
     - navigation.top
     - navigation.indexes
+    - navigation.footer
+    - navigation.path
+    - navigation.tracking
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.prune
+    - header.autohide
+    - toc.follow
     - search.highlight
     - search.share
     - search.suggest
     - content.code.copy
-    - content.action.edit
+    - content.code.annotate
+    - content.code.select
+    - content.tabs.link
+    - content.tooltips
+    - content.footnote.tooltips
 
 plugins:
   - search:
@@ -47,18 +59,22 @@ plugins:
       sections:
         Home:
           - index.md
-        Getting Started:
+        Guide:
           - getting-started/installation.md
           - getting-started/quickstart.md
-        Guide:
           - guide/architecture.md
           - guide/registry.md
           - guide/compilation.md
           - guide/docker.md
-        API Reference:
+        Resources:
+          - resources/index.md
           - api/index.md
+          - brand.md
         Changelog:
           - changelog.md
+
+extra_css:
+  - stylesheets/tinyleaf.css
 
 markdown_extensions:
   - admonition
@@ -97,16 +113,16 @@ extra:
 
 nav:
   - Home: index.md
-  - Getting Started:
+  - Guide:
       - Installation: getting-started/installation.md
       - Quick Start: getting-started/quickstart.md
-  - Guide:
       - Architecture: guide/architecture.md
       - Multi-Project Registry: guide/registry.md
       - Compilation: guide/compilation.md
       - Docker: guide/docker.md
-  - API Reference:
-      - api/index.md
   - Screenshots: screenshots.md
-  - Brand: brand.md
+  - Resources:
+      - Overview: resources/index.md
+      - API Reference: api/index.md
+      - Brand: brand.md
   - Changelog: changelog.md

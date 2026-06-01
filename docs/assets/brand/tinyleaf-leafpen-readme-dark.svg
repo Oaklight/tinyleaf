@@ -27,8 +27,7 @@
       <text class="brand-wordmark" x="78" y="46" fill="#1f2937">Tinyleaf</text>
     </g>
   </defs>
-  <rect width="560" height="120" rx="22" fill="#0d1117"/>
   <g transform="translate(32 29)"><use href="#word-k-dark" width="240" height="72"/></g>
-  <text x="316" y="58" font-family="Inter, system-ui, sans-serif" font-size="15" font-weight="620" fill="#d1fae5">Self-hosted TeX editor</text>
-  <text x="316" y="80" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#94a3b8">Tiny, local-first LaTeX editing.</text>
+  <text x="316" y="58" font-family="Inter, system-ui, sans-serif" font-size="15" font-weight="620" fill="#d1fae5">Fast, focused LaTeX writing</text>
+  <text x="316" y="80" font-family="Inter, system-ui, sans-serif" font-size="12" fill="#94a3b8">A lightweight editor for a snappy writing flow.</text>
 </svg>

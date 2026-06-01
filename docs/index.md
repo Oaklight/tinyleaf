@@ -1,15 +1,33 @@
 ---
+title: Tinyleaf
 hide:
   - navigation
+  - title
 ---
 
-# Tinyleaf
+<div class="tinyleaf-hero" markdown>
 
-![Tinyleaf logo](assets/brand/tinyleaf-leafpen-readme-light.svg)
+![Tinyleaf banner](assets/brand/tinyleaf-leafpen-readme-light.svg){ .tinyleaf-hero__banner .tinyleaf-hero__banner--light }
+![Tinyleaf banner](assets/brand/tinyleaf-leafpen-readme-dark.svg){ .tinyleaf-hero__banner .tinyleaf-hero__banner--dark }
 
-**Lightweight, zero-dependency web-based LaTeX editor.**
+<p class="tinyleaf-hero__tagline">A lightweight LaTeX editor tuned for a fast, focused writing flow.</p>
 
-Tinyleaf is a CLI-first LaTeX editor that runs in your browser. It requires no Python dependencies beyond the standard library, and supports both local and Docker-based compilation.
+<p class="tinyleaf-hero__desc">Open a project, edit LaTeX, preview the PDF, and keep the compile loop close at hand. Tinyleaf keeps writing quick, focused, and distraction-free.</p>
+
+<p class="tinyleaf-badges">
+  <a href="https://pypi.org/project/tinyleaf/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/tinyleaf?color=059669"></a>
+  <a href="https://github.com/Oaklight/tinyleaf/releases/latest"><img alt="GitHub release" src="https://img.shields.io/badge/release-v0.5.0-059669"></a>
+  <a href="https://github.com/Oaklight/tinyleaf/actions/workflows/lint.yml"><img alt="CI" src="https://github.com/Oaklight/tinyleaf/actions/workflows/lint.yml/badge.svg"></a>
+  <a href="https://www.gnu.org/licenses/agpl-3.0"><img alt="License: AGPL v3" src="https://img.shields.io/badge/License-AGPL_v3-047857.svg"></a>
+</p>
+
+<p class="tinyleaf-actions">
+  <a class="tinyleaf-button tinyleaf-button--primary" href="getting-started/quickstart/">Quick Start</a>
+  <a class="tinyleaf-button tinyleaf-button--secondary" href="screenshots/">View Screenshots</a>
+  <a class="tinyleaf-button tinyleaf-button--secondary" href="https://github.com/Oaklight/tinyleaf">GitHub</a>
+</p>
+
+</div>
 
 ![Editor view](assets/tinyleaf-editor.png)
 
