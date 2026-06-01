@@ -10,7 +10,7 @@ hide:
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，
 版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
-## [0.5.0] - 2026-05-25
+## [0.5.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.5.0) - 2026-05-25
 
 ### 新增
 
@@ -23,7 +23,7 @@ hide:
 - 默认字标更新为 STIX Two Text
 - 叶子笔主脉和笔头统一为 Pale Mint (`#d1fae5`)
 
-## [0.4.0] - 2026-05-25
+## [0.4.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.4.0) - 2026-05-25
 
 ### 新增
 
@@ -57,7 +57,7 @@ hide:
 - 新增 `/static/` 路由的静态文件服务，支持 MIME 类型检测和路径遍历防护
 - 内联 `onclick` 处理器迁移为 `addEventListener`，兼容 ES 模块
 
-## [0.3.0] - 2026-05-18
+## [0.3.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.3.0) - 2026-05-18
 
 ### 新增
 
@@ -84,7 +84,7 @@ hide:
 - 修复 `ty` 类型收窄：在 `compiler.py` 中添加 `assert proc.stdout is not None`
 - 将 `_vendor/` 从 ruff 格式化范围中排除
 
-## [0.2.0] - 2026-04-29
+## [0.2.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.2.0) - 2026-04-29
 
 ### 新增
 
@@ -101,7 +101,7 @@ hide:
 
 - 面包屑栏布局调整：定位按钮移至文件名左侧，关闭按钮在右侧
 
-## [0.1.0] - 2026-04-28
+## [0.1.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.1.0) - 2026-04-28
 
 tinyleaf 首次发布（前身为 texlive-web）。
 
@@ -194,7 +194,3 @@ tinyleaf 首次发布（前身为 texlive-web）。
 - 更新了 CLI 入口、配置目录和程序名称
 - 默认编译后端改为 Docker（使用 `--no-docker` 切换为本地编译）
 
-[0.4.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.4.0
-[0.3.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.3.0
-[0.2.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.2.0
-[0.1.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.1.0

@@ -29,6 +29,26 @@
   --tinyleaf-accent: #059669;
   --tinyleaf-accent-dark: #047857;
   --tinyleaf-mint: #d1fae5;
+
+  /* Material theme color overrides — keep in sync with the herobox / quill palette */
+  --md-primary-fg-color: #059669;
+  --md-primary-fg-color--light: #10b981;
+  --md-primary-fg-color--dark: #047857;
+  --md-primary-bg-color: #ffffff;
+  --md-primary-bg-color--light: #d1fae5;
+  --md-accent-fg-color: #10b981;
+  --md-accent-fg-color--transparent: rgba(16, 185, 129, 0.1);
+  --md-accent-bg-color: #ffffff;
+  --md-typeset-a-color: #047857;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #10b981;
+  --md-primary-fg-color--light: #6ee7b7;
+  --md-primary-fg-color--dark: #065f46;
+  --md-accent-fg-color: #6ee7b7;
+  --md-accent-fg-color--transparent: rgba(110, 231, 183, 0.1);
+  --md-typeset-a-color: #6ee7b7;
 }
 
 :root[lang="zh"],
