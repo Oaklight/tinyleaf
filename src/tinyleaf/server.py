@@ -1,5 +1,6 @@
 """HTTP server wrapper for tinyleaf."""
 
+import email.utils
 import json
 import os
 import urllib.parse
@@ -95,22 +96,14 @@ class TexliveHandler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
 
-        if path.startswith("/vendor/"):
-            filename = os.path.basename(path[8:])
-            config_dir = self.config.get("config_dir")
-            if config_dir:
-                filepath = os.path.join(config_dir, "vendor", filename)
-                if os.path.isfile(filepath):
-                    ct = (
-                        "application/javascript" if filename.endswith(".js") else "application/json"
-                    )
-                    self.send_response(200)
-                    self.send_header("Content-Type", ct)
-                    self.send_header("Content-Length", str(os.path.getsize(filepath)))
-                    self._send_cors_headers()
-                    self.end_headers()
-                    return
-        self._send_error(404, "Not found")
+        if path == "/" or path == "/index.html":
+            self._serve_static("index.html", "text/html")
+        elif path.startswith("/static/"):
+            self._serve_static_path(path[len("/static/") :])
+        elif path.startswith("/vendor/"):
+            self._serve_vendor(path[8:])
+        else:
+            self._send_error(404, "Not found")
 
     # ── Project route parsing ──
 
@@ -236,18 +229,43 @@ class TexliveHandler(BaseHTTPRequestHandler):
 
     # ── Response helpers ──
 
-    def _serve_static(self, filename, content_type):
-        filepath = os.path.join(STATIC_DIR, filename)
+    def _cache_control_for_static(self, filename):
+        if filename == "index.html" or filename.endswith((".css", ".js")):
+            return "no-cache"
+        return "public, max-age=86400"
+
+    def _send_cached_file(self, filepath, content_type, cache_control, charset=True):
         try:
+            stat = os.stat(filepath)
+            etag = f'"{stat.st_mtime_ns:x}-{stat.st_size:x}"'
+            last_modified = email.utils.formatdate(stat.st_mtime, usegmt=True)
+            if self.headers.get("If-None-Match") == etag:
+                self.send_response(304)
+                self.send_header("ETag", etag)
+                self.send_header("Cache-Control", cache_control)
+                self.end_headers()
+                return
             with open(filepath, "rb") as f:
                 content = f.read()
             self.send_response(200)
-            self.send_header("Content-Type", f"{content_type}; charset=utf-8")
+            if charset:
+                self.send_header("Content-Type", f"{content_type}; charset=utf-8")
+            else:
+                self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(content)))
+            self.send_header("Cache-Control", cache_control)
+            self.send_header("ETag", etag)
+            self.send_header("Last-Modified", last_modified)
             self.end_headers()
-            self.wfile.write(content)
+            if self.command != "HEAD":
+                self.wfile.write(content)
         except FileNotFoundError:
-            self._send_error(404, f"Static file not found: {filename}")
+            self._send_error(404, "File not found")
+
+    def _serve_static(self, filename, content_type):
+        filepath = os.path.join(STATIC_DIR, filename)
+        cache_control = self._cache_control_for_static(filename)
+        self._send_cached_file(filepath, content_type, cache_control)
 
     # Extension → MIME type mapping for static assets
     _MIME_TYPES = {
@@ -283,7 +301,12 @@ class TexliveHandler(BaseHTTPRequestHandler):
             self._send_error(404, f"Vendor file not found: {filename}")
             return
         ct = "application/javascript" if filename.endswith(".js") else "application/json"
-        self.send_file(filepath, content_type=ct)
+        self._send_cached_file(
+            filepath,
+            ct,
+            "public, max-age=31536000, immutable",
+            charset=False,
+        )
 
     def send_json(self, data, status=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")

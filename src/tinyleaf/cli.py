@@ -116,6 +116,9 @@ def main():
     if args.project_path and args.projects_dir:
         parser.error("Cannot specify both project_path and --projects-dir")
 
+    config_dir = os.path.abspath(args.config_dir)
+    registry.ensure_config_dir(config_dir)
+
     # Determine mode
     if args.project_path:
         mode = "single"
@@ -123,11 +126,8 @@ def main():
         if not os.path.isdir(project_path):
             print(f"Error: '{project_path}' is not a directory", file=sys.stderr)
             sys.exit(1)
-        config_dir = None
     else:
         mode = "multi"
-        config_dir = os.path.abspath(args.config_dir)
-        registry.ensure_config_dir(config_dir)
         project_path = None
 
         # Backward compat: migrate --projects-dir subdirs into registry
@@ -138,21 +138,21 @@ def main():
                 if count:
                     print(f"  Migrated {count} project(s) from {projects_dir}")
 
-        # Auto-download vendor JS modules on first start
-        from tinyleaf import vendor
+    # Auto-download vendor JS modules on first start
+    from tinyleaf import vendor
 
-        vendor_dir = os.path.join(config_dir, "vendor")
-        if not vendor.is_vendor_ready(vendor_dir):
-            proxy = vendor.load_proxy(config_dir)
-            print("  Downloading JS modules...")
-            if proxy:
-                print(f"  Using proxy: {proxy}")
-            try:
-                vendor.download_vendor(vendor_dir, proxy=proxy)
-                print("  JS modules ready")
-            except Exception as e:
-                print(f"  Warning: failed to download JS modules: {e}", file=sys.stderr)
-                print("  Editor will try CDN as fallback", file=sys.stderr)
+    vendor_dir = os.path.join(config_dir, "vendor")
+    if not vendor.is_vendor_ready(vendor_dir):
+        proxy = vendor.load_proxy(config_dir)
+        print("  Downloading JS modules...")
+        if proxy:
+            print(f"  Using proxy: {proxy}")
+        try:
+            vendor.download_vendor(vendor_dir, proxy=proxy)
+            print("  JS modules ready")
+        except Exception as e:
+            print(f"  Warning: failed to download JS modules: {e}", file=sys.stderr)
+            print("  Editor will try CDN as fallback", file=sys.stderr)
 
     # Check compilation backend
     use_docker = args.docker

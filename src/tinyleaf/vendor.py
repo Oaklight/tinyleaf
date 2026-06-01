@@ -23,6 +23,7 @@ VENDOR_PACKAGES = [
     ("@codemirror/language@6", "cm-language.js"),
     ("@codemirror/autocomplete@6", "cm-autocomplete.js"),
     ("@codemirror/search@6", "cm-search.js"),
+    ("@lezer/highlight@1", "lezer-highlight.js"),
     ("codemirror-lang-latex", "cm-lang-latex.js"),
     ("@codemirror/lang-markdown@6", "cm-lang-markdown.js"),
     ("@codemirror/lang-javascript@6", "cm-lang-javascript.js"),
