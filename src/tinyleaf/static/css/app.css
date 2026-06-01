@@ -1346,21 +1346,33 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
   margin-right: 5px;
 }
 
-.toolbar-logo-wordmark {
+.brand-wordmark {
   width: 112px;
   height: 34px;
   margin-right: 0;
   vertical-align: middle;
 }
 
+.about-wordmark {
+  width: 124px;
+  height: auto;
+}
+
+.about-version-badge {
+  align-self: flex-end;
+  margin-bottom: 3px;
+  color: var(--text-dim);
+  font-size: 10px;
+  font-family: var(--mono);
+  line-height: 1;
+}
+
 .about-brand {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  font-size: 15px;
-  font-weight: 700;
-  margin-bottom: 2px;
+  gap: 4px;
+  margin-bottom: 10px;
 }
 
 .about-logo {

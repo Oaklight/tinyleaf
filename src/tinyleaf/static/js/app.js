@@ -19,7 +19,6 @@ const I18N = {
     theme_indigo_dark: "Indigo Dark",
     theme_dracula: "Dracula",
     theme_nord: "Nord",
-    theme_one_dark: "One Dark",
     language: "Language",
     docker_image: "Image",
     use_docker: "Docker",
@@ -233,7 +232,6 @@ const I18N = {
     theme_indigo_dark: "靛蓝深色",
     theme_dracula: "德古拉",
     theme_nord: "北境",
-    theme_one_dark: "One Dark",
     language: "语言",
     docker_image: "镜像",
     use_docker: "Docker",
@@ -464,7 +462,7 @@ function setLang(lang) {
 // ══════════════════════════════════════════
 const THEME_GROUPS = {
   light: ["light", "paper", "mint"],
-  dark: ["indigo-dark", "dracula", "nord", "one-dark"],
+  dark: ["indigo-dark", "dracula", "nord"],
 };
 
 const THEME_LABEL_KEYS = {
@@ -474,7 +472,6 @@ const THEME_LABEL_KEYS = {
   "indigo-dark": "theme_indigo_dark",
   dracula: "theme_dracula",
   nord: "theme_nord",
-  "one-dark": "theme_one_dark",
 };
 
 const THEMES = {
@@ -514,12 +511,6 @@ const THEMES = {
     "--accent": "#88c0d0", "--accent-hover": "#8fbcbb",
     "--green": "#a3be8c", "--red": "#bf616a", "--orange": "#d08770", "--blue": "#5e81ac",
   },
-  "one-dark": {
-    "--bg": "#282c34", "--bg-card": "#2c313c", "--bg-hover": "#353b48",
-    "--border": "#3e4452", "--text": "#abb2bf", "--text-dim": "#636d83",
-    "--accent": "#61afef", "--accent-hover": "#80bfff",
-    "--green": "#98c379", "--red": "#e06c75", "--orange": "#d19a66", "--blue": "#61afef",
-  },
 };
 
 let currentTheme = localStorage.getItem("tinyleaf-theme") || "light";
@@ -533,12 +524,12 @@ function setTheme(name) {
   currentTheme = name;
   localStorage.setItem("tinyleaf-theme", name);
   document.getElementById("theme-select").value = name;
-  const brandLogo = document.getElementById("toolbar-brand-logo");
-  if (brandLogo) {
-    brandLogo.src = THEME_GROUPS.light.includes(name)
-      ? "/static/assets/brand-wordmark-light.svg"
-      : "/static/assets/brand-wordmark-dark.svg";
-  }
+  const brandWordmark = THEME_GROUPS.light.includes(name)
+    ? "/static/assets/brand-wordmark-light.svg"
+    : "/static/assets/brand-wordmark-dark.svg";
+  document.querySelectorAll(".brand-wordmark").forEach((img) => {
+    img.src = brandWordmark;
+  });
 }
 
 function renderThemeOptions() {
