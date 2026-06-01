@@ -167,6 +167,23 @@ body {
 .layout-btn:hover { background: var(--bg-hover); color: var(--text); }
 .layout-btn.active { background: var(--accent); color: #fff; }
 .layout-btn svg { width: 20px; height: 14px; display: block; }
+.sidebar-status-toggle {
+  padding: 2px 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-dim);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.sidebar-status-toggle:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.sidebar-status-toggle svg { width: 20px; height: 14px; display: block; }
 
 /* ── Editor-pane hidden state (PDF-only mode) ── */
 #editor-pane.hidden { display: none; }
@@ -380,7 +397,7 @@ input[type="checkbox"] { accent-color: var(--accent); }
 }
 
 /* ── Sidebar tabs ── */
-.sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; overflow: hidden; }
 .sidebar-tab {
   flex: 1; padding: 7px 0; font-size: 11px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.5px; background: none; border: none; border-bottom: 2px solid transparent;

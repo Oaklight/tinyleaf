@@ -1467,6 +1467,7 @@ async function showProjectList() {
   document.getElementById("toolbar-project").style.display = "none";
   document.getElementById("toolbar-project-name").style.display = "none";
   document.getElementById("btn-sidebar-toggle").style.display = "none";
+  document.getElementById("btn-sidebar-status-toggle").style.display = "none";
   document.getElementById("layout-switcher").style.display = "none";
 
   const projects = await api("GET", "/api/projects");
@@ -1683,6 +1684,7 @@ async function openProject(name) {
   document.getElementById("toolbar-project").style.display = "flex";
   document.getElementById("toolbar-project-name").style.display = "flex";
   document.getElementById("btn-sidebar-toggle").style.display = "";
+  document.getElementById("btn-sidebar-status-toggle").style.display = "";
   document.getElementById("layout-switcher").style.display = "";
 
   // Clear previous project state
@@ -2884,7 +2886,11 @@ function setLayout(mode) {
 function toggleSidebar() {
   if (S.layoutMode === "pdf") return;
   const sidebar = document.getElementById("sidebar");
+  const resizeSidebar = document.getElementById("resize-sidebar");
+  const editorView = document.getElementById("editor-view");
   const isCollapsed = sidebar.classList.toggle("collapsed");
+  resizeSidebar.classList.toggle("hidden", isCollapsed);
+  editorView.classList.toggle("sidebar-collapsed", isCollapsed);
   localStorage.setItem("tinyleaf-sidebar-collapsed", isCollapsed ? "1" : "0");
 }
 
@@ -4023,6 +4029,7 @@ document.querySelectorAll(".layout-btn").forEach(btn => {
   btn.addEventListener("click", () => setLayout(btn.dataset.layout));
 });
 document.getElementById("btn-sidebar-toggle").addEventListener("click", toggleSidebar);
+document.getElementById("btn-sidebar-status-toggle").addEventListener("click", toggleSidebar);
 document.getElementById("btn-pdf-refresh").onclick = () => {
   if (S.projectName) {
     const base = (S.currentFile || "main.tex").replace(/\.tex$/, ".pdf");
@@ -4150,6 +4157,8 @@ window.addEventListener("focus", () => {
   setLayout(savedLayout);
   if (savedLayout !== "pdf" && localStorage.getItem("tinyleaf-sidebar-collapsed") === "1") {
     sidebar.classList.add("collapsed");
+    resizeSidebar.classList.add("hidden");
+    document.getElementById("editor-view").classList.add("sidebar-collapsed");
   }
 
   function setupResize(handle, target, applySizeFn, storageKey, min, max, invert) {
