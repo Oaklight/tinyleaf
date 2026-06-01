@@ -640,11 +640,11 @@ function isArtifact(name) {
 }
 
 const LANG_MAP = {
-  ".tex": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latex" },
-  ".bib": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latex" },
-  ".sty": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latex" },
-  ".cls": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latex" },
-  ".dtx": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latex" },
+  ".tex": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latexLanguage" },
+  ".bib": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latexLanguage" },
+  ".sty": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latexLanguage" },
+  ".cls": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latexLanguage" },
+  ".dtx": { mod: "cm-lang-latex.js", cdn: "codemirror-lang-latex", fn: "latexLanguage" },
   ".md":  { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6", fn: "markdown" },
   ".markdown": { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6", fn: "markdown" },
   ".mmd": { mod: "cm-lang-markdown.js", cdn: "@codemirror/lang-markdown@6", fn: "markdown" },
@@ -691,7 +691,8 @@ async function getLangExtension(filePath) {
     catch { _langCache[key] = null; }
   }
   const mod = _langCache[key];
-  return mod?.[spec.fn]?.() || null;
+  const extension = mod?.[spec.fn];
+  return typeof extension === "function" ? extension() : extension || null;
 }
 
 // ══════════════════════════════════════════
