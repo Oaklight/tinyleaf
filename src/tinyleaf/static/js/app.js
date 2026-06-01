@@ -586,9 +586,10 @@ const [
   { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection },
   { EditorState },
   { defaultKeymap, history, historyKeymap, indentWithTab },
-  { syntaxHighlighting, defaultHighlightStyle, bracketMatching, foldGutter, foldKeymap },
+  { HighlightStyle, syntaxHighlighting, bracketMatching, foldGutter, foldKeymap },
   { closeBrackets, closeBracketsKeymap, autocompletion },
   { search, searchKeymap, highlightSelectionMatches, openSearchPanel },
+  { tags },
 ] = await Promise.all([
   loadMod("cm-view.js", "@codemirror/view@6"),
   loadMod("cm-state.js", "@codemirror/state@6"),
@@ -596,6 +597,23 @@ const [
   loadMod("cm-language.js", "@codemirror/language@6"),
   loadMod("cm-autocomplete.js", "@codemirror/autocomplete@6"),
   loadMod("cm-search.js", "@codemirror/search@6"),
+  loadMod("lezer-highlight.js", "@lezer/highlight@1"),
+]);
+
+const tinyleafHighlightStyle = HighlightStyle.define([
+  { tag: tags.keyword, color: "#7c3aed", fontWeight: "600" },
+  { tag: [tags.atom, tags.bool, tags.number], color: "#0f766e" },
+  { tag: [tags.string, tags.special(tags.string)], color: "#b45309" },
+  { tag: [tags.comment, tags.quote], color: "#64748b", fontStyle: "italic" },
+  { tag: [tags.variableName, tags.definition(tags.variableName)], color: "#2563eb" },
+  { tag: [tags.function(tags.variableName), tags.function(tags.propertyName)], color: "#059669", fontWeight: "600" },
+  { tag: [tags.heading, tags.strong], color: "#047857", fontWeight: "700" },
+  { tag: tags.emphasis, color: "#0f766e", fontStyle: "italic" },
+  { tag: [tags.link, tags.url], color: "#2563eb", textDecoration: "underline" },
+  { tag: tags.monospace, color: "#7c3aed" },
+  { tag: tags.processingInstruction, color: "#7c3aed", fontWeight: "600" },
+  { tag: [tags.punctuation, tags.separator], color: "#64748b" },
+  { tag: tags.invalid, color: "#dc2626" },
 ]);
 
 // ── Auto-pair \begin{env} → \end{env} on Enter ──
@@ -2056,7 +2074,7 @@ async function openFile(filePath) {
     autocompletion({ override: [latexCompletionSource] }),
     search(),
     highlightSelectionMatches(),
-    syntaxHighlighting(defaultHighlightStyle),
+    syntaxHighlighting(tinyleafHighlightStyle),
     keymap.of([
       ...defaultKeymap, ...historyKeymap, ...closeBracketsKeymap,
       ...foldKeymap, ...searchKeymap, indentWithTab,
