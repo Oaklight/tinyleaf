@@ -10,7 +10,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.5.0] - 2026-05-25
+## [0.5.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.5.0) - 2026-05-25
 
 ### Added
 
@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default wordmark updated to STIX Two Text
 - Leaf-pen spine and pen tip unified with Pale Mint (`#d1fae5`)
 
-## [0.4.0] - 2026-05-25
+## [0.4.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.4.0) - 2026-05-25
 
 ### Added
 
@@ -57,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Static file serving with `/static/` route, MIME type detection, and path traversal protection
 - Inline `onclick` handlers migrated to `addEventListener` for ES module compatibility
 
-## [0.3.0] - 2026-05-18
+## [0.3.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.3.0) - 2026-05-18
 
 ### Added
 
@@ -84,7 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed `ty` type narrowing: `assert proc.stdout is not None` in `compiler.py`
 - Excluded `_vendor/` from ruff formatting
 
-## [0.2.0] - 2026-04-29
+## [0.2.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.2.0) - 2026-04-29
 
 ### Added
 
@@ -101,7 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Breadcrumb bar layout: locate button moved to the left of the filename, close button on the right
 
-## [0.1.0] - 2026-04-28
+## [0.1.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.1.0) - 2026-04-28
 
 Initial release of tinyleaf (formerly texlive-web).
 
@@ -194,7 +194,3 @@ Initial release of tinyleaf (formerly texlive-web).
 - Updated CLI entry point, config directory, and program name
 - Default compilation backend changed to Docker (use `--no-docker` for local)
 
-[0.4.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.4.0
-[0.3.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.3.0
-[0.2.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.2.0
-[0.1.0]: https://github.com/Oaklight/tinyleaf/releases/tag/v0.1.0
