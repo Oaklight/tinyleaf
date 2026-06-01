@@ -1346,6 +1346,12 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
   margin-right: 5px;
 }
 
+.toolbar-logo-wordmark {
+  width: 112px;
+  height: 34px;
+  margin-right: 0;
+  vertical-align: middle;
+}
 
 .about-brand {
   display: inline-flex;

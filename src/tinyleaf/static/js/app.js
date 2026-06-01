@@ -11,6 +11,15 @@ const I18N = {
     commit: "Commit",
     push: "Push",
     theme: "Theme",
+    theme_group_light: "Light",
+    theme_group_dark: "Dark",
+    theme_light: "Light",
+    theme_paper: "Paper",
+    theme_mint: "Mint",
+    theme_indigo_dark: "Indigo Dark",
+    theme_dracula: "Dracula",
+    theme_nord: "Nord",
+    theme_one_dark: "One Dark",
     language: "Language",
     docker_image: "Image",
     use_docker: "Docker",
@@ -216,6 +225,15 @@ const I18N = {
     commit: "提交",
     push: "推送",
     theme: "主题",
+    theme_group_light: "明亮",
+    theme_group_dark: "深色",
+    theme_light: "明亮",
+    theme_paper: "纸张",
+    theme_mint: "薄荷",
+    theme_indigo_dark: "靛蓝深色",
+    theme_dracula: "德古拉",
+    theme_nord: "北境",
+    theme_one_dark: "One Dark",
     language: "语言",
     docker_image: "镜像",
     use_docker: "Docker",
@@ -438,17 +456,45 @@ function setLang(lang) {
   localStorage.setItem("tinyleaf-lang", lang);
   document.getElementById("lang-select").value = lang;
   applyI18n();
+  renderThemeOptions();
 }
 
 // ══════════════════════════════════════════
 // Themes (from llm-rosetta)
 // ══════════════════════════════════════════
+const THEME_GROUPS = {
+  light: ["light", "paper", "mint"],
+  dark: ["indigo-dark", "dracula", "nord", "one-dark"],
+};
+
+const THEME_LABEL_KEYS = {
+  light: "theme_light",
+  paper: "theme_paper",
+  mint: "theme_mint",
+  "indigo-dark": "theme_indigo_dark",
+  dracula: "theme_dracula",
+  nord: "theme_nord",
+  "one-dark": "theme_one_dark",
+};
+
 const THEMES = {
   light: {
     "--bg": "#ffffff", "--bg-card": "#f6f8fa", "--bg-hover": "#eef1f5",
     "--border": "#d1d9e0", "--text": "#1f2328", "--text-dim": "#656d76",
     "--accent": "#059669", "--accent-hover": "#047857",
     "--green": "#1a7f37", "--red": "#cf222e", "--orange": "#bf8700", "--blue": "#0969da",
+  },
+  paper: {
+    "--bg": "#fbf7ef", "--bg-card": "#f4eadc", "--bg-hover": "#eadfce",
+    "--border": "#dccbb5", "--text": "#2f2418", "--text-dim": "#7c6b5a",
+    "--accent": "#0f766e", "--accent-hover": "#0d5f59",
+    "--green": "#1a7f37", "--red": "#b42318", "--orange": "#a15c07", "--blue": "#2563eb",
+  },
+  mint: {
+    "--bg": "#f7fdf9", "--bg-card": "#eefaf3", "--bg-hover": "#dcfce7",
+    "--border": "#bbf7d0", "--text": "#17211b", "--text-dim": "#5c7467",
+    "--accent": "#059669", "--accent-hover": "#047857",
+    "--green": "#16a34a", "--red": "#dc2626", "--orange": "#d97706", "--blue": "#0284c7",
   },
   "indigo-dark": {
     "--bg": "#0f1117", "--bg-card": "#1a1d27", "--bg-hover": "#242838",
@@ -468,27 +514,16 @@ const THEMES = {
     "--accent": "#88c0d0", "--accent-hover": "#8fbcbb",
     "--green": "#a3be8c", "--red": "#bf616a", "--orange": "#d08770", "--blue": "#5e81ac",
   },
-  solarized: {
-    "--bg": "#002b36", "--bg-card": "#073642", "--bg-hover": "#0a4050",
-    "--border": "#586e75", "--text": "#fdf6e3", "--text-dim": "#839496",
-    "--accent": "#b58900", "--accent-hover": "#cb9a09",
-    "--green": "#859900", "--red": "#dc322f", "--orange": "#cb4b16", "--blue": "#268bd2",
-  },
   "one-dark": {
     "--bg": "#282c34", "--bg-card": "#2c313c", "--bg-hover": "#353b48",
     "--border": "#3e4452", "--text": "#abb2bf", "--text-dim": "#636d83",
     "--accent": "#61afef", "--accent-hover": "#80bfff",
     "--green": "#98c379", "--red": "#e06c75", "--orange": "#d19a66", "--blue": "#61afef",
   },
-  "rose-pine": {
-    "--bg": "#191724", "--bg-card": "#1f1d2e", "--bg-hover": "#26233a",
-    "--border": "#403d52", "--text": "#e0def4", "--text-dim": "#908caa",
-    "--accent": "#c4a7e7", "--accent-hover": "#d4bff7",
-    "--green": "#9ccfd8", "--red": "#eb6f92", "--orange": "#f6c177", "--blue": "#31748f",
-  },
 };
 
 let currentTheme = localStorage.getItem("tinyleaf-theme") || "light";
+if (!THEMES[currentTheme]) currentTheme = "light";
 
 function setTheme(name) {
   const vars = THEMES[name];
@@ -498,17 +533,38 @@ function setTheme(name) {
   currentTheme = name;
   localStorage.setItem("tinyleaf-theme", name);
   document.getElementById("theme-select").value = name;
+  const brandLogo = document.getElementById("toolbar-brand-logo");
+  if (brandLogo) {
+    brandLogo.src = THEME_GROUPS.light.includes(name)
+      ? "/static/assets/brand-wordmark-light.svg"
+      : "/static/assets/brand-wordmark-dark.svg";
+  }
+}
+
+function renderThemeOptions() {
+  const sel = document.getElementById("theme-select");
+  sel.replaceChildren();
+  const groups = [
+    { label: t("theme_group_light"), names: THEME_GROUPS.light },
+    { label: t("theme_group_dark"), names: THEME_GROUPS.dark },
+  ];
+  for (const group of groups) {
+    const optgroup = document.createElement("optgroup");
+    optgroup.label = group.label;
+    for (const name of group.names) {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = t(THEME_LABEL_KEYS[name]);
+      optgroup.appendChild(opt);
+    }
+    sel.appendChild(optgroup);
+  }
+  sel.value = currentTheme;
 }
 
 function initThemeSelect() {
   const sel = document.getElementById("theme-select");
-  for (const name of Object.keys(THEMES)) {
-    const opt = document.createElement("option");
-    opt.value = name;
-    opt.textContent = name.charAt(0).toUpperCase() + name.slice(1).replace("-", " ");
-    sel.appendChild(opt);
-  }
-  sel.value = currentTheme;
+  renderThemeOptions();
   sel.onchange = () => setTheme(sel.value);
 }
 
