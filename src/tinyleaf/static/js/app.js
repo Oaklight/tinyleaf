@@ -19,6 +19,11 @@ const I18N = {
     theme_indigo_dark: "Indigo Dark",
     theme_dracula: "Dracula",
     theme_nord: "Nord",
+    highlight_schema: "Highlight",
+    highlight_tinyleaf: "Tinyleaf",
+    highlight_solarized: "Solarized",
+    highlight_gruvbox: "Gruvbox",
+    highlight_dracula: "Dracula",
     language: "Language",
     docker_image: "Image",
     use_docker: "Docker",
@@ -232,6 +237,11 @@ const I18N = {
     theme_indigo_dark: "靛蓝深色",
     theme_dracula: "德古拉",
     theme_nord: "北境",
+    highlight_schema: "高亮",
+    highlight_tinyleaf: "Tinyleaf",
+    highlight_solarized: "Solarized",
+    highlight_gruvbox: "Gruvbox",
+    highlight_dracula: "Dracula",
     language: "语言",
     docker_image: "镜像",
     use_docker: "Docker",
@@ -455,6 +465,7 @@ function setLang(lang) {
   document.getElementById("lang-select").value = lang;
   applyI18n();
   renderThemeOptions();
+  renderHighlightOptions();
 }
 
 // ══════════════════════════════════════════
@@ -559,6 +570,36 @@ function initThemeSelect() {
   sel.onchange = () => setTheme(sel.value);
 }
 
+function renderHighlightOptions() {
+  const sel = document.getElementById("highlight-select");
+  sel.replaceChildren();
+  for (const [name, schema] of Object.entries(HIGHLIGHT_SCHEMAS)) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = t(schema.labelKey);
+    sel.appendChild(opt);
+  }
+  sel.value = currentHighlightSchema;
+}
+
+function setHighlightSchema(name) {
+  if (!HIGHLIGHT_SCHEMAS[name]) return;
+  currentHighlightSchema = name;
+  localStorage.setItem("tinyleaf-highlight", name);
+  document.getElementById("highlight-select").value = name;
+  for (const entry of S.editors.values()) {
+    entry.view.dispatch({
+      effects: highlightCompartment.reconfigure(highlightExtension()),
+    });
+  }
+}
+
+function initHighlightSelect() {
+  const sel = document.getElementById("highlight-select");
+  renderHighlightOptions();
+  sel.onchange = () => setHighlightSchema(sel.value);
+}
+
 // ══════════════════════════════════════════
 // Module loader: local vendor first, CDN fallback
 // ══════════════════════════════════════════
@@ -584,7 +625,7 @@ const pdfjsLib = await loadMod("pdfjs.js", "pdfjs-dist@4.9.155/build/pdf.min.mjs
 // ── CodeMirror 6 ──
 const [
   { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection },
-  { EditorState },
+  { EditorState, Compartment },
   { defaultKeymap, history, historyKeymap, indentWithTab },
   { HighlightStyle, syntaxHighlighting, bracketMatching, foldGutter, foldKeymap },
   { closeBrackets, closeBracketsKeymap, autocompletion },
@@ -600,21 +641,87 @@ const [
   loadMod("lezer-highlight.js", "@lezer/highlight@1"),
 ]);
 
-const tinyleafHighlightStyle = HighlightStyle.define([
-  { tag: tags.keyword, color: "#7c3aed", fontWeight: "600" },
-  { tag: [tags.atom, tags.bool, tags.number], color: "#0f766e" },
-  { tag: [tags.string, tags.special(tags.string)], color: "#b45309" },
-  { tag: [tags.comment, tags.quote], color: "#64748b", fontStyle: "italic" },
-  { tag: [tags.variableName, tags.definition(tags.variableName)], color: "#2563eb" },
-  { tag: [tags.function(tags.variableName), tags.function(tags.propertyName)], color: "#059669", fontWeight: "600" },
-  { tag: [tags.heading, tags.strong], color: "#047857", fontWeight: "700" },
-  { tag: tags.emphasis, color: "#0f766e", fontStyle: "italic" },
-  { tag: [tags.link, tags.url], color: "#2563eb", textDecoration: "underline" },
-  { tag: tags.monospace, color: "#7c3aed" },
-  { tag: tags.processingInstruction, color: "#7c3aed", fontWeight: "600" },
-  { tag: [tags.punctuation, tags.separator], color: "#64748b" },
-  { tag: tags.invalid, color: "#dc2626" },
-]);
+const HIGHLIGHT_SCHEMAS = {
+  tinyleaf: {
+    labelKey: "highlight_tinyleaf",
+    style: HighlightStyle.define([
+      { tag: tags.keyword, color: "#047857", fontWeight: "700" },
+      { tag: [tags.atom, tags.bool, tags.number], color: "#0d9488" },
+      { tag: [tags.string, tags.special(tags.string)], color: "#a16207" },
+      { tag: [tags.comment, tags.quote], color: "#64748b", fontStyle: "italic" },
+      { tag: [tags.variableName, tags.definition(tags.variableName)], color: "#2563eb" },
+      { tag: [tags.function(tags.variableName), tags.function(tags.propertyName)], color: "#047857", fontWeight: "700" },
+      { tag: [tags.heading, tags.strong], color: "#065f46", fontWeight: "800" },
+      { tag: tags.emphasis, color: "#0f766e", fontStyle: "italic" },
+      { tag: [tags.link, tags.url], color: "#2563eb", textDecoration: "underline" },
+      { tag: tags.monospace, color: "#7c3aed" },
+      { tag: tags.processingInstruction, color: "#059669", fontWeight: "700" },
+      { tag: [tags.punctuation, tags.separator], color: "#94a3b8" },
+      { tag: tags.invalid, color: "#dc2626", fontWeight: "700" },
+    ]),
+  },
+  solarized: {
+    labelKey: "highlight_solarized",
+    style: HighlightStyle.define([
+      { tag: tags.keyword, color: "#6c71c4", fontWeight: "600" },
+      { tag: [tags.atom, tags.bool, tags.number], color: "#2aa198" },
+      { tag: [tags.string, tags.special(tags.string)], color: "#859900" },
+      { tag: [tags.comment, tags.quote], color: "#93a1a1", fontStyle: "italic" },
+      { tag: [tags.variableName, tags.definition(tags.variableName)], color: "#268bd2" },
+      { tag: [tags.function(tags.variableName), tags.function(tags.propertyName)], color: "#b58900", fontWeight: "600" },
+      { tag: [tags.heading, tags.strong], color: "#cb4b16", fontWeight: "700" },
+      { tag: tags.emphasis, color: "#2aa198", fontStyle: "italic" },
+      { tag: [tags.link, tags.url], color: "#268bd2", textDecoration: "underline" },
+      { tag: tags.monospace, color: "#d33682" },
+      { tag: tags.processingInstruction, color: "#6c71c4", fontWeight: "600" },
+      { tag: [tags.punctuation, tags.separator], color: "#839496" },
+      { tag: tags.invalid, color: "#dc322f" },
+    ]),
+  },
+  gruvbox: {
+    labelKey: "highlight_gruvbox",
+    style: HighlightStyle.define([
+      { tag: tags.keyword, color: "#af3a03", fontWeight: "700" },
+      { tag: [tags.atom, tags.bool, tags.number], color: "#8f3f71" },
+      { tag: [tags.string, tags.special(tags.string)], color: "#79740e" },
+      { tag: [tags.comment, tags.quote], color: "#928374", fontStyle: "italic" },
+      { tag: [tags.variableName, tags.definition(tags.variableName)], color: "#076678" },
+      { tag: [tags.function(tags.variableName), tags.function(tags.propertyName)], color: "#b57614", fontWeight: "700" },
+      { tag: [tags.heading, tags.strong], color: "#9d0006", fontWeight: "800" },
+      { tag: tags.emphasis, color: "#427b58", fontStyle: "italic" },
+      { tag: [tags.link, tags.url], color: "#076678", textDecoration: "underline" },
+      { tag: tags.monospace, color: "#8f3f71" },
+      { tag: tags.processingInstruction, color: "#af3a03", fontWeight: "700" },
+      { tag: [tags.punctuation, tags.separator], color: "#7c6f64" },
+      { tag: tags.invalid, color: "#cc241d", fontWeight: "700" },
+    ]),
+  },
+  dracula: {
+    labelKey: "highlight_dracula",
+    style: HighlightStyle.define([
+      { tag: tags.keyword, color: "#bd93f9", fontWeight: "700" },
+      { tag: [tags.atom, tags.bool, tags.number], color: "#ffb86c" },
+      { tag: [tags.string, tags.special(tags.string)], color: "#f1fa8c" },
+      { tag: [tags.comment, tags.quote], color: "#6272a4", fontStyle: "italic" },
+      { tag: [tags.variableName, tags.definition(tags.variableName)], color: "#8be9fd" },
+      { tag: [tags.function(tags.variableName), tags.function(tags.propertyName)], color: "#50fa7b", fontWeight: "700" },
+      { tag: [tags.heading, tags.strong], color: "#ff79c6", fontWeight: "800" },
+      { tag: tags.emphasis, color: "#8be9fd", fontStyle: "italic" },
+      { tag: [tags.link, tags.url], color: "#8be9fd", textDecoration: "underline" },
+      { tag: tags.monospace, color: "#ff79c6" },
+      { tag: tags.processingInstruction, color: "#bd93f9", fontWeight: "700" },
+      { tag: [tags.punctuation, tags.separator], color: "#6272a4" },
+      { tag: tags.invalid, color: "#ff5555", fontWeight: "700" },
+    ]),
+  },
+};
+
+let currentHighlightSchema = localStorage.getItem("tinyleaf-highlight") || "tinyleaf";
+if (!HIGHLIGHT_SCHEMAS[currentHighlightSchema]) currentHighlightSchema = "tinyleaf";
+const highlightCompartment = new Compartment();
+function highlightExtension() {
+  return syntaxHighlighting(HIGHLIGHT_SCHEMAS[currentHighlightSchema].style);
+}
 
 // ── Auto-pair \begin{env} → \end{env} on Enter ──
 function latexAutoCloseEnv() {
@@ -814,6 +921,7 @@ function setStatus(msg, level = "info") {
 // ══════════════════════════════════════════
 async function init() {
   initThemeSelect();
+  initHighlightSelect();
   setTheme(currentTheme);
   setLang(currentLang);
 
@@ -2074,7 +2182,7 @@ async function openFile(filePath) {
     autocompletion({ override: [latexCompletionSource] }),
     search(),
     highlightSelectionMatches(),
-    syntaxHighlighting(tinyleafHighlightStyle),
+    highlightCompartment.of(highlightExtension()),
     keymap.of([
       ...defaultKeymap, ...historyKeymap, ...closeBracketsKeymap,
       ...foldKeymap, ...searchKeymap, indentWithTab,
