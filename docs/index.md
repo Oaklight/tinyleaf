@@ -1,15 +1,33 @@
 ---
+title: Tinyleaf
 hide:
   - navigation
+  - title
 ---
 
-# Tinyleaf
+<div class="tinyleaf-hero" markdown>
 
-![Tinyleaf 标志](assets/brand/tinyleaf-leafpen-readme-light.svg)
+![Tinyleaf 横幅](assets/brand/tinyleaf-leafpen-readme-light.svg){ .tinyleaf-hero__banner .tinyleaf-hero__banner--light }
+![Tinyleaf 横幅](assets/brand/tinyleaf-leafpen-readme-dark.svg){ .tinyleaf-hero__banner .tinyleaf-hero__banner--dark }
 
-**轻量级、零依赖的 Web LaTeX 编辑器。**
+<p class="tinyleaf-hero__tagline">一个轻量、敏捷、专注写作体验的 LaTeX 编辑器。</p>
 
-Tinyleaf 是一个 CLI 优先的 LaTeX 编辑器，运行在浏览器中。后端仅依赖 Python 标准库，支持本地和 Docker 两种编译方式。
+<p class="tinyleaf-hero__desc">打开项目，编辑 LaTeX，预览 PDF，把编译流程放在手边。Tinyleaf 让写作保持轻快、专注、少打断。</p>
+
+<p class="tinyleaf-badges">
+  <a href="https://pypi.org/project/tinyleaf/"><img alt="PyPI version" src="https://img.shields.io/pypi/v/tinyleaf?color=059669"></a>
+  <a href="https://github.com/Oaklight/tinyleaf/releases/latest"><img alt="GitHub release" src="https://img.shields.io/badge/release-v0.5.0-059669"></a>
+  <a href="https://github.com/Oaklight/tinyleaf/actions/workflows/lint.yml"><img alt="CI" src="https://github.com/Oaklight/tinyleaf/actions/workflows/lint.yml/badge.svg"></a>
+  <a href="https://www.gnu.org/licenses/agpl-3.0"><img alt="License: AGPL v3" src="https://img.shields.io/badge/License-AGPL_v3-047857.svg"></a>
+</p>
+
+<p class="tinyleaf-actions">
+  <a class="tinyleaf-button tinyleaf-button--primary" href="getting-started/quickstart/">快速开始</a>
+  <a class="tinyleaf-button tinyleaf-button--secondary" href="screenshots/">查看截图</a>
+  <a class="tinyleaf-button tinyleaf-button--secondary" href="https://github.com/Oaklight/tinyleaf">GitHub</a>
+</p>
+
+</div>
 
 ![编辑器视图](assets/tinyleaf-editor.png)
 

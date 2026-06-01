@@ -1,0 +1,216 @@
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-sans@5.2.8/400.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-sans@5.2.8/500.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-sans@5.2.8/600.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-sans@5.2.8/700.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-sans@5.2.8/400-italic.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-sans-condensed@5.2.8/600.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/ibm-plex-sans-condensed@5.2.8/600-italic.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.2.9/400.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.2.9/500.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.2.9/700.css");
+@import url("https://cdn.jsdelivr.net/npm/@alleyway-boop/fonts@1.0.0/css/index.css");
+
+@font-face {
+  font-family: "Smiley Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("https://cdn.jsdelivr.net/npm/@fontpkg/smiley-sans@2.0.4/SmileySans-Oblique.ttf.woff2") format("woff2");
+}
+
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/iosevka@5.2.8/400.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/iosevka@5.2.8/500.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/iosevka@5.2.8/600.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/iosevka@5.2.8/700.css");
+
+:root {
+  --md-text-font: "IBM Plex Sans";
+  --md-code-font: "Iosevka";
+  --tinyleaf-accent: #059669;
+  --tinyleaf-accent-dark: #047857;
+  --tinyleaf-mint: #d1fae5;
+}
+
+:root[lang="zh"],
+[lang="zh"] {
+  --md-text-font: "Alibaba PuHuiTi 2.0";
+}
+
+.md-header__button.md-logo {
+  display: inline-flex;
+  align-items: center;
+  width: 7.4rem;
+  height: 2.4rem;
+  margin-right: 0.75rem;
+  padding: 0;
+  background: url("../assets/brand/tinyleaf-leafpen-wordmark-light.svg") left center / contain no-repeat;
+}
+
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  width: 7.4rem !important;
+  max-width: none;
+  height: auto !important;
+  opacity: 0;
+}
+
+[data-md-color-scheme="slate"] .md-header__button.md-logo {
+  background-image: url("../assets/brand/tinyleaf-leafpen-wordmark-dark.svg");
+}
+
+.md-header__title {
+  flex: 1 1 auto;
+  min-width: 1rem;
+  margin-left: 0;
+}
+
+.md-header__topic {
+  display: none;
+}
+
+.md-typeset h1#__skip:has(+ .tinyleaf-hero) {
+  display: none;
+}
+
+.md-content:has(.tinyleaf-hero) .md-content__inner {
+  margin-top: 0;
+}
+
+.md-content:has(.tinyleaf-hero) .tinyleaf-hero {
+  margin-top: 0;
+}
+
+.md-typeset .tinyleaf-hero {
+  display: grid;
+  gap: 1rem;
+  margin: 1.2rem 0 1.8rem;
+  padding: 1.4rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 1.1rem;
+  background: linear-gradient(135deg, rgba(209, 250, 229, 0.34), rgba(255, 255, 255, 0));
+}
+
+[data-md-color-scheme="slate"] .md-typeset .tinyleaf-hero {
+  background: linear-gradient(135deg, rgba(5, 150, 105, 0.18), rgba(0, 0, 0, 0));
+}
+
+.md-typeset .tinyleaf-hero__banner {
+  width: min(100%, 35rem);
+  margin: 0 0 0.25rem;
+  border-radius: 1rem;
+}
+
+[data-md-color-scheme="default"] .md-typeset .tinyleaf-hero__banner--dark,
+[data-md-color-scheme="slate"] .md-typeset .tinyleaf-hero__banner--light {
+  display: none;
+}
+
+.md-typeset .tinyleaf-hero__tagline {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+:root[lang="zh"] .md-typeset .tinyleaf-hero__tagline,
+[lang="zh"] .md-typeset .tinyleaf-hero__tagline {
+  font-family: "Smiley Sans", var(--md-text-font), sans-serif;
+  font-weight: 700;
+}
+
+.md-typeset .tinyleaf-hero__desc {
+  max-width: 42rem;
+  margin: 0;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .tinyleaf-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.2rem 0 0;
+}
+
+.md-typeset .tinyleaf-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.3rem;
+}
+
+.md-typeset .tinyleaf-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.2rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.md-typeset .tinyleaf-button--primary {
+  color: white;
+  background: var(--tinyleaf-accent);
+}
+
+.md-typeset .tinyleaf-button--primary:hover {
+  color: white;
+  background: var(--tinyleaf-accent-dark);
+}
+
+.md-typeset .tinyleaf-button--secondary {
+  color: var(--tinyleaf-accent-dark);
+  background: rgba(209, 250, 229, 0.55);
+}
+
+.md-typeset .highlight code,
+.md-typeset pre code {
+  font-size: 0.75rem;
+}
+
+[data-md-color-scheme="slate"] .md-typeset .tinyleaf-button--secondary {
+  color: var(--tinyleaf-mint);
+  background: rgba(209, 250, 229, 0.12);
+}
+
+.md-typeset .brand-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.md-typeset .brand-preview-grid--stacked {
+  grid-template-columns: 1fr;
+}
+
+.md-typeset .brand-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 7rem;
+  padding: 1.4rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+.md-typeset .brand-preview--light {
+  background: #ffffff;
+}
+
+.md-typeset .brand-preview--dark {
+  background: #0d1117;
+}
+
+.md-typeset .brand-preview--compact {
+  width: fit-content;
+  min-width: 8rem;
+  min-height: 5rem;
+  justify-content: center;
+}
+
+.md-typeset .brand-preview img {
+  max-width: 100%;
+  margin: 0;
+}

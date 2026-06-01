@@ -20,7 +20,7 @@
     </g>
     <g id="word-k-dark">
       <g transform="translate(5 3)"><use href="#quill-leaf-mark"/></g>
-      <text class="brand-wordmark" x="78" y="46" fill="#e5e7eb">Tinyleaf</text>
+      <text class="brand-wordmark" x="78" y="46" fill="#f8fafc">Tinyleaf</text>
     </g>
     <g id="word-k-light">
       <g transform="translate(5 3)"><use href="#quill-leaf-mark"/></g>
