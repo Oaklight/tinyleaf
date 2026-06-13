@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
@@ -39,17 +40,13 @@ jobs:
           sed -i "s/^__version__ = .*/__version__ = \"${VER}\"/" src/tinyleaf/__init__.py
           grep __version__ src/tinyleaf/__init__.py
 
-      - name: Install build tools
-        run: pip install build twine
-
       - name: Build package
-        run: python -m build
+        run: |
+          pip install build
+          python -m build
 
       - name: Publish to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: twine upload dist/*.whl dist/*.tar.gz
+        uses: pypa/gh-action-pypi-publish@release/v1
 
       - name: Commit and tag
         run: |
