@@ -46,8 +46,8 @@ tinyleaf = "tinyleaf.cli:main"
 [project.optional-dependencies]
 dev = [
     "pre-commit>=4.0.0",
-    "ruff>=0.15.0",
-    "ty>=0.0.31",
+    "ruff==0.15.20",
+    "ty==0.0.54",
     "complexipy>=5.2.0",
     "build>=1.2.2.post1",
     "twine>=6.1.0",
