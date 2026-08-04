@@ -58,24 +58,6 @@ theme:
 plugins:
   - search:
       separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
-  - llmstxt:
-      full_output: llms-full.txt
-      sections:
-        首页:
-          - index.md
-        使用指南:
-          - getting-started/installation.md
-          - getting-started/quickstart.md
-          - guide/architecture.md
-          - guide/registry.md
-          - guide/compilation.md
-          - guide/docker.md
-        资源:
-          - resources/index.md
-          - api/index.md
-          - brand.md
-        更新日志:
-          - changelog.md
 
 extra_css:
   - stylesheets/tinyleaf.css
