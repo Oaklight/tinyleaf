@@ -1,97 +1,40 @@
-"""API request handlers for tinyleaf."""
+"""API request handlers for tinyleaf.
 
+Handlers are pure functions: they receive parsed data (config, body, params)
+and return dicts (auto-coerced to JSON by the server) or Response objects.
+Errors are raised via abort() / HTTPException.
+"""
+
+import asyncio
 import io
 import json
 import os
 import re
 import subprocess
-import time
 import zipfile
 
 from tinyleaf import compiler, git_ops, registry, vendor
 from tinyleaf._vendor import synctex
+from tinyleaf._vendor.httpserver import FileResponse, Response, abort
 
 # Project config file name
 CONFIG_FILE = ".tinyleaf.json"
 SETTINGS_FILE = "settings.json"
 
 
-def handle_request(handler, action, **kwargs):
-    """Dispatch an API action to the appropriate handler function."""
-    dispatch = {
-        "get_mode": _get_mode,
-        "list_docker_images": _list_docker_images,
-        "docker_pull": _docker_pull,
-        "docker_rmi": _docker_rmi,
-        "cancel_docker_pull": _cancel_docker_pull,
-        "list_projects": _list_projects,
-        "create_project": _create_project,
-        "register_project": _register_project,
-        "delete_project": _delete_project,
-        "rename_project": _rename_project,
-        "browse_filesystem": _browse_filesystem,
-        "vendor_status": _vendor_status,
-        "update_vendor": _update_vendor,
-        "get_settings": _get_settings,
-        "put_settings": _put_settings,
-        "list_files": _list_files,
-        "read_file": _read_file,
-        "check_file": _check_file,
-        "write_file": _write_file,
-        "delete_file": _delete_file,
-        "mkdir": _mkdir,
-        "rename_path": _rename_path,
-        "upload": _upload,
-        "get_config": _get_config,
-        "put_config": _put_config,
-        "compile": _compile,
-        "cancel_compile": _cancel_compile,
-        "compile_stream": _compile_stream,
-        "get_output": _get_output,
-        "synctex_query": _synctex_query,
-        "synctex_forward": _synctex_forward,
-        "clean": _clean,
-        "search_files": _search_files,
-        "git_status": _git_status,
-        "git_diff": _git_diff,
-        "git_diff_file": _git_diff_file,
-        "git_commit": _git_commit,
-        "git_push": _git_push,
-        "git_pull": _git_pull,
-        "git_log": _git_log,
-        "word_count": _word_count,
-        "export_zip": _export_zip,
-        "project_symbols": _project_symbols,
-    }
-    fn = dispatch.get(action)
-    if fn:
-        fn(handler, **kwargs)
-    else:
-        handler.send_json({"error": f"Unknown action: {action}"}, status=400)
-
-
 # ── Helpers ──
 
 
-def _get_project_dir(handler, name):
-    """Resolve project name to directory path.
-
-    Returns:
-        Absolute path or None (sends error response).
-    """
-    config = handler.config
-
+def _get_project_dir(config, name):
+    """Resolve project name to directory path. Raises on failure."""
     if config["mode"] == "single":
         return config["project_path"]
 
-    # Multi-project mode: look up in registry
     project_dir = registry.get_project_path(config["config_dir"], name)
     if not project_dir:
-        handler.send_json({"error": f"Project not found: {name}"}, status=404)
-        return None
+        abort(404, f"Project not found: {name}")
     if not os.path.isdir(project_dir):
-        handler.send_json({"error": f"Project directory missing: {project_dir}"}, status=404)
-        return None
+        abort(404, f"Project directory missing: {project_dir}")
     return project_dir
 
 
@@ -133,27 +76,49 @@ def _detect_main_file(project_dir):
     return candidates[0] if candidates else "main.tex"
 
 
+def _read_settings(config_dir):
+    """Read global settings from config_dir/settings.json."""
+    path = os.path.join(config_dir, SETTINGS_FILE)
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _write_settings(config_dir, data):
+    """Write global settings to config_dir/settings.json."""
+    path = os.path.join(config_dir, SETTINGS_FILE)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
+def _ensure_within_project(project_dir, file_path):
+    """Validate that file_path resolves inside project_dir."""
+    full_path = os.path.join(project_dir, file_path)
+    if not os.path.abspath(full_path).startswith(os.path.abspath(project_dir)):
+        abort(403, "Access denied")
+    return full_path
+
+
 # ── Mode ──
 
 
-def _get_mode(handler):
+def handle_get_mode(config):
     from tinyleaf import __version__
 
-    config = handler.config
-    handler.send_json(
-        {
-            "mode": config["mode"],
-            "docker": config["use_docker"],
-            "image": config["docker_image"],
-            "version": __version__,
-        }
-    )
+    return {
+        "mode": config["mode"],
+        "docker": config["use_docker"],
+        "image": config["docker_image"],
+        "version": __version__,
+    }
 
 
-# Docker image name prefix for filtering
+# ── Docker ──
+
 _DOCKER_IMAGE_PREFIX = "oaklight/texlive"
 
-# Known tags (stable list — update manually when new tags are added)
 _KNOWN_TAGS = [
     "latest",
     "alpine-science",
@@ -175,8 +140,7 @@ _KNOWN_TAGS = [
 ]
 
 
-def _list_docker_images(handler):
-    """List known oaklight/texlive tags with local availability status."""
+def handle_list_docker_images():
     local_tags = set()
     try:
         result = subprocess.run(
@@ -197,102 +161,79 @@ def _list_docker_images(handler):
     for name in _KNOWN_TAGS:
         full = f"{_DOCKER_IMAGE_PREFIX}:{name}"
         all_tags.append({"tag": full, "name": name, "local": full in local_tags})
-    handler.send_json(all_tags)
+    return all_tags
 
 
-def _docker_pull(handler):
-    """Pull a Docker image, optionally via registry mirror."""
-    body = handler.read_json_body()
+def handle_docker_pull(body, config):
     image = body.get("image")
     if not image:
-        handler.send_json({"error": "Missing image"}, status=400)
-        return
+        abort(400, "Missing image")
 
-    config_dir = handler.config.get("config_dir")
+    config_dir = config.get("config_dir")
     registry_mirror = None
     if config_dir:
         settings = _read_settings(config_dir)
         registry_mirror = settings.get("registry_mirror") or None
 
     success, msg = compiler.docker_pull_image(image, registry_mirror=registry_mirror)
-    handler.send_json({"success": success, "message": msg})
+    return {"success": success, "message": msg}
 
 
-def _docker_rmi(handler):
-    """Remove a local Docker image."""
-    body = handler.read_json_body()
+def handle_docker_rmi(body):
     image = body.get("image")
     if not image:
-        handler.send_json({"error": "Missing image"}, status=400)
-        return
-
+        abort(400, "Missing image")
     success, msg = compiler.docker_remove_image(image)
-    handler.send_json({"success": success, "message": msg})
+    return {"success": success, "message": msg}
 
 
-def _cancel_docker_pull(handler):
-    """Cancel a running docker pull."""
-    body = handler.read_json_body()
+def handle_cancel_docker_pull(body):
     image = body.get("image")
     if not image:
-        handler.send_json({"error": "Missing image"}, status=400)
-        return
-
+        abort(400, "Missing image")
     cancelled = compiler.cancel_docker_pull(image)
-    handler.send_json({"cancelled": cancelled})
+    return {"cancelled": cancelled}
 
 
 # ── Projects ──
 
 
-def _list_projects(handler):
-    config = handler.config
+def handle_list_projects(config):
     if config["mode"] == "single":
-        name = os.path.basename(config["project_path"])
-        handler.send_json(
-            [
-                {
-                    "name": name,
-                    "path": config["project_path"],
-                    "exists": True,
-                    "git": git_ops.has_git(config["project_path"]),
-                }
-            ]
-        )
-        return
+        return [
+            {
+                "name": os.path.basename(config["project_path"]),
+                "path": config["project_path"],
+                "exists": True,
+                "git": git_ops.has_git(config["project_path"]),
+            }
+        ]
 
     projects = registry.list_projects(config["config_dir"])
     for p in projects:
         p["git"] = git_ops.has_git(p["path"]) if p["exists"] else False
-    handler.send_json(projects)
+    return projects
 
 
-def _create_project(handler):
-    config = handler.config
+def handle_create_project(body, config):
     if config["mode"] == "single":
-        handler.send_json({"error": "Cannot create projects in single mode"}, status=400)
-        return
+        abort(400, "Cannot create projects in single mode")
 
-    body = handler.read_json_body()
     name = body.get("name", "").strip()
     path = body.get("path", "").strip()
 
     if not name or "/" in name or name.startswith("."):
-        handler.send_json({"error": "Invalid project name"}, status=400)
-        return
+        abort(400, "Invalid project name")
     if not path:
-        handler.send_json({"error": "Project path required"}, status=400)
-        return
+        abort(400, "Project path required")
 
     path = os.path.abspath(path)
     full_dir = os.path.join(path, name)
 
     if os.path.exists(full_dir):
-        handler.send_json({"error": "Directory already exists"}, status=409)
-        return
+        abort(409, "Directory already exists")
 
     os.makedirs(full_dir)
-    # Create a default main.tex
     main_tex = os.path.join(full_dir, "main.tex")
     with open(main_tex, "w") as f:
         f.write(
@@ -302,24 +243,18 @@ def _create_project(handler):
     try:
         registry.register_project(config["config_dir"], name, full_dir)
     except ValueError as e:
-        handler.send_json({"error": str(e)}, status=400)
-        return
+        abort(400, str(e))
 
-    handler.send_json({"name": name, "path": full_dir}, status=201)
+    return {"name": name, "path": full_dir}, 201
 
 
-def _register_project(handler):
-    """Register an existing directory as a project."""
-    config = handler.config
+def handle_register_project(body, config):
     if config["mode"] == "single":
-        handler.send_json({"error": "Cannot register projects in single mode"}, status=400)
-        return
+        abort(400, "Cannot register projects in single mode")
 
-    body = handler.read_json_body()
     path = body.get("path", "").strip()
     if not path:
-        handler.send_json({"error": "Path required"}, status=400)
-        return
+        abort(400, "Path required")
 
     path = os.path.abspath(path)
     name = body.get("name", "").strip() or os.path.basename(path)
@@ -327,66 +262,49 @@ def _register_project(handler):
     try:
         entry = registry.register_project(config["config_dir"], name, path)
     except ValueError as e:
-        handler.send_json({"error": str(e)}, status=400)
-        return
+        abort(400, str(e))
 
-    handler.send_json({"name": name, "path": path, "added_at": entry["added_at"]}, status=201)
+    return {"name": name, "path": path, "added_at": entry["added_at"]}, 201
 
 
-def _delete_project(handler, name):
-    config = handler.config
+def handle_delete_project(body, config, name):
     if config["mode"] == "single":
-        handler.send_json({"error": "Cannot delete project in single mode"}, status=400)
-        return
+        abort(400, "Cannot delete project in single mode")
 
-    body = handler.read_json_body()
     delete_files = body.get("delete_files", False)
 
     try:
         registry.unregister_project(config["config_dir"], name, delete_files=delete_files)
     except KeyError:
-        handler.send_json({"error": f"Project not found: {name}"}, status=404)
-        return
+        abort(404, f"Project not found: {name}")
 
-    handler.send_json({"deleted": name, "files_deleted": delete_files})
+    return {"deleted": name, "files_deleted": delete_files}
 
 
-def _rename_project(handler, name):
-    config = handler.config
+def handle_rename_project(body, config, name):
     if config["mode"] == "single":
-        handler.send_json({"error": "Cannot rename project in single mode"}, status=400)
-        return
+        abort(400, "Cannot rename project in single mode")
 
-    body = handler.read_json_body()
     new_name = body.get("new_name", "").strip()
     if not new_name:
-        handler.send_json({"error": "new_name is required"}, status=400)
-        return
+        abort(400, "new_name is required")
 
     try:
         registry.rename_project(config["config_dir"], name, new_name)
     except KeyError:
-        handler.send_json({"error": f"Project not found: {name}"}, status=404)
-        return
+        abort(404, f"Project not found: {name}")
     except ValueError as e:
-        handler.send_json({"error": str(e)}, status=400)
-        return
+        abort(400, str(e))
 
-    handler.send_json({"old_name": name, "new_name": new_name})
+    return {"old_name": name, "new_name": new_name}
 
 
-def _browse_filesystem(handler):
-    """List subdirectories of a given path for the folder picker."""
-    import urllib.parse
-
-    parsed = urllib.parse.urlparse(handler.path)
-    params = urllib.parse.parse_qs(parsed.query)
-    path = params.get("path", [os.path.expanduser("~")])[0]
+def handle_browse_filesystem(query_params):
+    path = query_params.get("path", [os.path.expanduser("~")])[0]
     path = os.path.expanduser(path)
 
     if not os.path.isdir(path):
-        handler.send_json({"error": f"Not a directory: {path}"}, status=400)
-        return
+        abort(400, f"Not a directory: {path}")
 
     entries = []
     try:
@@ -397,105 +315,69 @@ def _browse_filesystem(handler):
             if os.path.isdir(full):
                 entries.append(item)
     except PermissionError:
-        handler.send_json({"error": "Permission denied"}, status=403)
-        return
+        abort(403, "Permission denied")
 
-    handler.send_json({"path": path, "dirs": entries})
+    return {"path": path, "dirs": entries}
 
 
 # ── Vendor ──
 
 
-def _vendor_status(handler):
-    config_dir = handler.config.get("config_dir")
+def handle_vendor_status(config):
+    config_dir = config.get("config_dir")
     if not config_dir:
-        handler.send_json({"ready": False, "reason": "single mode"})
-        return
+        return {"ready": False, "reason": "single mode"}
     vendor_dir = os.path.join(config_dir, "vendor")
     manifest = vendor.get_manifest(vendor_dir)
     proxy = vendor.load_proxy(config_dir) or ""
     if manifest:
-        handler.send_json({"ready": True, "manifest": manifest, "proxy": proxy})
-    else:
-        handler.send_json({"ready": False, "proxy": proxy})
+        return {"ready": True, "manifest": manifest, "proxy": proxy}
+    return {"ready": False, "proxy": proxy}
 
 
-def _update_vendor(handler):
-    config_dir = handler.config.get("config_dir")
+def handle_update_vendor(body, config):
+    config_dir = config.get("config_dir")
     if not config_dir:
-        handler.send_json({"error": "Not available in single mode"}, status=400)
-        return
-    body = handler.read_json_body()
+        abort(400, "Not available in single mode")
     proxy = body.get("proxy", "").strip() if body else ""
-    # Persist proxy setting
     vendor.save_proxy(config_dir, proxy)
     vendor_dir = os.path.join(config_dir, "vendor")
     try:
         manifest = vendor.download_vendor(vendor_dir, proxy=proxy or None)
-        handler.send_json({"ok": True, "manifest": manifest})
+        return {"ok": True, "manifest": manifest}
     except Exception as e:
-        handler.send_json({"error": str(e)}, status=500)
+        abort(500, str(e))
 
 
 # ── Global Settings ──
 
 
-def _read_settings(config_dir):
-    """Read global settings from config_dir/settings.json."""
-    path = os.path.join(config_dir, SETTINGS_FILE)
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+def handle_get_settings(config):
+    config_dir = config.get("config_dir")
+    if not config_dir:
         return {}
+    return _read_settings(config_dir)
 
 
-def _write_settings(config_dir, data):
-    """Write global settings to config_dir/settings.json."""
-    path = os.path.join(config_dir, SETTINGS_FILE)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
-
-def _get_settings(handler):
-    config_dir = handler.config.get("config_dir")
+def handle_put_settings(body, config):
+    config_dir = config.get("config_dir")
     if not config_dir:
-        handler.send_json({})
-        return
-    handler.send_json(_read_settings(config_dir))
-
-
-def _put_settings(handler):
-    config_dir = handler.config.get("config_dir")
-    if not config_dir:
-        handler.send_json({"error": "Not available in single mode"}, status=400)
-        return
-    body = handler.read_json_body()
+        abort(400, "Not available in single mode")
     existing = _read_settings(config_dir)
     existing.update(body)
     _write_settings(config_dir, existing)
-    handler.send_json(existing)
+    return existing
 
 
 # ── Files ──
 
 
-def _list_files(handler, name):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
-
-    tree = _build_file_tree(project_dir, project_dir)
-    handler.send_json(tree)
+def handle_list_files(config, name):
+    project_dir = _get_project_dir(config, name)
+    return _build_file_tree(project_dir, project_dir)
 
 
 def _build_file_tree(base_dir, current_dir):
-    """Build a nested file tree structure.
-
-    Returns:
-        List of {name, path, type} where type is "file" or "dir".
-        Dirs have a "children" key.
-    """
     entries = []
     try:
         items = sorted(os.listdir(current_dir))
@@ -523,82 +405,49 @@ def _build_file_tree(base_dir, current_dir):
     return dirs_list + files_list
 
 
-def _read_file(handler, name, file_path):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
-
-    full_path = os.path.join(project_dir, file_path)
-    # Security: ensure file is within project
-    if not os.path.abspath(full_path).startswith(os.path.abspath(project_dir)):
-        handler.send_json({"error": "Access denied"}, status=403)
-        return
+def handle_read_file(config, name, file_path):
+    project_dir = _get_project_dir(config, name)
+    full_path = _ensure_within_project(project_dir, file_path)
 
     if not os.path.exists(full_path):
-        handler.send_json({"error": "File not found"}, status=404)
-        return
+        abort(404, "File not found")
 
     try:
         with open(full_path, encoding="utf-8") as f:
             content = f.read()
-        handler.send_json(
-            {"path": file_path, "content": content, "mtime": os.path.getmtime(full_path)}
-        )
+        return {"path": file_path, "content": content, "mtime": os.path.getmtime(full_path)}
     except UnicodeDecodeError:
-        handler.send_json({"error": "Binary file, cannot read as text"}, status=400)
+        abort(400, "Binary file, cannot read as text")
 
 
-def _check_file(handler, name, file_path):
-    """Return mtime of a file without reading its content."""
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
-
-    full_path = os.path.join(project_dir, file_path)
-    if not os.path.abspath(full_path).startswith(os.path.abspath(project_dir)):
-        handler.send_json({"error": "Access denied"}, status=403)
-        return
+def handle_check_file(config, name, file_path):
+    project_dir = _get_project_dir(config, name)
+    full_path = _ensure_within_project(project_dir, file_path)
 
     if not os.path.exists(full_path):
-        handler.send_json({"exists": False})
-        return
+        return {"exists": False}
 
-    handler.send_json({"path": file_path, "mtime": os.path.getmtime(full_path)})
+    return {"path": file_path, "mtime": os.path.getmtime(full_path)}
 
 
-def _write_file(handler, name, file_path):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_write_file(body, config, name, file_path):
+    project_dir = _get_project_dir(config, name)
+    full_path = _ensure_within_project(project_dir, file_path)
 
-    full_path = os.path.join(project_dir, file_path)
-    if not os.path.abspath(full_path).startswith(os.path.abspath(project_dir)):
-        handler.send_json({"error": "Access denied"}, status=403)
-        return
-
-    body = handler.read_json_body()
     content = body.get("content", "")
-
     os.makedirs(os.path.dirname(full_path), exist_ok=True)
     with open(full_path, "w", encoding="utf-8") as f:
         f.write(content)
 
-    handler.send_json({"path": file_path, "saved": True})
+    return {"path": file_path, "saved": True}
 
 
-def _delete_file(handler, name, file_path):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
-
-    full_path = os.path.join(project_dir, file_path)
-    if not os.path.abspath(full_path).startswith(os.path.abspath(project_dir)):
-        handler.send_json({"error": "Access denied"}, status=403)
-        return
+def handle_delete_file(config, name, file_path):
+    project_dir = _get_project_dir(config, name)
+    full_path = _ensure_within_project(project_dir, file_path)
 
     if not os.path.exists(full_path):
-        handler.send_json({"error": "File not found"}, status=404)
-        return
+        abort(404, "File not found")
 
     import shutil
 
@@ -606,81 +455,59 @@ def _delete_file(handler, name, file_path):
         shutil.rmtree(full_path)
     else:
         os.remove(full_path)
-    handler.send_json({"path": file_path, "deleted": True})
+    return {"path": file_path, "deleted": True}
 
 
-def _mkdir(handler, name):
-    """Create a directory inside a project."""
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_mkdir(body, config, name):
+    project_dir = _get_project_dir(config, name)
 
-    body = handler.read_json_body()
     dir_path = body.get("path", "").strip()
     if not dir_path:
-        handler.send_json({"error": "Directory path required"}, status=400)
-        return
+        abort(400, "Directory path required")
 
-    full_path = os.path.join(project_dir, dir_path)
-    if not os.path.abspath(full_path).startswith(os.path.abspath(project_dir)):
-        handler.send_json({"error": "Access denied"}, status=403)
-        return
+    full_path = _ensure_within_project(project_dir, dir_path)
 
     if os.path.exists(full_path):
-        handler.send_json({"error": "Path already exists"}, status=409)
-        return
+        abort(409, "Path already exists")
 
     os.makedirs(full_path, exist_ok=True)
-    handler.send_json({"path": dir_path, "created": True})
+    return {"path": dir_path, "created": True}
 
 
-def _rename_path(handler, name):
-    """Rename a file or directory inside a project."""
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_rename_path(body, config, name):
+    project_dir = _get_project_dir(config, name)
 
-    body = handler.read_json_body()
     old_path = body.get("old_path", "").strip()
     new_path = body.get("new_path", "").strip()
     if not old_path or not new_path:
-        handler.send_json({"error": "old_path and new_path required"}, status=400)
-        return
+        abort(400, "old_path and new_path required")
 
-    old_full = os.path.join(project_dir, old_path)
-    new_full = os.path.join(project_dir, new_path)
-    abs_project = os.path.abspath(project_dir)
-    if not os.path.abspath(old_full).startswith(abs_project) or not os.path.abspath(
-        new_full
-    ).startswith(abs_project):
-        handler.send_json({"error": "Access denied"}, status=403)
-        return
+    old_full = _ensure_within_project(project_dir, old_path)
+    new_full = _ensure_within_project(project_dir, new_path)
 
     if not os.path.exists(old_full):
-        handler.send_json({"error": "Source not found"}, status=404)
-        return
+        abort(404, "Source not found")
 
     if os.path.exists(new_full):
-        handler.send_json({"error": "Destination already exists"}, status=409)
-        return
+        abort(409, "Destination already exists")
 
     os.makedirs(os.path.dirname(new_full), exist_ok=True)
     os.rename(old_full, new_full)
-    handler.send_json({"old_path": old_path, "new_path": new_path, "renamed": True})
+    return {"old_path": old_path, "new_path": new_path, "renamed": True}
 
 
-def _upload(handler, name):
-    """Handle multipart file upload."""
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_upload(request, config, name):
+    """Handle multipart file upload.
 
-    content_type = handler.headers.get("Content-Type", "")
+    This handler receives the raw Request object because it needs
+    direct access to the request body and headers for multipart parsing.
+    """
+    project_dir = _get_project_dir(config, name)
+
+    content_type = request.headers.get("content-type", "")
     if "multipart/form-data" not in content_type:
-        handler.send_json({"error": "Expected multipart/form-data"}, status=400)
-        return
+        abort(400, "Expected multipart/form-data")
 
-    # Parse boundary from content-type
     boundary = None
     for part in content_type.split(";"):
         part = part.strip()
@@ -689,17 +516,15 @@ def _upload(handler, name):
             break
 
     if not boundary:
-        handler.send_json({"error": "Missing boundary"}, status=400)
-        return
+        abort(400, "Missing boundary")
+    assert boundary is not None
 
-    content_length = int(handler.headers.get("Content-Length", 0))
-    body = handler.rfile.read(content_length)
+    body = request.body
 
     boundary_bytes = ("--" + boundary).encode()
     parts = body.split(boundary_bytes)
 
     uploaded = []
-    # Get target directory from query or default to root
     target_dir = ""
 
     for part in parts:
@@ -708,22 +533,18 @@ def _upload(handler, name):
         if b"Content-Disposition:" not in part:
             continue
 
-        # Parse headers and content
         header_end = part.find(b"\r\n\r\n")
         if header_end < 0:
             continue
         headers_raw = part[:header_end].decode("utf-8", errors="replace")
         file_data = part[header_end + 4 :]
-        # Strip trailing \r\n
         if file_data.endswith(b"\r\n"):
             file_data = file_data[:-2]
 
-        # Check for target_dir field
         if 'name="target_dir"' in headers_raw:
             target_dir = file_data.decode("utf-8", errors="replace").strip()
             continue
 
-        # Extract filename
         filename = None
         for line in headers_raw.split("\r\n"):
             if "filename=" in line:
@@ -746,48 +567,39 @@ def _upload(handler, name):
             f.write(file_data)
         uploaded.append(rel_path)
 
-    handler.send_json({"uploaded": uploaded, "count": len(uploaded)})
+    return {"uploaded": uploaded, "count": len(uploaded)}
 
 
 # ── Config ──
 
 
-def _get_config(handler, name):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_get_config(config, name):
+    project_dir = _get_project_dir(config, name)
 
     config_data = _read_project_config(project_dir)
-    # Auto-detect main file if not configured
     if "main_file" not in config_data:
         config_data["main_file"] = _detect_main_file(project_dir)
     if "engine" not in config_data:
         config_data["engine"] = "pdflatex"
 
-    handler.send_json(config_data)
+    return config_data
 
 
-def _put_config(handler, name):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_put_config(body, config, name):
+    project_dir = _get_project_dir(config, name)
 
-    body = handler.read_json_body()
     existing = _read_project_config(project_dir)
     existing.update(body)
     _write_project_config(project_dir, existing)
-    handler.send_json(existing)
+    return existing
 
 
 # ── Compile ──
 
 
-def _compile(handler, name):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_compile(body, config, name):
+    project_dir = _get_project_dir(config, name)
 
-    body = handler.read_json_body()
     config_data = _read_project_config(project_dir)
 
     main_file = (
@@ -795,14 +607,11 @@ def _compile(handler, name):
     )
     engine = body.get("engine") or config_data.get("engine", "pdflatex")
 
-    server_config = handler.config
-    # Allow overriding docker settings from request or project config
-    use_docker = body.get("use_docker", config_data.get("use_docker", server_config["use_docker"]))
+    use_docker = body.get("use_docker", config_data.get("use_docker", config["use_docker"]))
     docker_image = (
-        body.get("docker_image") or config_data.get("docker_image") or server_config["docker_image"]
+        body.get("docker_image") or config_data.get("docker_image") or config["docker_image"]
     )
-    # Read registry mirror from global settings
-    config_dir = handler.config.get("config_dir")
+    config_dir = config.get("config_dir")
     registry_mirror = None
     if config_dir:
         settings = _read_settings(config_dir)
@@ -817,82 +626,92 @@ def _compile(handler, name):
         registry_mirror=registry_mirror,
     )
 
-    handler.send_json({"compile_id": compile_id, "main_file": main_file, "engine": engine})
+    return {"compile_id": compile_id, "main_file": main_file, "engine": engine}
 
 
-def _cancel_compile(handler, name, compile_id):
-    """Cancel a running compilation."""
+def handle_cancel_compile(compile_id):
     cancelled = compiler.cancel_compile(compile_id)
-    handler.send_json({"cancelled": cancelled})
+    return {"cancelled": cancelled}
 
 
-def _compile_stream(handler, name, compile_id):
+async def sse_compile_stream(compile_id, name):
+    """Async generator that yields SSE events for a compile job."""
     job = compiler.get_job(compile_id)
     if not job:
-        handler.send_json({"error": "Compile job not found"}, status=404)
+        yield _sse_frame({"error": "Compile job not found"}, event="error")
         return
-
-    handler.start_sse()
 
     sent_index = 0
     while True:
         new_logs = job.get_logs_from(sent_index)
         for entry in new_logs:
-            handler.send_sse_event(entry, event="log")
+            yield _sse_frame(entry, event="log")
             sent_index += 1
 
         if job.is_done:
-            # Send any remaining logs
             remaining = job.get_logs_from(sent_index)
             for entry in remaining:
-                handler.send_sse_event(entry, event="log")
+                yield _sse_frame(entry, event="log")
 
             done_data = {"status": job.status}
             if job.pdf_path:
-                project_name = name
-                done_data["pdf_url"] = f"/api/projects/{project_name}/output/{job.pdf_path}"
-            handler.send_sse_event(done_data, event="done")
-            break
+                done_data["pdf_url"] = f"/api/projects/{name}/output/{job.pdf_path}"
+            yield _sse_frame(done_data, event="done")
+            return
 
-        time.sleep(0.1)
+        await asyncio.sleep(0.1)
 
 
-def _get_output(handler, name, file_path):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def _sse_frame(data, event=None):
+    """Format a single SSE frame as bytes."""
+    lines = []
+    if event:
+        lines.append(f"event: {event}")
+    if isinstance(data, dict):
+        lines.append(f"data: {json.dumps(data, ensure_ascii=False)}")
+    else:
+        lines.append(f"data: {data}")
+    lines.append("")
+    lines.append("")
+    return "\n".join(lines)
 
-    full_path = os.path.join(project_dir, file_path)
-    if not os.path.abspath(full_path).startswith(os.path.abspath(project_dir)):
-        handler.send_json({"error": "Access denied"}, status=403)
-        return
 
-    _MIME_MAP = {
-        ".pdf": "application/pdf",
-        ".png": "image/png",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".gif": "image/gif",
-        ".svg": "image/svg+xml",
-        ".webp": "image/webp",
-        ".bmp": "image/bmp",
-        ".ico": "image/x-icon",
-    }
+# ── Output ──
+
+_OUTPUT_MIME_MAP = {
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+    ".ico": "image/x-icon",
+}
+
+
+def handle_get_output(config, name, file_path):
+    project_dir = _get_project_dir(config, name)
+    full_path = _ensure_within_project(project_dir, file_path)
+
     ext = os.path.splitext(file_path)[1].lower()
-    content_type = _MIME_MAP.get(ext, "application/octet-stream")
-    handler.send_file(full_path, content_type=content_type)
+    content_type = _OUTPUT_MIME_MAP.get(ext, "application/octet-stream")
+
+    from pathlib import Path
+
+    return FileResponse(Path(full_path), content_type=content_type)
 
 
-def _find_synctex_file(handler, project_dir):
-    """Find the .synctex.gz or .synctex file for a project.
+# ── SyncTeX ──
 
-    Returns the path on success, or None after sending an error response.
-    """
+
+def _find_synctex_file(project_dir):
+    """Find the .synctex.gz or .synctex file for a project."""
     config_data = _read_project_config(project_dir)
     main_file = config_data.get("main_file") or _detect_main_file(project_dir)
     if not main_file:
-        handler.send_json({"error": "No main file found"}, status=404)
-        return None
+        abort(404, "No main file found")
 
     base = os.path.splitext(main_file)[0]
     synctex_gz = os.path.join(project_dir, base + ".synctex.gz")
@@ -903,83 +722,62 @@ def _find_synctex_file(handler, project_dir):
     if os.path.exists(synctex_plain):
         return synctex_plain
 
-    handler.send_json(
-        {"error": "SyncTeX file not found. Compile with -synctex=1"},
-        status=404,
-    )
-    return None
+    abort(404, "SyncTeX file not found. Compile with -synctex=1")
 
 
-def _synctex_query(handler, name, qs=None):
-    """Handle SyncTeX inverse search: PDF click → source location."""
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_synctex_query(query_params, config, name):
+    project_dir = _get_project_dir(config, name)
 
-    qs = qs or {}
     try:
-        page = int(qs.get("page", [None])[0])
-        x = float(qs.get("x", [None])[0])
-        y = float(qs.get("y", [None])[0])
+        page = int(query_params.get("page", [None])[0])
+        x = float(query_params.get("x", [None])[0])
+        y = float(query_params.get("y", [None])[0])
     except (TypeError, ValueError, IndexError):
-        handler.send_json({"error": "Missing or invalid page/x/y parameters"}, status=400)
-        return
+        abort(400, "Missing or invalid page/x/y parameters")
 
-    synctex_path = _find_synctex_file(handler, project_dir)
-    if not synctex_path:
-        return
+    synctex_path = _find_synctex_file(project_dir)
 
     try:
         data = synctex.parse_synctex(synctex_path, strip_prefix="/workspace/")
         result = synctex.inverse_search(data, page, x, y)
     except Exception as exc:
-        handler.send_json({"error": f"SyncTeX parse error: {exc}"}, status=500)
-        return
+        abort(500, f"SyncTeX parse error: {exc}")
 
     if result is None:
-        handler.send_json({"error": "No match found"}, status=404)
-        return
+        abort(404, "No match found")
 
-    handler.send_json(result)
+    return result
 
 
-def _synctex_forward(handler, name, qs=None):
-    """Handle SyncTeX forward search: source location → PDF position."""
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_synctex_forward(query_params, config, name):
+    project_dir = _get_project_dir(config, name)
 
-    qs = qs or {}
-    file_param = qs.get("file", [None])[0]
-    line_param = qs.get("line", [None])[0]
+    file_param = query_params.get("file", [None])[0]
+    line_param = query_params.get("line", [None])[0]
 
     if not file_param or not line_param:
-        handler.send_json({"error": "Missing file or line parameter"}, status=400)
-        return
+        abort(400, "Missing file or line parameter")
 
     try:
         line_num = int(line_param)
     except ValueError:
-        handler.send_json({"error": "Invalid line parameter"}, status=400)
-        return
+        abort(400, "Invalid line parameter")
 
-    synctex_path = _find_synctex_file(handler, project_dir)
-    if not synctex_path:
-        return
+    synctex_path = _find_synctex_file(project_dir)
 
     try:
         data = synctex.parse_synctex(synctex_path, strip_prefix="/workspace/")
         result = synctex.forward_search(data, file_param, line_num)
     except Exception as exc:
-        handler.send_json({"error": f"SyncTeX parse error: {exc}"}, status=500)
-        return
+        abort(500, f"SyncTeX parse error: {exc}")
 
     if result is None:
-        handler.send_json({"error": "No match found"}, status=404)
-        return
+        abort(404, "No match found")
 
-    handler.send_json(result)
+    return result
 
+
+# ── Clean ──
 
 _CLEAN_EXTENSIONS = {
     ".aux",
@@ -1002,18 +800,14 @@ _CLEAN_EXTENSIONS = {
 }
 
 
-def _clean(handler, name):
-    """Remove LaTeX compilation artifacts from the project directory."""
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_clean(config, name):
+    project_dir = _get_project_dir(config, name)
 
     removed = []
     for root, dirs, filenames in os.walk(project_dir):
         dirs[:] = [d for d in dirs if not d.startswith(".")]
         for fname in filenames:
             _, ext = os.path.splitext(fname)
-            # Handle .synctex.gz (compound extension)
             if fname.endswith(".synctex.gz"):
                 ext = ".synctex.gz"
             if ext in _CLEAN_EXTENSIONS:
@@ -1025,28 +819,20 @@ def _clean(handler, name):
                 except OSError:
                     pass
 
-    handler.send_json({"removed": removed, "count": len(removed)})
+    return {"removed": removed, "count": len(removed)}
 
 
 # ── Word Count ──
 
 
-def _word_count(handler, name=""):
-    """Run texcount on the project's main file and return word statistics.
-
-    Tries to run texcount via Docker (same pattern as compilation) if Docker
-    is enabled, otherwise falls back to a local texcount binary.
-    """
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_word_count(config, name):
+    project_dir = _get_project_dir(config, name)
 
     config_data = _read_project_config(project_dir)
     main_file = config_data.get("main_file") or _detect_main_file(project_dir)
 
-    server_config = handler.config
-    use_docker = config_data.get("use_docker", server_config["use_docker"])
-    docker_image = config_data.get("docker_image") or server_config["docker_image"]
+    use_docker = config_data.get("use_docker", config["use_docker"])
+    docker_image = config_data.get("docker_image") or config["docker_image"]
 
     texcount_cmd = ["texcount", "-inc", "-sum", "-merge", main_file]
 
@@ -1075,33 +861,18 @@ def _word_count(handler, name=""):
             timeout=30,
         )
     except FileNotFoundError:
-        handler.send_json(
-            {"error": "texcount not found. Enable Docker or install texcount locally."},
-            status=500,
-        )
-        return
+        abort(500, "texcount not found. Enable Docker or install texcount locally.")
     except subprocess.TimeoutExpired:
-        handler.send_json({"error": "texcount timed out"}, status=500)
-        return
+        abort(500, "texcount timed out")
 
     if result.returncode != 0:
         stderr = result.stderr.strip() or result.stdout.strip()
-        handler.send_json({"error": f"texcount failed: {stderr}"}, status=500)
-        return
+        abort(500, f"texcount failed: {stderr}")
 
-    stats = _parse_texcount_output(result.stdout)
-    handler.send_json(stats)
+    return _parse_texcount_output(result.stdout)
 
 
 def _parse_texcount_output(output):
-    """Parse texcount output into a structured dict.
-
-    Args:
-        output: Raw stdout from texcount with -sum -merge flags.
-
-    Returns:
-        Dict with word/count statistics.
-    """
     stats = {
         "words_in_text": 0,
         "words_in_headers": 0,
@@ -1111,14 +882,6 @@ def _parse_texcount_output(output):
         "math_display": 0,
     }
 
-    # texcount -sum -merge output lines look like:
-    #   Words in text: 1234
-    #   Words in headers: 56
-    #   Words outside text (captions, etc.): 78
-    #   Number of headers: 12
-    #   Number of floats/tables/figures: 3
-    #   Number of math inlines: 45
-    #   Number of math displayed: 6
     patterns = {
         "words_in_text": r"Words in text:\s*(\d+)",
         "words_in_headers": r"Words in headers:\s*(\d+)",
@@ -1133,7 +896,6 @@ def _parse_texcount_output(output):
         if match:
             stats[key] = int(match.group(1))
 
-    # Total = text + headers + captions (outside text)
     stats["total"] = (
         stats["words_in_text"] + stats["words_in_headers"] + stats["words_outside_text"]
     )
@@ -1143,10 +905,8 @@ def _parse_texcount_output(output):
 
 # ── Export ──
 
-# Directories to skip when building the export zip
 _EXPORT_SKIP_DIRS = {".git", "__pycache__", ".tinyleaf"}
 
-# File extensions for LaTeX build artifacts to exclude from export
 _EXPORT_SKIP_EXTS = {
     ".aux",
     ".log",
@@ -1162,31 +922,16 @@ _EXPORT_SKIP_EXTS = {
 }
 
 
-def _export_zip(handler, name=""):
-    """Export a project directory as a downloadable zip file.
-
-    Creates an in-memory zip archive of the project, excluding version control
-    directories, build artifacts, and the internal config file. The compiled
-    PDF is included if present.
-
-    Args:
-        handler: The HTTP request handler.
-        name: Project name.
-    """
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_export_zip(config, name):
+    project_dir = _get_project_dir(config, name)
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for root, dirs, files in os.walk(project_dir):
-            # Skip excluded directories in-place
             dirs[:] = [d for d in dirs if d not in _EXPORT_SKIP_DIRS]
             for fname in files:
-                # Skip internal config
                 if fname == CONFIG_FILE:
                     continue
-                # Skip build artifacts (handle compound .synctex.gz extension)
                 if fname.endswith(".synctex.gz"):
                     continue
                 ext = os.path.splitext(fname)[1].lower()
@@ -1198,13 +943,14 @@ def _export_zip(handler, name=""):
 
     data = buf.getvalue()
     safe_name = name.replace(" ", "_") if name else "project"
-    handler.send_response(200)
-    handler.send_header("Content-Type", "application/zip")
-    handler.send_header("Content-Disposition", f'attachment; filename="{safe_name}.zip"')
-    handler.send_header("Content-Length", str(len(data)))
-    handler._send_cors_headers()
-    handler.end_headers()
-    handler.wfile.write(data)
+    return Response(
+        body=data,
+        status_code=200,
+        content_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_name}.zip"',
+        },
+    )
 
 
 # ── Search ──
@@ -1253,27 +999,21 @@ _SEARCH_BINARY_EXTS = {
 }
 
 
-def _search_files(handler, name, qs=None):
-    """Search for text across all project files (grep-style)."""
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_search_files(query_params, config, name):
+    project_dir = _get_project_dir(config, name)
 
-    qs = qs or {}
-    query = qs.get("q", [None])[0]
+    query = query_params.get("q", [None])[0]
     if not query:
-        handler.send_json({"error": "Missing search query"}, status=400)
-        return
+        abort(400, "Missing search query")
 
-    case_sensitive = qs.get("case", ["0"])[0] == "1"
+    case_sensitive = query_params.get("case", ["0"])[0] == "1"
     max_results = 500
 
     flags = 0 if case_sensitive else re.IGNORECASE
     try:
         pattern = re.compile(re.escape(query), flags)
     except re.error:
-        handler.send_json({"error": "Invalid search pattern"}, status=400)
-        return
+        abort(400, "Invalid search pattern")
 
     results = {}
     total = 0
@@ -1313,36 +1053,22 @@ def _search_files(handler, name, qs=None):
         if total >= max_results:
             break
 
-    handler.send_json(
-        {
-            "query": query,
-            "case_sensitive": case_sensitive,
-            "results": results,
-            "total": total,
-            "truncated": total >= max_results,
-        }
-    )
+    return {
+        "query": query,
+        "case_sensitive": case_sensitive,
+        "results": results,
+        "total": total,
+        "truncated": total >= max_results,
+    }
 
 
 # ── Symbols (labels & citations) ──
 
-# Directories to skip when scanning for symbols
 _SYMBOLS_SKIP_DIRS = {".git", "__pycache__", ".ruff_cache", "node_modules"}
 
 
-def _project_symbols(handler, name=""):
-    """Scan project .tex and .bib files for labels and citation keys.
-
-    Walks all .tex files to extract ``\\label{...}`` definitions and all .bib
-    files to extract BibTeX entry keys with optional title/author/year metadata.
-
-    Args:
-        handler: The HTTP request handler.
-        name: Project name.
-    """
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_project_symbols(config, name):
+    project_dir = _get_project_dir(config, name)
 
     labels = []
     citations = []
@@ -1378,7 +1104,6 @@ def _project_symbols(handler, name=""):
 
                 for m in re.finditer(r"@\w+\{([^,\s]+),", content):
                     key = m.group(1)
-                    # Search a window after the entry key for metadata fields
                     pos = m.end()
                     window = content[pos : pos + 500]
                     title_m = re.search(r"title\s*=\s*[{\"]([^}\"]+)", window)
@@ -1394,92 +1119,70 @@ def _project_symbols(handler, name=""):
                         }
                     )
 
-    handler.send_json({"labels": labels, "citations": citations})
+    return {"labels": labels, "citations": citations}
 
 
 # ── Git ──
 
 
-def _git_status(handler, name):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
-    handler.send_json(git_ops.status(project_dir))
+def handle_git_status(config, name):
+    project_dir = _get_project_dir(config, name)
+    return git_ops.status(project_dir)
 
 
-def _parse_diff_qs(qs):
-    """Extract diff query-string parameters.
-
-    Args:
-        qs: Parsed query string dict (values are lists).
-
-    Returns:
-        Tuple of (staged, fmt) where staged is one of ``"both"``,
-        ``"staged"``, ``"unstaged"`` and fmt is ``"text"`` or ``"json"``.
-    """
-    staged_raw = (qs or {}).get("staged", ["both"])[0]
+def _parse_diff_qs(query_params):
+    staged_raw = query_params.get("staged", ["both"])[0]
     staged = staged_raw if staged_raw in ("both", "staged", "unstaged") else "both"
-    fmt_raw = (qs or {}).get("format", ["text"])[0]
+    fmt_raw = query_params.get("format", ["text"])[0]
     fmt = "json" if fmt_raw == "json" else "text"
     return staged, fmt
 
 
-def _git_diff(handler, name, qs=None):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
-    staged, fmt = _parse_diff_qs(qs)
+def handle_git_diff(query_params, config, name):
+    project_dir = _get_project_dir(config, name)
+    staged, fmt = _parse_diff_qs(query_params)
     result = git_ops.diff(project_dir, staged=staged, fmt=fmt)
     if fmt == "json":
-        handler.send_json(result)
-    else:
-        handler.send_text(result)
+        return result
+    return Response(
+        body=result.encode("utf-8"),
+        content_type="text/plain; charset=utf-8",
+    )
 
 
-def _git_diff_file(handler, name, file_path, qs=None):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
-    staged, fmt = _parse_diff_qs(qs)
+def handle_git_diff_file(query_params, config, name, file_path):
+    project_dir = _get_project_dir(config, name)
+    staged, fmt = _parse_diff_qs(query_params)
     result = git_ops.diff(project_dir, file_path=file_path, staged=staged, fmt=fmt)
     if fmt == "json":
-        handler.send_json(result)
-    else:
-        handler.send_text(result)
+        return result
+    return Response(
+        body=result.encode("utf-8"),
+        content_type="text/plain; charset=utf-8",
+    )
 
 
-def _git_commit(handler, name):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
+def handle_git_commit(body, config, name):
+    project_dir = _get_project_dir(config, name)
 
-    body = handler.read_json_body()
     message = body.get("message", "").strip()
     if not message:
-        handler.send_json({"error": "Commit message required"}, status=400)
-        return
+        abort(400, "Commit message required")
 
     files = body.get("files")
-    result = git_ops.commit(project_dir, message, files=files)
-    handler.send_json(result)
+    return git_ops.commit(project_dir, message, files=files)
 
 
-def _git_push(handler, name):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
-    handler.send_json(git_ops.push(project_dir))
+def handle_git_push(config, name):
+    project_dir = _get_project_dir(config, name)
+    return git_ops.push(project_dir)
 
 
-def _git_pull(handler, name):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
-    handler.send_json(git_ops.pull(project_dir))
+def handle_git_pull(config, name):
+    project_dir = _get_project_dir(config, name)
+    return git_ops.pull(project_dir)
 
 
-def _git_log(handler, name):
-    project_dir = _get_project_dir(handler, name)
-    if not project_dir:
-        return
-    handler.send_json(git_ops.log(project_dir))
+def handle_git_log(config, name):
+    project_dir = _get_project_dir(config, name)
+    return git_ops.log(project_dir)
