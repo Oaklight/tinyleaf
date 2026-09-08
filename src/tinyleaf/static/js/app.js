@@ -41,6 +41,7 @@ const I18N = {
     no_pdf: "No PDF",
     refresh: "Refresh",
     fit: "Fit",
+    comfort: "Comfort",
     compile_to_preview: "Compile to see PDF preview",
     compile_log: "Compile Log",
     copy_log: "Copy log",
@@ -127,6 +128,7 @@ const I18N = {
     zoom_in: "Zoom in",
     zoom_out: "Zoom out",
     fit_width: "Fit width",
+    comfort_width: "Comfortable width",
     toggle_hd: "Toggle HD/Fast",
     git_repo: "Git repository",
     keyboard_shortcuts: "Keyboard Shortcuts",
@@ -262,6 +264,7 @@ const I18N = {
     no_pdf: "无 PDF",
     refresh: "刷新",
     fit: "适宽",
+    comfort: "舒适",
     compile_to_preview: "编译后预览 PDF",
     compile_log: "编译日志",
     copy_log: "复制日志",
@@ -348,6 +351,7 @@ const I18N = {
     zoom_in: "放大",
     zoom_out: "缩小",
     fit_width: "适应宽度",
+    comfort_width: "舒适宽度",
     toggle_hd: "高清/快速切换",
     git_repo: "Git 仓库",
     keyboard_shortcuts: "键盘快捷键",
@@ -2887,6 +2891,7 @@ function setLayout(mode) {
 
   localStorage.setItem("tinyleaf-layout", mode);
   S.layoutMode = mode;
+  if (S.pdfDoc) setTimeout(() => renderPDF(), 50);
 }
 
 function toggleSidebar() {
@@ -4045,6 +4050,18 @@ document.getElementById("btn-pdf-refresh").onclick = () => {
 document.getElementById("btn-pdf-zoom-in").onclick = () => { S.pdfZoom = Math.min(S.pdfZoom + 0.25, 5); updateZoomLabel(); renderPDF(); };
 document.getElementById("btn-pdf-zoom-out").onclick = () => { S.pdfZoom = Math.max(S.pdfZoom - 0.25, 0.25); updateZoomLabel(); renderPDF(); };
 document.getElementById("btn-pdf-zoom-fit").onclick = () => { S.pdfZoom = 1.0; updateZoomLabel(); renderPDF(); };
+document.getElementById("btn-pdf-zoom-comfort").onclick = () => {
+  const container = document.getElementById("pdf-container");
+  if (!container || !S.pdfDoc) return;
+  S.pdfDoc.getPage(1).then(page => {
+    const pageWidth = page.getViewport({ scale: 1 }).width;
+    const containerWidth = container.clientWidth - 40;
+    const comfortWidth = Math.min(containerWidth, 800);
+    S.pdfZoom = comfortWidth / containerWidth;
+    updateZoomLabel();
+    renderPDF();
+  });
+};
 document.getElementById("btn-pdf-hd").onclick = () => {
   S.pdfRenderHD = !S.pdfRenderHD;
   document.getElementById("btn-pdf-hd").classList.toggle("active", S.pdfRenderHD);
