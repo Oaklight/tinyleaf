@@ -1292,6 +1292,11 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
 }
 .shortcut-row .shortcut-keys { display: flex; gap: 3px; align-items: center; }
 .shortcut-row .shortcut-keys span { font-size: 10px; color: var(--text-dim); }
+.shortcut-row.rebindable { cursor: pointer; }
+.shortcut-row.rebindable:hover { background: var(--bg-hover); border-radius: 4px; }
+.shortcut-row.recording { background: var(--accent-bg, rgba(99,102,241,0.1)); border-radius: 4px; }
+kbd.recording { background: var(--accent); color: white; animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 
 /* ── Word count popup ── */
 .wordcount-popup {

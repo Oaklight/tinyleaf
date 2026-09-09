@@ -12,6 +12,8 @@ const I18N = {
     push: "Push",
     changes: "Changes",
     history: "History",
+    press_new_key: "Press new key...",
+    reset_keybinding: "Reset",
     no_commits: "No commits yet",
     loading: "Loading...",
     empty_commit: "Empty commit",
@@ -240,6 +242,8 @@ const I18N = {
     push: "推送",
     changes: "变更",
     history: "历史",
+    press_new_key: "按下新按键...",
+    reset_keybinding: "重置",
     no_commits: "暂无提交",
     loading: "加载中...",
     empty_commit: "空提交",
@@ -958,6 +962,7 @@ async function init() {
   // Load global settings (show_debian, etc.)
   try {
     const globalSettings = await api("GET", "/api/settings");
+    S._globalSettings = globalSettings;
     document.getElementById("show-debian-toggle").checked = !!globalSettings.show_debian;
     if (globalSettings.registry_mirror) {
       document.getElementById("registry-mirror-input").value = globalSettings.registry_mirror;
@@ -3733,61 +3738,77 @@ const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 const MOD = isMac ? "⌘" : "Ctrl";
 
 function showShortcutsPopup() {
-  const groups = [
-    { title: t("shortcut_editing"), shortcuts: [
-      { keys: [MOD, "S"], desc: t("sc_save") },
-      { keys: [MOD, "F"], desc: t("sc_find") },
-      { keys: [MOD, "H"], desc: t("sc_replace") },
-    ]},
-    { title: t("shortcut_compile"), shortcuts: [
-      { keys: [MOD, "Enter"], desc: t("sc_compile") },
-      { keys: [MOD, "`"],     desc: t("sc_toggle_log") },
-    ]},
-    { title: t("shortcut_navigation"), shortcuts: [
-      { keys: [MOD, "P"],          desc: t("sc_quick_open") },
-      { keys: [MOD, "B"],          desc: t("sc_toggle_sidebar") },
-      { keys: [MOD, "Shift", "E"], desc: t("sc_files_tab") },
-      { keys: [MOD, "Shift", "G"], desc: t("sc_git_tab") },
-      { keys: [MOD, "Shift", "F"], desc: t("sc_search_tab") },
-      { keys: [MOD, "Shift", "O"], desc: t("sc_outline_tab") },
-      { keys: [MOD, "Tab"],          desc: t("sc_next_tab") },
-      { keys: [MOD, "Shift", "Tab"], desc: t("sc_prev_tab") },
-      { keys: [MOD, "W"],            desc: t("sc_close_tab") },
-    ]},
-    { title: t("shortcut_git"), shortcuts: [
-      { keys: [MOD, "Shift", "Alt", "C"], desc: t("sc_commit") },
-      { keys: [MOD, "Shift", "Alt", "P"], desc: t("sc_push") },
-    ]},
-    { title: t("shortcut_pdf"), shortcuts: [
-      { keys: [MOD, "Click"], desc: t("sc_synctex") },
-      { keys: [MOD, "Shift", "Enter"], desc: t("sc_forward_search") },
-      { keys: [MOD, "F"], desc: t("sc_pdf_search") },
-    ]},
-    { title: t("shortcut_layout"), shortcuts: [
-      { keys: [MOD, "Shift", "1"], desc: t("sc_layout_editor") },
-      { keys: [MOD, "Shift", "2"], desc: t("sc_layout_split") },
-      { keys: [MOD, "Shift", "3"], desc: t("sc_layout_pdf") },
-    ]},
-    { title: t("shortcut_general"), shortcuts: [
-      { keys: [MOD, "/"], desc: t("sc_shortcuts") },
-      { keys: ["Esc"], desc: t("sc_close") },
-    ]},
-  ];
+  const groupOrder = ["shortcut_editing", "shortcut_compile", "shortcut_navigation", "shortcut_git", "shortcut_pdf", "shortcut_layout", "shortcut_general"];
+  const groups = {};
+  for (const g of groupOrder) groups[g] = [];
+
+  for (const [id, b] of Object.entries(keybindings)) {
+    if (b.group && groups[b.group]) {
+      groups[b.group].push({ id, keys: keybindingLabel(id), desc: t(b.desc) });
+    }
+  }
+  // Add non-rebindable entries
+  groups["shortcut_pdf"].unshift({ id: "_synctex", keys: MOD + "+Click", desc: t("sc_synctex") });
+  groups["shortcut_general"].push({ id: "_escape", keys: "Esc", desc: t("sc_close") });
 
   const container = document.getElementById("shortcuts-content");
-  container.innerHTML = groups.map(g => `
+  container.innerHTML = groupOrder.map(g => {
+    const items = groups[g];
+    if (!items.length) return "";
+    return `
     <div class="shortcut-group">
-      <div class="shortcut-group-title">${g.title}</div>
-      ${g.shortcuts.map(s => `
-        <div class="shortcut-row">
+      <div class="shortcut-group-title">${t(g)}</div>
+      ${items.map(s => `
+        <div class="shortcut-row${s.id.startsWith("_") ? "" : " rebindable"}" data-action="${s.id}">
           <span class="shortcut-desc">${s.desc}</span>
-          <span class="shortcut-keys">${s.keys.map(k => `<kbd>${k}</kbd>`).join('<span>+</span>')}</span>
+          <span class="shortcut-keys">${s.keys.split("+").map(k => `<kbd>${k}</kbd>`).join('<span>+</span>')}</span>
         </div>
       `).join("")}
     </div>
-  `).join("");
+  `;
+  }).join("");
+
+  // Rebind click handler
+  container.querySelectorAll(".shortcut-row.rebindable").forEach(row => {
+    row.onclick = () => startRebind(row.dataset.action, row);
+  });
 
   document.getElementById("shortcuts-popup").classList.add("open");
+}
+
+function startRebind(actionId, row) {
+  const keysSpan = row.querySelector(".shortcut-keys");
+  const orig = keysSpan.innerHTML;
+  keysSpan.innerHTML = '<kbd class="recording">' + t("press_new_key") + '</kbd>';
+  row.classList.add("recording");
+
+  function handler(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === "Escape") {
+      keysSpan.innerHTML = orig;
+      row.classList.remove("recording");
+      document.removeEventListener("keydown", handler, true);
+      return;
+    }
+    if (["Control", "Meta", "Shift", "Alt"].includes(e.key)) return;
+
+    const newBinding = { key: e.key };
+    if (e.ctrlKey || e.metaKey) newBinding.mod = true;
+    if (e.shiftKey) newBinding.shift = true;
+    if (e.altKey) newBinding.alt = true;
+
+    const overrides = (S._globalSettings && S._globalSettings.keybindings) || {};
+    overrides[actionId] = newBinding;
+    api("PUT", "/api/settings", { keybindings: overrides });
+    S._globalSettings = S._globalSettings || {};
+    S._globalSettings.keybindings = overrides;
+    loadKeybindings(overrides);
+    row.classList.remove("recording");
+    document.removeEventListener("keydown", handler, true);
+    showShortcutsPopup();
+  }
+  document.addEventListener("keydown", handler, true);
 }
 
 // ══════════════════════════════════════════
@@ -4016,38 +4037,101 @@ function setupQuickOpen() {
   });
 }
 
+
+// ══════════════════════════════════════════
+// Keybinding Registry
+// ══════════════════════════════════════════
+
+const DEFAULT_KEYBINDINGS = {
+  save:           { key: "s", mod: true, desc: "sc_save", group: "shortcut_editing" },
+  find:           { key: "f", mod: true, desc: "sc_find", group: "shortcut_editing", context: "editor" },
+  replace:        { key: "h", mod: true, desc: "sc_replace", group: "shortcut_editing" },
+  compile:        { key: "Enter", mod: true, desc: "sc_compile", group: "shortcut_compile" },
+  toggle_log:     { key: "`", mod: true, desc: "sc_toggle_log", group: "shortcut_compile" },
+  quick_open:     { key: "p", mod: true, desc: "sc_quick_open", group: "shortcut_navigation" },
+  toggle_sidebar: { key: "b", mod: true, desc: "sc_toggle_sidebar", group: "shortcut_navigation" },
+  files_tab:      { key: "E", mod: true, shift: true, desc: "sc_files_tab", group: "shortcut_navigation" },
+  git_tab:        { key: "G", mod: true, shift: true, desc: "sc_git_tab", group: "shortcut_navigation" },
+  search_tab:     { key: "F", mod: true, shift: true, desc: "sc_search_tab", group: "shortcut_navigation" },
+  outline_tab:    { key: "O", mod: true, shift: true, desc: "sc_outline_tab", group: "shortcut_navigation" },
+  next_tab:       { key: "Tab", ctrl: true, desc: "sc_next_tab", group: "shortcut_navigation" },
+  prev_tab:       { key: "Tab", ctrl: true, shift: true, desc: "sc_prev_tab", group: "shortcut_navigation" },
+  close_tab:      { key: "w", mod: true, desc: "sc_close_tab", group: "shortcut_navigation" },
+  commit:         { key: "C", mod: true, shift: true, alt: true, desc: "sc_commit", group: "shortcut_git" },
+  push:           { key: "P", mod: true, shift: true, alt: true, desc: "sc_push", group: "shortcut_git" },
+  forward_search: { key: "Enter", mod: true, shift: true, desc: "sc_forward_search", group: "shortcut_pdf" },
+  pdf_search:     { key: "f", mod: true, desc: "sc_pdf_search", group: "shortcut_pdf", context: "pdf" },
+  layout_editor:  { key: "1", mod: true, shift: true, desc: "sc_layout_editor", group: "shortcut_layout" },
+  layout_split:   { key: "2", mod: true, shift: true, desc: "sc_layout_split", group: "shortcut_layout" },
+  layout_pdf:     { key: "3", mod: true, shift: true, desc: "sc_layout_pdf", group: "shortcut_layout" },
+  shortcuts:      { key: "/", mod: true, desc: "sc_shortcuts", group: "shortcut_general" },
+};
+
+let keybindings = {};
+
+function loadKeybindings(overrides) {
+  keybindings = {};
+  for (const [id, def] of Object.entries(DEFAULT_KEYBINDINGS)) {
+    keybindings[id] = overrides[id] ? { ...def, ...overrides[id] } : { ...def };
+  }
+}
+
+function keybindingLabel(id) {
+  const b = keybindings[id] || DEFAULT_KEYBINDINGS[id];
+  if (!b) return "";
+  const parts = [];
+  if (b.mod) parts.push(MOD);
+  if (b.ctrl && !b.mod) parts.push("Ctrl");
+  if (b.shift) parts.push("Shift");
+  if (b.alt) parts.push("Alt");
+  parts.push(b.key === " " ? "Space" : b.key);
+  return parts.join("+");
+}
+
+function matchesKeybinding(e, id) {
+  const b = keybindings[id];
+  if (!b) return false;
+  const mod = b.mod ? (e.ctrlKey || e.metaKey) : (b.ctrl ? e.ctrlKey : false);
+  if ((b.mod || b.ctrl) && !mod) return false;
+  if (!(b.mod || b.ctrl) && (e.ctrlKey || e.metaKey)) return false;
+  if (!!b.shift !== e.shiftKey) return false;
+  if (!!b.alt !== e.altKey) return false;
+  return e.key === b.key || e.key.toLowerCase() === b.key.toLowerCase();
+}
+
 function setupKeybindings() {
+  const settings = S._globalSettings || {};
+  loadKeybindings(settings.keybindings || {});
+
   document.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); saveCurrentFile(); }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "Enter") { e.preventDefault(); syncTexForwardSearch(); }
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === "Enter") { e.preventDefault(); compile(); }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "E") { e.preventDefault(); switchSidebarTab("files"); }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "G") { e.preventDefault(); switchSidebarTab("git"); }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "F") { e.preventDefault(); switchSidebarTab("search"); }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "O") { e.preventDefault(); switchSidebarTab("outline"); }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.key === "C") { e.preventDefault(); doCommit(); }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && e.key === "P") { e.preventDefault(); doPush(); }
-    if ((e.ctrlKey || e.metaKey) && e.key === "/") { e.preventDefault(); showShortcutsPopup(); }
-    if ((e.ctrlKey || e.metaKey) && e.key === "`") { e.preventDefault(); toggleLog(); }
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "b") { e.preventDefault(); toggleSidebar(); }
-    // Ctrl+H: prevent browser history and open CM search/replace panel
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "h") {
+    if (matchesKeybinding(e, "save")) { e.preventDefault(); saveCurrentFile(); }
+    if (matchesKeybinding(e, "forward_search")) { e.preventDefault(); syncTexForwardSearch(); }
+    if (matchesKeybinding(e, "compile")) { e.preventDefault(); compile(); }
+    if (matchesKeybinding(e, "files_tab")) { e.preventDefault(); switchSidebarTab("files"); }
+    if (matchesKeybinding(e, "git_tab")) { e.preventDefault(); switchSidebarTab("git"); }
+    if (matchesKeybinding(e, "search_tab")) { e.preventDefault(); switchSidebarTab("search"); }
+    if (matchesKeybinding(e, "outline_tab")) { e.preventDefault(); switchSidebarTab("outline"); }
+    if (matchesKeybinding(e, "commit")) { e.preventDefault(); doCommit(); }
+    if (matchesKeybinding(e, "push")) { e.preventDefault(); doPush(); }
+    if (matchesKeybinding(e, "shortcuts")) { e.preventDefault(); showShortcutsPopup(); }
+    if (matchesKeybinding(e, "toggle_log")) { e.preventDefault(); toggleLog(); }
+    if (matchesKeybinding(e, "toggle_sidebar")) { e.preventDefault(); toggleSidebar(); }
+    if (matchesKeybinding(e, "replace")) {
       e.preventDefault();
       if (S.editorView) openSearchPanel(S.editorView);
     }
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "p") { e.preventDefault(); openQuickOpen(); }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "1") { e.preventDefault(); setLayout("editor"); }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "2") { e.preventDefault(); setLayout("split"); }
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === "3") { e.preventDefault(); setLayout("pdf"); }
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "w") {
+    if (matchesKeybinding(e, "quick_open")) { e.preventDefault(); openQuickOpen(); }
+    if (matchesKeybinding(e, "layout_editor")) { e.preventDefault(); setLayout("editor"); }
+    if (matchesKeybinding(e, "layout_split")) { e.preventDefault(); setLayout("split"); }
+    if (matchesKeybinding(e, "layout_pdf")) { e.preventDefault(); setLayout("pdf"); }
+    if (matchesKeybinding(e, "close_tab")) {
       if (S.activeTab) { e.preventDefault(); closeTab(S.activeTab); }
     }
-    if (e.ctrlKey && !e.altKey && e.key === "Tab") {
+    if (matchesKeybinding(e, "next_tab") || matchesKeybinding(e, "prev_tab")) {
       e.preventDefault();
-      cycleTabs(e.shiftKey ? -1 : 1);
+      cycleTabs(matchesKeybinding(e, "prev_tab") ? -1 : 1);
     }
-    // Ctrl+F: open PDF search when focus is in PDF pane or PDF-only layout
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key === "f") {
+    if (matchesKeybinding(e, "pdf_search")) {
       const pdfPane = document.getElementById("pdf-pane");
       const editorPane = document.getElementById("editor-pane");
       const inPdfPane = pdfPane && pdfPane.contains(document.activeElement);
