@@ -36,13 +36,14 @@ class CompileJob:
         self.proc = None  # asyncio.subprocess.Process reference for cancellation
         self._cancelled = False
         self._done_event = asyncio.Event()
-        self._log_queue = asyncio.Queue()
+        self._subscribers: list[asyncio.Queue] = []
         self._task = None  # asyncio.Task running the compilation
 
     def append_log(self, line, level="info"):
         entry = {"line": line, "level": level}
         self.log_lines.append(entry)
-        self._log_queue.put_nowait(entry)
+        for q in self._subscribers:
+            q.put_nowait(entry)
 
     def get_logs_from(self, index):
         return list(self.log_lines[index:])
@@ -50,8 +51,12 @@ class CompileJob:
     def finish(self, status, pdf_path=None):
         self.status = status
         self.pdf_path = pdf_path
-        self._log_queue.put_nowait(_DONE_SENTINEL)
+        for q in self._subscribers:
+            q.put_nowait(_DONE_SENTINEL)
         self._done_event.set()
+
+    async def wait(self):
+        await self._done_event.wait()
 
     def cancel(self):
         """Cancel this compilation by killing the subprocess."""
@@ -62,12 +67,26 @@ class CompileJob:
         self.finish("cancelled")
 
     async def log_stream(self):
-        """Async generator yielding log entries as they arrive."""
-        while True:
-            entry = await self._log_queue.get()
-            if entry is _DONE_SENTINEL:
+        """Async generator yielding log entries as they arrive.
+
+        Each caller gets its own queue, so multiple consumers (e.g. two
+        browser tabs) receive all log entries independently.
+        """
+        q: asyncio.Queue = asyncio.Queue()
+        self._subscribers.append(q)
+        try:
+            # Replay entries logged before this consumer connected
+            for entry in list(self.log_lines):
+                yield entry
+            if self.is_done:
                 return
-            yield entry
+            while True:
+                entry = await q.get()
+                if entry is _DONE_SENTINEL:
+                    return
+                yield entry
+        finally:
+            self._subscribers.remove(q)
 
     @property
     def is_cancelled(self):
@@ -168,7 +187,12 @@ def _build_multipass_cmds(engine, main_file):
 
 
 async def _run_compile(job: CompileJob):
-    """Run the compilation as an async task."""
+    """Run the compilation as an async task.
+
+    Cancellation is cooperative via job._cancelled flag + proc.kill(),
+    not via asyncio task cancellation, so CancelledError won't bypass
+    the except handler.
+    """
     try:
         if job.engine == "latexmk":
             cmds = [_build_latexmk_args("pdflatex", job.main_file)]
@@ -226,7 +250,7 @@ async def _run_compile(job: CompileJob):
                 job.append_log(line, level=level)
 
             await proc.wait()
-            last_rc = proc.returncode or 0
+            last_rc = proc.returncode
 
             if job.is_cancelled:
                 return
@@ -290,6 +314,10 @@ async def _has_latexmk(job):
             )
         await asyncio.wait_for(proc.wait(), timeout=15)
         return proc.returncode == 0
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        return False
     except Exception:
         return False
 
@@ -307,6 +335,10 @@ async def _docker_image_exists(image):
         )
         await asyncio.wait_for(proc.wait(), timeout=10)
         return proc.returncode == 0
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        return False
     except Exception:
         return False
 
