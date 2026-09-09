@@ -2943,12 +2943,15 @@ function setLayout(mode) {
     sidebar.classList.remove("collapsed");
     editorPane.classList.remove("hidden");
     pdfPane.classList.remove("collapsed");
+    const savedPdfW = localStorage.getItem("tinyleaf-pdf-width");
+    if (savedPdfW) pdfPane.style.flex = "0 0 " + savedPdfW + "px";
     resizeSidebar.classList.remove("hidden");
     resizePdf.classList.remove("hidden");
   } else if (mode === "pdf") {
     sidebar.classList.add("collapsed");
     editorPane.classList.add("hidden");
     pdfPane.classList.remove("collapsed");
+    pdfPane.style.flex = "";
     resizeSidebar.classList.add("hidden");
     resizePdf.classList.add("hidden");
   }
@@ -2964,7 +2967,7 @@ function setLayout(mode) {
 
   localStorage.setItem("tinyleaf-layout", mode);
   S.layoutMode = mode;
-  if (S.pdfDoc) setTimeout(() => renderPDF(), 50);
+  if (S.pdfDoc) requestAnimationFrame(() => requestAnimationFrame(() => renderPDF()));
 }
 
 function toggleSidebar() {
