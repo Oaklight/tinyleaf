@@ -5,7 +5,6 @@ and return dicts (auto-coerced to JSON by the server) or Response objects.
 Errors are raised via abort() / HTTPException.
 """
 
-import asyncio
 import io
 import json
 import os
@@ -164,7 +163,7 @@ def handle_list_docker_images():
     return all_tags
 
 
-def handle_docker_pull(body, config):
+async def handle_docker_pull(body, config):
     image = body.get("image")
     if not image:
         abort(400, "Missing image")
@@ -175,15 +174,15 @@ def handle_docker_pull(body, config):
         settings = _read_settings(config_dir)
         registry_mirror = settings.get("registry_mirror") or None
 
-    success, msg = compiler.docker_pull_image(image, registry_mirror=registry_mirror)
+    success, msg = await compiler.docker_pull_image(image, registry_mirror=registry_mirror)
     return {"success": success, "message": msg}
 
 
-def handle_docker_rmi(body):
+async def handle_docker_rmi(body):
     image = body.get("image")
     if not image:
         abort(400, "Missing image")
-    success, msg = compiler.docker_remove_image(image)
+    success, msg = await compiler.docker_remove_image(image)
     return {"success": success, "message": msg}
 
 
@@ -600,7 +599,7 @@ def handle_put_config(body, config, name):
 # ── Compile ──
 
 
-def handle_compile(body, config, name):
+async def handle_compile(body, config, name):
     project_dir = _get_project_dir(config, name)
 
     config_data = _read_project_config(project_dir)
@@ -620,7 +619,7 @@ def handle_compile(body, config, name):
         settings = _read_settings(config_dir)
         registry_mirror = settings.get("registry_mirror") or None
 
-    compile_id = compiler.start_compile(
+    compile_id = await compiler.start_compile(
         project_dir=project_dir,
         main_file=main_file,
         engine=engine,
@@ -644,25 +643,13 @@ async def sse_compile_stream(compile_id, name):
     """
     job = compiler.get_job(compile_id)
 
-    sent_index = 0
-    while True:
-        new_logs = job.get_logs_from(sent_index)
-        for entry in new_logs:
-            yield _sse_frame(entry, event="log")
-            sent_index += 1
+    async for entry in job.log_stream():
+        yield _sse_frame(entry, event="log")
 
-        if job.is_done:
-            remaining = job.get_logs_from(sent_index)
-            for entry in remaining:
-                yield _sse_frame(entry, event="log")
-
-            done_data = {"status": job.status}
-            if job.pdf_path:
-                done_data["pdf_url"] = f"/api/projects/{name}/output/{job.pdf_path}"
-            yield _sse_frame(done_data, event="done")
-            return
-
-        await asyncio.sleep(0.1)
+    done_data = {"status": job.status}
+    if job.pdf_path:
+        done_data["pdf_url"] = f"/api/projects/{name}/output/{job.pdf_path}"
+    yield _sse_frame(done_data, event="done")
 
 
 def _sse_frame(data, event=None):

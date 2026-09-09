@@ -3,10 +3,11 @@
 Supports local latexmk and Docker-based compilation.
 """
 
+import asyncio
 import os
-import subprocess
-import threading
 import uuid
+
+_DONE_SENTINEL = object()
 
 
 class CompileJob:
@@ -32,34 +33,41 @@ class CompileJob:
         self.log_lines = []
         self.status = "running"  # running | success | error | cancelled
         self.pdf_path = None
-        self.proc = None  # subprocess.Popen reference for cancellation
+        self.proc = None  # asyncio.subprocess.Process reference for cancellation
         self._cancelled = False
-        self._lock = threading.Lock()
-        self._done_event = threading.Event()
+        self._done_event = asyncio.Event()
+        self._log_queue = asyncio.Queue()
+        self._task = None  # asyncio.Task running the compilation
 
     def append_log(self, line, level="info"):
-        with self._lock:
-            self.log_lines.append({"line": line, "level": level})
+        entry = {"line": line, "level": level}
+        self.log_lines.append(entry)
+        self._log_queue.put_nowait(entry)
 
     def get_logs_from(self, index):
-        with self._lock:
-            return list(self.log_lines[index:])
+        return list(self.log_lines[index:])
 
     def finish(self, status, pdf_path=None):
         self.status = status
         self.pdf_path = pdf_path
+        self._log_queue.put_nowait(_DONE_SENTINEL)
         self._done_event.set()
-
-    def wait(self, timeout=None):
-        self._done_event.wait(timeout)
 
     def cancel(self):
         """Cancel this compilation by killing the subprocess."""
         self._cancelled = True
-        if self.proc and self.proc.poll() is None:
+        if self.proc and self.proc.returncode is None:
             self.proc.kill()
         self.append_log("Cancelled by user.", level="warning")
         self.finish("cancelled")
+
+    async def log_stream(self):
+        """Async generator yielding log entries as they arrive."""
+        while True:
+            entry = await self._log_queue.get()
+            if entry is _DONE_SENTINEL:
+                return
+            yield entry
 
     @property
     def is_cancelled(self):
@@ -70,14 +78,12 @@ class CompileJob:
         return self._done_event.is_set()
 
 
-# Global compile job registry
+# Global compile job registry (single-threaded asyncio, no lock needed)
 _jobs: dict[str, CompileJob] = {}
-_jobs_lock = threading.Lock()
 
 
 def get_job(compile_id):
-    with _jobs_lock:
-        return _jobs.get(compile_id)
+    return _jobs.get(compile_id)
 
 
 def cancel_compile(compile_id):
@@ -93,7 +99,7 @@ def cancel_compile(compile_id):
     return True
 
 
-def start_compile(
+async def start_compile(
     project_dir,
     main_file="main.tex",
     engine="pdflatex",
@@ -125,11 +131,8 @@ def start_compile(
         registry_mirror=registry_mirror,
     )
 
-    with _jobs_lock:
-        _jobs[compile_id] = job
-
-    thread = threading.Thread(target=_run_compile, args=(job,), daemon=True)
-    thread.start()
+    _jobs[compile_id] = job
+    job._task = asyncio.create_task(_run_compile(job))
     return compile_id
 
 
@@ -155,7 +158,7 @@ def _build_latexmk_args(engine, main_file):
 def _build_multipass_cmds(engine, main_file):
     """Build multi-pass compile commands for direct engine use.
 
-    Flow: engine → bibtex → engine → engine (3 passes with bibliography).
+    Flow: engine -> bibtex -> engine -> engine (3 passes with bibliography).
     """
     base = os.path.splitext(main_file)[0]
     common_flags = ["-synctex=1", "-interaction=nonstopmode", "-file-line-error"]
@@ -164,14 +167,13 @@ def _build_multipass_cmds(engine, main_file):
     return [engine_cmd, bibtex_cmd, engine_cmd, engine_cmd]
 
 
-def _run_compile(job: CompileJob):
-    """Run the compilation in a background thread."""
+async def _run_compile(job: CompileJob):
+    """Run the compilation as an async task."""
     try:
         if job.engine == "latexmk":
-            # latexmk auto-detects engine from .latexmkrc or defaults to pdflatex
             cmds = [_build_latexmk_args("pdflatex", job.main_file)]
         elif job.engine in ("pdflatex", "lualatex", "xelatex"):
-            if _has_latexmk(job):
+            if await _has_latexmk(job):
                 cmds = [_build_latexmk_args(job.engine, job.main_file)]
             else:
                 cmds = _build_multipass_cmds(job.engine, job.main_file)
@@ -179,11 +181,10 @@ def _run_compile(job: CompileJob):
             cmds = [_build_latexmk_args("pdflatex", job.main_file)]
 
         if job.use_docker:
-            # Auto-pull image if not available locally
-            if not _docker_image_exists(job.docker_image):
+            if not await _docker_image_exists(job.docker_image):
                 if job.is_cancelled:
                     return
-                if not _docker_pull(job, job.docker_image, job.registry_mirror):
+                if not await _docker_pull(job, job.docker_image, job.registry_mirror):
                     return
 
             if job.is_cancelled:
@@ -201,46 +202,43 @@ def _run_compile(job: CompileJob):
             ]
             cmds = [docker_prefix + c for c in cmds]
 
-        for cmd_idx, cmd in enumerate(cmds):
+        last_rc = 0
+        for cmd in cmds:
             if job.is_cancelled:
                 return
 
             job.append_log(f"$ {' '.join(cmd)}", level="info")
 
-            proc = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
                 cwd=job.project_dir if not job.use_docker else None,
-                text=True,
-                bufsize=1,
             )
             job.proc = proc
 
             assert proc.stdout is not None
-            for line in proc.stdout:
+            async for raw_line in proc.stdout:
                 if job.is_cancelled:
                     break
-                line = line.rstrip("\n")
+                line = raw_line.decode("utf-8", errors="replace").rstrip("\n")
                 level = _classify_log_line(line)
                 job.append_log(line, level=level)
 
-            proc.wait()
+            await proc.wait()
+            last_rc = proc.returncode or 0
 
             if job.is_cancelled:
                 return
 
-            # bibtex may fail if no .bib — that's okay, continue
             is_bibtex = cmd[-1].endswith((".aux",)) or "bibtex" in cmd
-            if proc.returncode != 0 and not is_bibtex:
+            if last_rc != 0 and not is_bibtex:
                 break
 
-        # Find output PDF
         base = os.path.splitext(job.main_file)[0]
         pdf_name = base + ".pdf"
         pdf_full = os.path.join(job.project_dir, pdf_name)
 
-        last_rc = proc.returncode
         if last_rc == 0 and os.path.exists(pdf_full):
             job.finish("success", pdf_path=pdf_name)
         else:
@@ -269,46 +267,57 @@ def _classify_log_line(line):
     return "info"
 
 
-def _has_latexmk(job):
+async def _has_latexmk(job):
     """Check if latexmk is available (in Docker or locally)."""
     try:
         if job.use_docker:
-            r = subprocess.run(
-                ["docker", "run", "--rm", job.docker_image, "which", "latexmk"],
-                capture_output=True,
-                timeout=15,
+            proc = await asyncio.create_subprocess_exec(
+                "docker",
+                "run",
+                "--rm",
+                job.docker_image,
+                "which",
+                "latexmk",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
             )
         else:
-            r = subprocess.run(["which", "latexmk"], capture_output=True, timeout=5)
-        return r.returncode == 0
+            proc = await asyncio.create_subprocess_exec(
+                "which",
+                "latexmk",
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+        await asyncio.wait_for(proc.wait(), timeout=15)
+        return proc.returncode == 0
     except Exception:
         return False
 
 
-def _docker_image_exists(image):
+async def _docker_image_exists(image):
     """Check if a Docker image exists locally."""
     try:
-        result = subprocess.run(
-            ["docker", "image", "inspect", image],
-            capture_output=True,
-            timeout=10,
+        proc = await asyncio.create_subprocess_exec(
+            "docker",
+            "image",
+            "inspect",
+            image,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
         )
-        return result.returncode == 0
+        await asyncio.wait_for(proc.wait(), timeout=10)
+        return proc.returncode == 0
     except Exception:
         return False
 
 
-def _docker_pull(job, image, registry_mirror=None):
+async def _docker_pull(job, image, registry_mirror=None):
     """Pull a Docker image, streaming output to the compile job log.
-
-    If registry_mirror is set, pulls from the mirror and retags to the
-    original name.
 
     Returns:
         True if pull succeeded, False otherwise.
     """
     if registry_mirror:
-        # e.g. "oaklight/texlive:tag" -> "docker.1ms.run/oaklight/texlive:tag"
         pull_image = f"{registry_mirror}/{image}"
         job.append_log(
             f"Image '{image}' not found locally, pulling from mirror {registry_mirror}..."
@@ -318,23 +327,23 @@ def _docker_pull(job, image, registry_mirror=None):
         job.append_log(f"Image '{image}' not found locally, pulling...")
 
     try:
-        proc = subprocess.Popen(
-            ["docker", "pull", pull_image],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
+        proc = await asyncio.create_subprocess_exec(
+            "docker",
+            "pull",
+            pull_image,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
         )
         job.proc = proc
 
         assert proc.stdout is not None
-        for line in proc.stdout:
+        async for raw_line in proc.stdout:
             if job.is_cancelled:
                 proc.kill()
-                proc.wait()
+                await proc.wait()
                 return False
-            job.append_log(line.rstrip("\n"))
-        proc.wait()
+            job.append_log(raw_line.decode("utf-8", errors="replace").rstrip("\n"))
+        await proc.wait()
 
         if job.is_cancelled:
             return False
@@ -344,10 +353,24 @@ def _docker_pull(job, image, registry_mirror=None):
             job.finish("error")
             return False
 
-        # Retag if pulled from mirror
         if registry_mirror and pull_image != image:
-            subprocess.run(["docker", "tag", pull_image, image], timeout=10)
-            subprocess.run(["docker", "rmi", pull_image], capture_output=True, timeout=10)
+            retag = await asyncio.create_subprocess_exec(
+                "docker",
+                "tag",
+                pull_image,
+                image,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await asyncio.wait_for(retag.wait(), timeout=10)
+            rmi = await asyncio.create_subprocess_exec(
+                "docker",
+                "rmi",
+                pull_image,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await asyncio.wait_for(rmi.wait(), timeout=10)
             job.append_log(f"Retagged '{pull_image}' -> '{image}'")
 
         job.append_log("Image ready.")
@@ -359,12 +382,8 @@ def _docker_pull(job, image, registry_mirror=None):
         return False
 
 
-def docker_pull_image(image, registry_mirror=None):
+async def docker_pull_image(image, registry_mirror=None):
     """Pull a Docker image (standalone, not tied to a compile job).
-
-    Args:
-        image: Full image name (e.g. "oaklight/texlive:alpine-science-cn").
-        registry_mirror: Optional registry mirror host.
 
     Returns:
         Tuple of (success: bool, message: str).
@@ -375,46 +394,59 @@ def docker_pull_image(image, registry_mirror=None):
         pull_image = image
 
     try:
-        proc = subprocess.Popen(
-            ["docker", "pull", pull_image],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
+        proc = await asyncio.create_subprocess_exec(
+            "docker",
+            "pull",
+            pull_image,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
         )
-        with _pull_procs_lock:
-            _pull_procs[image] = proc
+        _pull_procs[image] = proc
 
         assert proc.stdout is not None
         output_lines = []
-        for line in proc.stdout:
-            output_lines.append(line)
-        proc.wait()
+        async for raw_line in proc.stdout:
+            output_lines.append(raw_line.decode("utf-8", errors="replace"))
+        await proc.wait()
 
-        with _pull_procs_lock:
-            _pull_procs.pop(image, None)
+        _pull_procs.pop(image, None)
 
         if proc.returncode != 0:
             stderr = "".join(output_lines).strip()
-            if proc.returncode == -9 or proc.returncode == -15:
+            if proc.returncode in (-9, -15):
                 return False, "Cancelled"
             return False, stderr or "Pull failed"
 
         if registry_mirror and pull_image != image:
-            subprocess.run(["docker", "tag", pull_image, image], timeout=10)
-            subprocess.run(["docker", "rmi", pull_image], capture_output=True, timeout=10)
+            retag = await asyncio.create_subprocess_exec(
+                "docker",
+                "tag",
+                pull_image,
+                image,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await asyncio.wait_for(retag.wait(), timeout=10)
+            rmi = await asyncio.create_subprocess_exec(
+                "docker",
+                "rmi",
+                pull_image,
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            await asyncio.wait_for(rmi.wait(), timeout=10)
 
         return True, "OK"
-    except subprocess.TimeoutExpired:
+    except asyncio.TimeoutError:
+        _pull_procs.pop(image, None)
         return False, "Pull timed out"
     except Exception as e:
-        with _pull_procs_lock:
-            _pull_procs.pop(image, None)
+        _pull_procs.pop(image, None)
         return False, str(e)
 
 
 # Track standalone pull processes for cancellation
-_pull_procs: dict[str, subprocess.Popen] = {}
-_pull_procs_lock = threading.Lock()
+_pull_procs: dict[str, asyncio.subprocess.Process] = {}
 
 
 def cancel_docker_pull(image):
@@ -423,32 +455,30 @@ def cancel_docker_pull(image):
     Returns:
         True if a pull was found and killed, False otherwise.
     """
-    with _pull_procs_lock:
-        proc = _pull_procs.pop(image, None)
-    if proc and proc.poll() is None:
+    proc = _pull_procs.pop(image, None)
+    if proc and proc.returncode is None:
         proc.kill()
         return True
     return False
 
 
-def docker_remove_image(image):
+async def docker_remove_image(image):
     """Remove a local Docker image.
-
-    Args:
-        image: Full image name to remove.
 
     Returns:
         Tuple of (success: bool, message: str).
     """
     try:
-        result = subprocess.run(
-            ["docker", "rmi", image],
-            capture_output=True,
-            text=True,
-            timeout=30,
+        proc = await asyncio.create_subprocess_exec(
+            "docker",
+            "rmi",
+            image,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
-        if result.returncode == 0:
+        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=30)
+        if proc.returncode == 0:
             return True, "OK"
-        return False, result.stderr.strip() or "Remove failed"
+        return False, stderr.decode("utf-8", errors="replace").strip() or "Remove failed"
     except Exception as e:
         return False, str(e)

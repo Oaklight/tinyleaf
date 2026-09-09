@@ -144,17 +144,17 @@ def api_list_docker_images(request):
 
 
 @app.post("/api/docker/pull")
-def api_docker_pull(request):
+async def api_docker_pull(request):
     from tinyleaf.handlers import handle_docker_pull
 
-    return handle_docker_pull(request.json(), _config)
+    return await handle_docker_pull(request.json(), _config)
 
 
 @app.post("/api/docker/rmi")
-def api_docker_rmi(request):
+async def api_docker_rmi(request):
     from tinyleaf.handlers import handle_docker_rmi
 
-    return handle_docker_rmi(request.json())
+    return await handle_docker_rmi(request.json())
 
 
 @app.post("/api/docker/cancel-pull")
@@ -273,10 +273,10 @@ def api_put_config(request, name):
 
 
 @app.post("/api/projects/<name>/compile")
-def api_compile(request, name):
+async def api_compile(request, name):
     from tinyleaf.handlers import handle_compile
 
-    return handle_compile(request.json(), _config, name)
+    return await handle_compile(request.json(), _config, name)
 
 
 @app.get("/api/projects/<name>/compile/<compile_id>/stream")
