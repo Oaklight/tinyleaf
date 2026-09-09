@@ -612,6 +612,22 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
 #git-commit-btns { display: flex; gap: 6px; }
 #git-commit-btns button { flex: 1; }
 
+/* ── Git Sub-tabs & History ── */
+.git-sub-tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 8px; }
+.git-sub-tab { background: none; border: none; color: var(--fg-muted); padding: 4px 10px; font-size: 11px; cursor: pointer; border-bottom: 2px solid transparent; text-transform: uppercase; letter-spacing: 0.5px; }
+.git-sub-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.git-sub-tab:hover { color: var(--fg); }
+#git-history-panel { flex: 1; overflow-y: auto; }
+#git-log-list { padding: 4px 0; }
+.git-log-entry { padding: 6px 12px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.git-log-entry:hover { background: var(--bg-hover); }
+.git-log-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.git-log-hash { font-family: var(--font-mono); font-size: 11px; color: var(--accent); }
+.git-log-date { font-size: 11px; color: var(--fg-muted); white-space: nowrap; }
+.git-log-msg { font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.git-log-author { font-size: 11px; color: var(--fg-muted); margin-top: 1px; }
+.git-log-empty { padding: 20px; text-align: center; color: var(--fg-muted); font-size: 12px; }
+
 /* ── Editor Tab Bar ── */
 #editor-tabs {
   display: flex;

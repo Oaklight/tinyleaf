@@ -1143,6 +1143,13 @@ def _parse_diff_qs(query_params):
 
 def handle_git_diff(query_params, config, name):
     project_dir = _get_project_dir(config, name)
+    commit = query_params.get("commit", [""])[0] if query_params else ""
+    if commit:
+        result = git_ops.show_commit(project_dir, commit)
+        return Response(
+            body=result.encode("utf-8"),
+            content_type="text/plain; charset=utf-8",
+        )
     staged, fmt = _parse_diff_qs(query_params)
     result = git_ops.diff(project_dir, staged=staged, fmt=fmt)
     if fmt == "json":

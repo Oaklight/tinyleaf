@@ -215,3 +215,19 @@ def log(project_dir, count=20):
             }
         )
     return entries
+
+
+def show_commit(project_dir, commit_hash):
+    """Get the diff for a specific commit.
+
+    Args:
+        project_dir: Project directory.
+        commit_hash: Git commit hash (short or full).
+
+    Returns:
+        Unified diff text for the commit.
+    """
+    if not has_git(project_dir):
+        return ""
+    rc, out, _ = _run_git(project_dir, "show", "--format=", "--patch", commit_hash)
+    return out if rc == 0 else ""
