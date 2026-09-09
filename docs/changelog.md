@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Close tab keyboard shortcut fallthrough to tab cycling
 - httpserver list return type coercion (500 errors on project/file list endpoints)
 - Subprocess orphan prevention on timeout in latexmk/Docker image checks
+- PDF pane not filling viewport width in PDF-only layout when pane had been resized in split mode
 
 ## [0.5.1](https://github.com/Oaklight/tinyleaf/releases/tag/v0.5.1) - 2026-06-01
 
