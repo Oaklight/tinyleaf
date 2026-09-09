@@ -12,6 +12,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.6.0) - 2026-09-09
+
+### Added
+
+- Customizable keyboard shortcuts with data-driven keybinding registry, rebind UI, conflict detection, and per-shortcut reset
+- Git commit history view in sidebar with diff viewer
+- Recent projects sorting by last opened time in multi-project mode
+- PDF scroll position and zoom preservation across recompile via SyncTeX round-trip
+- Comfort zoom mode and automatic PDF resize on layout switch
+- Nuitka binary compilation support with CI workflow for Linux and Windows
+
+### Changed
+
+- Migrated server from Bottle to zero-dependency httpserver (asyncio-based)
+- Refactored compiler from threading to asyncio: subprocess, event, and queue primitives replaced with async equivalents; SSE log streaming now uses per-consumer pub-sub queues instead of polling
+- Updated vendored zerodep modules (httpserver 0.4.0 with cookie support)
+- Refactored release workflow into prepare → build → release pipeline with trusted PyPI publisher
+
+### Fixed
+
+- Git diff view argument order and commit hash validation
+- Close tab keyboard shortcut fallthrough to tab cycling
+- httpserver list return type coercion (500 errors on project/file list endpoints)
+- Subprocess orphan prevention on timeout in latexmk/Docker image checks
+
 ## [0.5.1](https://github.com/Oaklight/tinyleaf/releases/tag/v0.5.1) - 2026-06-01
 
 ### Added
