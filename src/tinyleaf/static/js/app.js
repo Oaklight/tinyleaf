@@ -4053,14 +4053,11 @@ document.getElementById("btn-pdf-zoom-fit").onclick = () => { S.pdfZoom = 1.0; u
 document.getElementById("btn-pdf-zoom-comfort").onclick = () => {
   const container = document.getElementById("pdf-container");
   if (!container || !S.pdfDoc) return;
-  S.pdfDoc.getPage(1).then(page => {
-    const pageWidth = page.getViewport({ scale: 1 }).width;
-    const containerWidth = container.clientWidth - 40;
-    const comfortWidth = Math.min(containerWidth, 800);
-    S.pdfZoom = comfortWidth / containerWidth;
-    updateZoomLabel();
-    renderPDF();
-  });
+  const containerWidth = container.clientWidth - 40;
+  const comfortWidth = Math.min(containerWidth, 800);
+  S.pdfZoom = comfortWidth / containerWidth;
+  updateZoomLabel();
+  renderPDF();
 };
 document.getElementById("btn-pdf-hd").onclick = () => {
   S.pdfRenderHD = !S.pdfRenderHD;
