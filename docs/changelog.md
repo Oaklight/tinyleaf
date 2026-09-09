@@ -12,6 +12,31 @@ hide:
 
 ## [Unreleased]
 
+## [0.6.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.6.0) - 2026-09-09
+
+### 新增
+
+- 可自定义键盘快捷键：数据驱动的快捷键注册表、重绑定 UI、冲突检测和逐项重置
+- 侧边栏 Git 提交历史查看器及差异对比
+- 多项目模式按最近打开时间排序
+- 通过 SyncTeX 往返实现 PDF 滚动位置和缩放在重新编译后保持
+- 舒适缩放模式及布局切换时自动调整 PDF 大小
+- Nuitka 二进制编译支持，包含 Linux 和 Windows CI 工作流
+
+### 变更
+
+- 服务器从 Bottle 迁移至零依赖 httpserver（基于 asyncio）
+- 编译器从 threading 重构为 asyncio：subprocess、event 和 queue 原语替换为异步等价物；SSE 日志流改用消费者级别的发布-订阅队列，取代轮询
+- 更新 vendored zerodep 模块（httpserver 0.4.0，支持 cookie）
+- 发版工作流重构为 prepare → build → release 流水线，使用 PyPI 可信发布
+
+### 修复
+
+- Git diff 视图参数顺序及提交哈希校验
+- 关闭标签快捷键穿透到标签切换的问题
+- httpserver 列表返回类型转换（项目/文件列表接口 500 错误）
+- 超时时 latexmk/Docker 镜像检查的子进程孤儿问题
+
 ## [0.5.1](https://github.com/Oaklight/tinyleaf/releases/tag/v0.5.1) - 2026-06-01
 
 ### 新增
