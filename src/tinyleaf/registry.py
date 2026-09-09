@@ -58,6 +58,7 @@ def list_projects(config_dir):
                 "name": name,
                 "path": info["path"],
                 "added_at": info.get("added_at", ""),
+                "last_opened": info.get("last_opened", ""),
                 "exists": os.path.isdir(info["path"]),
             }
         )
@@ -155,4 +156,18 @@ def rename_project(config_dir, old_name, new_name):
         raise ValueError(f"Project name already exists: {new_name}")
 
     data["projects"][new_name] = data["projects"].pop(old_name)
+    save_registry(config_dir, data)
+
+
+def touch_project(config_dir, name):
+    """Update the last_opened timestamp for a project.
+
+    Args:
+        config_dir: Config directory containing the registry.
+        name: Project name to touch.
+    """
+    data = load_registry(config_dir)
+    if name not in data["projects"]:
+        return
+    data["projects"][name]["last_opened"] = datetime.now().isoformat(timespec="seconds")
     save_registry(config_dir, data)

@@ -1481,13 +1481,22 @@ async function showProjectList() {
   document.getElementById("layout-switcher").style.display = "none";
 
   const projects = await api("GET", "/api/projects");
+  // Sort by last_opened (most recent first), then by name
+  projects.sort((a, b) => {
+    const ta = a.last_opened || "";
+    const tb = b.last_opened || "";
+    if (tb !== ta) return tb.localeCompare(ta);
+    return a.name.localeCompare(b.name);
+  });
   const grid = document.getElementById("project-grid");
   grid.innerHTML = "";
 
   for (const p of projects) {
     const card = document.createElement("div");
     card.className = "project-card" + (p.exists === false ? " stale" : "");
-    const timeStr = p.added_at ? new Date(p.added_at).toLocaleString() : "";
+    const timeStr = p.last_opened
+      ? new Date(p.last_opened).toLocaleString()
+      : (p.added_at ? new Date(p.added_at).toLocaleString() : "");
     const gitBadge = p.git ? `<span class="git-badge" title="Git repository"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></span>` : "";
     card.innerHTML = `<h3>${esc(p.name)} ${gitBadge}</h3>`
       + `<div class="project-path">${esc(p.path || "")}</div>`
