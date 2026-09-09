@@ -10,6 +10,8 @@ const I18N = {
     save: "Save",
     commit: "Commit",
     push: "Push",
+    changes: "Changes",
+    history: "History",
     theme: "Theme",
     theme_group_light: "Light",
     theme_group_dark: "Dark",
@@ -233,6 +235,8 @@ const I18N = {
     save: "保存",
     commit: "提交",
     push: "推送",
+    changes: "变更",
+    history: "历史",
     theme: "主题",
     theme_group_light: "明亮",
     theme_group_dark: "深色",
@@ -3623,6 +3627,56 @@ async function doPush() {
   refreshGit();
 }
 
+function switchGitSubTab(tabName) {
+  document.querySelectorAll(".git-sub-tab").forEach(b => b.classList.toggle("active", b.dataset.gitTab === tabName));
+  document.getElementById("git-changes-panel").style.display = tabName === "changes" ? "" : "none";
+  document.getElementById("git-history-panel").style.display = tabName === "history" ? "" : "none";
+  if (tabName === "history") refreshGitLog();
+}
+
+async function refreshGitLog() {
+  if (!S.projectName) return;
+  const list = document.getElementById("git-log-list");
+  list.innerHTML = "";
+  try {
+    const commits = await api("GET", `/api/projects/${enc(S.projectName)}/git/log`);
+    if (!commits.length) {
+      list.innerHTML = `<div class="git-log-empty">No commits yet</div>`;
+      return;
+    }
+    for (const c of commits) {
+      const entry = document.createElement("div");
+      entry.className = "git-log-entry";
+      entry.innerHTML = `<div class="git-log-top"><span class="git-log-hash">${esc(c.hash)}</span><span class="git-log-date">${esc(new Date(c.date).toLocaleDateString())}</span></div>`
+        + `<div class="git-log-msg">${esc(c.message)}</div>`
+        + `<div class="git-log-author">${esc(c.author)}</div>`;
+      entry.onclick = () => showCommitDiff(c.hash);
+      list.appendChild(entry);
+    }
+  } catch (err) {
+    list.innerHTML = `<div class="git-log-empty">${esc(err.message)}</div>`;
+  }
+}
+
+async function showCommitDiff(hash) {
+  if (!S.projectName) return;
+  _openDiffPane();
+  document.getElementById("diff-title").textContent = hash;
+  const content = document.getElementById("diff-content");
+  content.innerHTML = `<div class="diff-no-changes">Loading...</div>`;
+  try {
+    const resp = await fetch(`/api/projects/${enc(S.projectName)}/git/diff?commit=${encodeURIComponent(hash)}`);
+    const text = await resp.text();
+    if (!text.trim()) {
+      content.innerHTML = `<div class="diff-no-changes">Empty commit</div>`;
+      return;
+    }
+    _renderDiffText(content, text);
+  } catch (err) {
+    content.innerHTML = `<div class="diff-no-changes">${esc(err.message)}</div>`;
+  }
+}
+
 // ══════════════════════════════════════════
 // New File / Folder (root level)
 // ══════════════════════════════════════════
@@ -4039,6 +4093,7 @@ document.getElementById("auto-compile-toggle").onchange = (e) => {
 document.getElementById("btn-git-commit-selected").onclick = doCommit;
 document.getElementById("btn-git-push").onclick = doPush;
 document.getElementById("btn-git-refresh").onclick = refreshGit;
+document.querySelectorAll(".git-sub-tab").forEach(b => b.onclick = () => switchGitSubTab(b.dataset.gitTab));
 document.getElementById("btn-diff-close").onclick = closeDiffPane;
 document.getElementById("btn-diff-refresh").onclick = () => {
   if (S._diffFilePath) {

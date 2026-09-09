@@ -93,6 +93,11 @@
               <span style="flex:1"></span>
               <button class="sm" id="btn-git-refresh" style="font-size:10px;padding:1px 6px" title="Refresh" data-i18n-title="refresh">&#x21bb;</button>
             </div>
+            <div class="git-sub-tabs">
+              <button class="git-sub-tab active" data-git-tab="changes" data-i18n="changes">Changes</button>
+              <button class="git-sub-tab" data-git-tab="history" data-i18n="history">History</button>
+            </div>
+            <div id="git-changes-panel">
             <div id="git-files"></div>
             <div id="git-diff-view" style="display:none"></div>
             <div id="git-commit-area">
@@ -101,6 +106,10 @@
                 <button class="sm primary" id="btn-git-commit-selected" data-i18n="commit">Commit</button>
                 <button class="sm" id="btn-git-push" data-i18n="push">Push</button>
               </div>
+            </div>
+            </div>
+            <div id="git-history-panel" style="display:none">
+              <div id="git-log-list"></div>
             </div>
           </div>
           <div id="sidebar-search">
