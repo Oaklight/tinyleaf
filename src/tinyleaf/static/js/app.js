@@ -2354,6 +2354,12 @@ async function compile() {
 
   if (S.modified.has(S.currentFile)) await saveCurrentFile();
 
+  S._preCompileView = null;
+  if (S.pdfDoc) {
+    const loc = await captureViewPosition();
+    if (loc) S._preCompileView = { preserveZoom: true, restoreLocation: loc };
+  }
+
   const engine = document.getElementById("engine-select").value;
   const btnCompile = document.getElementById("btn-compile");
   btnCompile.textContent = t("cancel");
@@ -2393,7 +2399,8 @@ async function compile() {
         setStatus(t("compile_failed"), "error");
         document.getElementById("log-status").innerHTML = `<span class="badge error">FAILED</span>`;
       }
-      if (d.pdf_url) loadPDF(d.pdf_url);
+      if (d.pdf_url) loadPDF(d.pdf_url, S._preCompileView || {});
+      S._preCompileView = null;
       refreshFiles();
       refreshGit();
     });
@@ -2431,7 +2438,7 @@ async function doClean() {
 // PDF Viewer
 // ══════════════════════════════════════════
 
-async function loadPDF(url) {
+async function loadPDF(url, opts = {}) {
   const container = document.getElementById("pdf-container");
   container.innerHTML = "";
   setPdfStatus(t("loading_pdf"));
@@ -2441,12 +2448,13 @@ async function loadPDF(url) {
     const pdfUrl = url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();
     const doc = await pdfjsLib.getDocument(pdfUrl).promise;
     S.pdfDoc = doc;
-    S.pdfZoom = 1.0;
+    if (!opts.preserveZoom) S.pdfZoom = 1.0;
     S.pdfTextPages = null;
     S.pdfSearchMatches = [];
     S.pdfSearchIndex = -1;
     updateZoomLabel();
     await renderPDF();
+    if (opts.restoreLocation) await restoreViewPosition(opts.restoreLocation);
     // Extract text in the background for PDF search
     extractPdfText().catch(() => {});
   } catch (err) {
@@ -2565,6 +2573,42 @@ async function renderPDF() {
 
 function updateZoomLabel() {
   document.getElementById("pdf-zoom-level").textContent = Math.round(S.pdfZoom * 100) + "%";
+}
+
+
+async function captureViewPosition() {
+  if (!S.pdfDoc || !S.projectName) return null;
+  const container = document.getElementById("pdf-container");
+  const pageNum = parseInt(document.getElementById("pdf-page-input").value) || 1;
+  const canvas = container.querySelector(`canvas[data-page-num="${pageNum}"]`);
+  if (!canvas) return null;
+  const scale = parseFloat(canvas.dataset.scale);
+  if (!scale) return null;
+  const wrapper = canvas.closest(".pdf-page-wrapper") || canvas;
+  const centerY = container.scrollTop + container.clientHeight / 2;
+  const pdfY = (centerY - wrapper.offsetTop) / scale;
+  const pdfX = (canvas.clientWidth / 2) / scale;
+  try {
+    const data = await api("GET",
+      `/api/projects/${enc(S.projectName)}/synctex?page=${pageNum}&x=${pdfX}&y=${pdfY}`);
+    if (data.file && data.line) return { file: data.file, line: data.line };
+  } catch {}
+  return null;
+}
+
+async function restoreViewPosition(location) {
+  if (!location || !S.pdfDoc || !S.projectName) return;
+  try {
+    const data = await api("GET",
+      `/api/projects/${enc(S.projectName)}/synctex/forward?file=${enc(location.file)}&line=${location.line}`);
+    if (!data.page) return;
+    const container = document.getElementById("pdf-container");
+    const canvas = container.querySelector(`canvas[data-page-num="${data.page}"]`);
+    if (!canvas) return;
+    const scale = parseFloat(canvas.dataset.scale);
+    const wrapper = canvas.closest(".pdf-page-wrapper") || canvas;
+    container.scrollTop = wrapper.offsetTop + data.y * scale - container.clientHeight / 2;
+  } catch {}
 }
 
 async function syncTexInverseSearch(page, x, y) {
@@ -4036,10 +4080,15 @@ document.querySelectorAll(".layout-btn").forEach(btn => {
 });
 document.getElementById("btn-sidebar-toggle").addEventListener("click", toggleSidebar);
 document.getElementById("btn-sidebar-status-toggle").addEventListener("click", toggleSidebar);
-document.getElementById("btn-pdf-refresh").onclick = () => {
+document.getElementById("btn-pdf-refresh").onclick = async () => {
   if (S.projectName) {
     const base = (S.currentFile || "main.tex").replace(/\.tex$/, ".pdf");
-    loadPDF(`/api/projects/${enc(S.projectName)}/output/${enc(base)}`);
+    const opts = {};
+    if (S.pdfDoc) {
+      const loc = await captureViewPosition();
+      if (loc) { opts.preserveZoom = true; opts.restoreLocation = loc; }
+    }
+    loadPDF(`/api/projects/${enc(S.projectName)}/output/${enc(base)}`, opts);
   }
 };
 document.getElementById("btn-pdf-zoom-in").onclick = () => { S.pdfZoom = Math.min(S.pdfZoom + 0.25, 5); updateZoomLabel(); renderPDF(); };
