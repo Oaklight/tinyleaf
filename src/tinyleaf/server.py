@@ -18,9 +18,15 @@ _CORS_HEADERS = {
     "Access-Control-Allow-Headers": "Content-Type",
 }
 
-app = App()
+app = App(max_body_size=50 * 1024 * 1024)
 
 _config: dict = {}
+
+
+def _json_body(request):
+    """Parse JSON body, returning {} for empty bodies."""
+    return request.json() if request.body else {}
+
 
 # Extension → MIME type mapping for static assets
 _MIME_TYPES = {
@@ -275,8 +281,11 @@ def api_compile(request, name):
 
 @app.get("/api/projects/<name>/compile/<compile_id>/stream")
 async def api_compile_stream(request, name, compile_id):
+    from tinyleaf import compiler
     from tinyleaf.handlers import sse_compile_stream
 
+    if not compiler.get_job(compile_id):
+        abort(404, "Compile job not found")
     return StreamingResponse(
         sse_compile_stream(compile_id, name),
         content_type="text/event-stream",
@@ -351,7 +360,7 @@ def api_project_symbols(request, name):
 def api_delete_project(request, name):
     from tinyleaf.handlers import handle_delete_project
 
-    return handle_delete_project(request.json(), _config, name)
+    return handle_delete_project(_json_body(request), _config, name)
 
 
 @app.post("/api/projects/<name>/rename-project")
