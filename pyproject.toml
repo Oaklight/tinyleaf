@@ -79,3 +79,6 @@ include = ["src"]
 
 [tool.ty.rules]
 unresolved-import = "ignore"
+
+[tool.zerodep]
+vendor-dir = "src/tinyleaf/_vendor"
