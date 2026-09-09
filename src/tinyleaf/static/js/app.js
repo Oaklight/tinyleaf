@@ -12,6 +12,9 @@ const I18N = {
     push: "Push",
     changes: "Changes",
     history: "History",
+    no_commits: "No commits yet",
+    loading: "Loading...",
+    empty_commit: "Empty commit",
     theme: "Theme",
     theme_group_light: "Light",
     theme_group_dark: "Dark",
@@ -237,6 +240,9 @@ const I18N = {
     push: "推送",
     changes: "变更",
     history: "历史",
+    no_commits: "暂无提交",
+    loading: "加载中...",
+    empty_commit: "空提交",
     theme: "主题",
     theme_group_light: "明亮",
     theme_group_dark: "深色",
@@ -3650,7 +3656,7 @@ async function refreshGitLog() {
   try {
     const commits = await api("GET", `/api/projects/${enc(S.projectName)}/git/log`);
     if (!commits.length) {
-      list.innerHTML = `<div class="git-log-empty">No commits yet</div>`;
+      list.innerHTML = `<div class="git-log-empty">${t("no_commits")}</div>`;
       return;
     }
     for (const c of commits) {
@@ -3672,15 +3678,15 @@ async function showCommitDiff(hash) {
   _openDiffPane();
   document.getElementById("diff-title").textContent = hash;
   const content = document.getElementById("diff-content");
-  content.innerHTML = `<div class="diff-no-changes">Loading...</div>`;
+  content.innerHTML = `<div class="diff-no-changes">${t("loading")}</div>`;
   try {
     const resp = await fetch(`/api/projects/${enc(S.projectName)}/git/diff?commit=${encodeURIComponent(hash)}`);
     const text = await resp.text();
     if (!text.trim()) {
-      content.innerHTML = `<div class="diff-no-changes">Empty commit</div>`;
+      content.innerHTML = `<div class="diff-no-changes">${t("empty_commit")}</div>`;
       return;
     }
-    _renderDiffText(content, text);
+    _renderDiffText(text, content);
   } catch (err) {
     content.innerHTML = `<div class="diff-no-changes">${esc(err.message)}</div>`;
   }
