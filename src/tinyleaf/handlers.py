@@ -635,11 +635,11 @@ def handle_cancel_compile(compile_id):
 
 
 async def sse_compile_stream(compile_id, name):
-    """Async generator that yields SSE events for a compile job."""
+    """Async generator that yields SSE events for a compile job.
+
+    Caller must verify the job exists before invoking this generator.
+    """
     job = compiler.get_job(compile_id)
-    if not job:
-        yield _sse_frame({"error": "Compile job not found"}, event="error")
-        return
 
     sent_index = 0
     while True:
