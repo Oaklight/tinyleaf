@@ -1,6 +1,7 @@
 """Git operations via subprocess for tinyleaf."""
 
 import os
+import re
 import subprocess
 
 
@@ -228,6 +229,8 @@ def show_commit(project_dir, commit_hash):
         Unified diff text for the commit.
     """
     if not has_git(project_dir):
+        return ""
+    if not re.match(r"^[0-9a-fA-F]{4,40}$", commit_hash):
         return ""
     rc, out, _ = _run_git(project_dir, "show", "--format=", "--patch", commit_hash)
     return out if rc == 0 else ""
