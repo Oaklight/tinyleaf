@@ -71,23 +71,39 @@ jobs:
           path: dist/*
           retention-days: 7
 
+  binaries:
+    needs: prepare
+    uses: ./.github/workflows/nuitka.yml
+    with:
+      ref: v${{ inputs.version }}
+      platforms: "all"
+      upx: false
+
   github-release:
-    needs: build-publish
+    needs: [build-publish, binaries]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download artifacts
+      - name: Download dist artifacts
         uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist/
 
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tinyleaf-${{ inputs.version }}-*
+          path: binaries/
+          merge-multiple: true
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${{ inputs.version }}" dist/* \
+          ls -lh dist/ binaries/
+          gh release create "v${{ inputs.version }}" dist/* binaries/* \
             --repo "${{ github.repository }}" \
             --title "v${{ inputs.version }}" \
             --generate-notes
