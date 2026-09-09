@@ -4178,6 +4178,7 @@ function setupKeybindings() {
     if (matchesKeybinding(e, "layout_pdf")) { e.preventDefault(); setLayout("pdf"); return; }
     if (matchesKeybinding(e, "close_tab")) {
       if (S.activeTab) { e.preventDefault(); closeTab(S.activeTab); }
+      return;
     }
     const isPrev = matchesKeybinding(e, "prev_tab");
     if (isPrev || matchesKeybinding(e, "next_tab")) {
