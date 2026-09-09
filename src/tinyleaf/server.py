@@ -158,7 +158,7 @@ async def api_docker_rmi(request):
 
 
 @app.post("/api/docker/cancel-pull")
-def api_cancel_docker_pull(request):
+async def api_cancel_docker_pull(request):
     from tinyleaf.handlers import handle_cancel_docker_pull
 
     return handle_cancel_docker_pull(request.json())
@@ -294,7 +294,7 @@ async def api_compile_stream(request, name, compile_id):
 
 
 @app.post("/api/projects/<name>/compile/<compile_id>/cancel")
-def api_cancel_compile(request, name, compile_id):
+async def api_cancel_compile(request, name, compile_id):
     from tinyleaf.handlers import handle_cancel_compile
 
     return handle_cancel_compile(compile_id)
