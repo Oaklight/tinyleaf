@@ -2413,12 +2413,14 @@ async function compile() {
       evtSource.close();
       S.compiling = false;
       S.compileId = null;
+      S._preCompileView = null;
       btnCompile.textContent = t("compile");
       setStatus(t("connection_lost"), "error");
     };
   } catch (err) {
     S.compiling = false;
     S.compileId = null;
+    S._preCompileView = null;
     btnCompile.textContent = t("compile");
     setStatus(`${t("compile_error")}: ${err.message}`, "error");
   }
@@ -2579,7 +2581,6 @@ function updateZoomLabel() {
   document.getElementById("pdf-zoom-level").textContent = Math.round(S.pdfZoom * 100) + "%";
 }
 
-
 async function captureViewPosition() {
   if (!S.pdfDoc || !S.projectName) return null;
   const container = document.getElementById("pdf-container");
@@ -2596,7 +2597,9 @@ async function captureViewPosition() {
     const data = await api("GET",
       `/api/projects/${enc(S.projectName)}/synctex?page=${pageNum}&x=${pdfX}&y=${pdfY}`);
     if (data.file && data.line) return { file: data.file, line: data.line };
-  } catch {}
+  } catch (err) {
+    console.warn("captureViewPosition:", err.message);
+  }
   return null;
 }
 
@@ -2612,7 +2615,9 @@ async function restoreViewPosition(location) {
     const scale = parseFloat(canvas.dataset.scale);
     const wrapper = canvas.closest(".pdf-page-wrapper") || canvas;
     container.scrollTop = wrapper.offsetTop + data.y * scale - container.clientHeight / 2;
-  } catch {}
+  } catch (err) {
+    console.warn("restoreViewPosition:", err.message);
+  }
 }
 
 async function syncTexInverseSearch(page, x, y) {
