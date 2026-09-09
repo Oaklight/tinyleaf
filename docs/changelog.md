@@ -36,6 +36,7 @@ hide:
 - 关闭标签快捷键穿透到标签切换的问题
 - httpserver 列表返回类型转换（项目/文件列表接口 500 错误）
 - 超时时 latexmk/Docker 镜像检查的子进程孤儿问题
+- PDF 面板在分割模式下调整过宽度后，切换到仅 PDF 布局时无法填满视口宽度
 
 ## [0.5.1](https://github.com/Oaklight/tinyleaf/releases/tag/v0.5.1) - 2026-06-01
 
