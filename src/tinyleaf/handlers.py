@@ -576,6 +576,9 @@ def handle_upload(request, config, name):
 def handle_get_config(config, name):
     project_dir = _get_project_dir(config, name)
 
+    if config["mode"] == "multi":
+        registry.touch_project(config["config_dir"], name)
+
     config_data = _read_project_config(project_dir)
     if "main_file" not in config_data:
         config_data["main_file"] = _detect_main_file(project_dir)
