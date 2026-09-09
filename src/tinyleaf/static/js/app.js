@@ -3744,7 +3744,8 @@ function showShortcutsPopup() {
 
   for (const [id, b] of Object.entries(keybindings)) {
     if (b.group && groups[b.group]) {
-      groups[b.group].push({ id, keys: keybindingLabel(id), desc: t(b.desc) });
+      const overrides = (S._globalSettings && S._globalSettings.keybindings) || {};
+      groups[b.group].push({ id, keys: keybindingLabel(id), desc: t(b.desc), customized: !!overrides[id] });
     }
   }
   // Add non-rebindable entries
@@ -3762,53 +3763,94 @@ function showShortcutsPopup() {
         <div class="shortcut-row${s.id.startsWith("_") ? "" : " rebindable"}" data-action="${s.id}">
           <span class="shortcut-desc">${s.desc}</span>
           <span class="shortcut-keys">${s.keys.split("+").map(k => `<kbd>${k}</kbd>`).join('<span>+</span>')}</span>
+          ${s.customized ? `<button class="reset-btn" title="${t("reset_keybinding")}">&times;</button>` : ""}
         </div>
       `).join("")}
     </div>
   `;
   }).join("");
 
-  // Rebind click handler
   container.querySelectorAll(".shortcut-row.rebindable").forEach(row => {
-    row.onclick = () => startRebind(row.dataset.action, row);
+    row.onclick = (e) => {
+      if (e.target.closest(".reset-btn")) { resetKeybinding(row.dataset.action); return; }
+      startRebind(row.dataset.action, row);
+    };
   });
 
   document.getElementById("shortcuts-popup").classList.add("open");
 }
 
+let _activeRebindCleanup = null;
+
 function startRebind(actionId, row) {
+  if (_activeRebindCleanup) _activeRebindCleanup();
   const keysSpan = row.querySelector(".shortcut-keys");
   const orig = keysSpan.innerHTML;
   keysSpan.innerHTML = '<kbd class="recording">' + t("press_new_key") + '</kbd>';
   row.classList.add("recording");
 
+  function cleanup() {
+    row.classList.remove("recording");
+    document.removeEventListener("keydown", handler, true);
+    _activeRebindCleanup = null;
+  }
+
+  _activeRebindCleanup = () => { keysSpan.innerHTML = orig; cleanup(); };
+
   function handler(e) {
     e.preventDefault();
     e.stopPropagation();
-    if (e.key === "Escape") {
-      keysSpan.innerHTML = orig;
-      row.classList.remove("recording");
-      document.removeEventListener("keydown", handler, true);
-      return;
-    }
+    if (e.key === "Escape") { _activeRebindCleanup(); return; }
     if (["Control", "Meta", "Shift", "Alt"].includes(e.key)) return;
 
     const newBinding = { key: e.key };
-    if (e.ctrlKey || e.metaKey) newBinding.mod = true;
+    if (e.metaKey && !e.ctrlKey) newBinding.mod = true;
+    else if (e.ctrlKey && !e.metaKey) {
+      const origBinding = DEFAULT_KEYBINDINGS[actionId];
+      if (origBinding && origBinding.ctrl) newBinding.ctrl = true;
+      else newBinding.mod = true;
+    } else if (e.ctrlKey || e.metaKey) newBinding.mod = true;
     if (e.shiftKey) newBinding.shift = true;
     if (e.altKey) newBinding.alt = true;
 
+    // Conflict detection
+    for (const [id, b] of Object.entries(keybindings)) {
+      if (id === actionId) continue;
+      const testEvt = { key: newBinding.key, ctrlKey: !!newBinding.mod || !!newBinding.ctrl, metaKey: !!newBinding.mod, shiftKey: !!newBinding.shift, altKey: !!newBinding.alt };
+      if (matchesKeybinding(testEvt, id)) {
+        const conflictDesc = t(b.desc);
+        if (!confirm(`This combo is already used by "${conflictDesc}". Override?`)) {
+          _activeRebindCleanup();
+          return;
+        }
+        break;
+      }
+    }
+
     const overrides = (S._globalSettings && S._globalSettings.keybindings) || {};
     overrides[actionId] = newBinding;
-    api("PUT", "/api/settings", { keybindings: overrides });
+    api("PUT", "/api/settings", { keybindings: overrides }).catch(err => {
+      console.warn("Failed to save keybinding:", err.message);
+    });
     S._globalSettings = S._globalSettings || {};
     S._globalSettings.keybindings = overrides;
     loadKeybindings(overrides);
-    row.classList.remove("recording");
-    document.removeEventListener("keydown", handler, true);
+    cleanup();
     showShortcutsPopup();
   }
   document.addEventListener("keydown", handler, true);
+}
+
+function resetKeybinding(actionId) {
+  const overrides = (S._globalSettings && S._globalSettings.keybindings) || {};
+  delete overrides[actionId];
+  api("PUT", "/api/settings", { keybindings: overrides }).catch(err => {
+    console.warn("Failed to save keybinding:", err.message);
+  });
+  S._globalSettings = S._globalSettings || {};
+  S._globalSettings.keybindings = overrides;
+  loadKeybindings(overrides);
+  showShortcutsPopup();
 }
 
 // ══════════════════════════════════════════
@@ -4072,7 +4114,16 @@ let keybindings = {};
 function loadKeybindings(overrides) {
   keybindings = {};
   for (const [id, def] of Object.entries(DEFAULT_KEYBINDINGS)) {
-    keybindings[id] = overrides[id] ? { ...def, ...overrides[id] } : { ...def };
+    if (overrides[id]) {
+      const o = overrides[id];
+      const pick = {};
+      for (const k of ["key", "mod", "shift", "alt", "ctrl"]) {
+        if (o[k] !== undefined) pick[k] = o[k];
+      }
+      keybindings[id] = { ...def, ...pick };
+    } else {
+      keybindings[id] = { ...def };
+    }
   }
 }
 
@@ -4104,32 +4155,35 @@ function setupKeybindings() {
   loadKeybindings(settings.keybindings || {});
 
   document.addEventListener("keydown", (e) => {
-    if (matchesKeybinding(e, "save")) { e.preventDefault(); saveCurrentFile(); }
-    if (matchesKeybinding(e, "forward_search")) { e.preventDefault(); syncTexForwardSearch(); }
-    if (matchesKeybinding(e, "compile")) { e.preventDefault(); compile(); }
-    if (matchesKeybinding(e, "files_tab")) { e.preventDefault(); switchSidebarTab("files"); }
-    if (matchesKeybinding(e, "git_tab")) { e.preventDefault(); switchSidebarTab("git"); }
-    if (matchesKeybinding(e, "search_tab")) { e.preventDefault(); switchSidebarTab("search"); }
-    if (matchesKeybinding(e, "outline_tab")) { e.preventDefault(); switchSidebarTab("outline"); }
-    if (matchesKeybinding(e, "commit")) { e.preventDefault(); doCommit(); }
-    if (matchesKeybinding(e, "push")) { e.preventDefault(); doPush(); }
-    if (matchesKeybinding(e, "shortcuts")) { e.preventDefault(); showShortcutsPopup(); }
-    if (matchesKeybinding(e, "toggle_log")) { e.preventDefault(); toggleLog(); }
-    if (matchesKeybinding(e, "toggle_sidebar")) { e.preventDefault(); toggleSidebar(); }
+    if (matchesKeybinding(e, "save")) { e.preventDefault(); saveCurrentFile(); return; }
+    if (matchesKeybinding(e, "forward_search")) { e.preventDefault(); syncTexForwardSearch(); return; }
+    if (matchesKeybinding(e, "compile")) { e.preventDefault(); compile(); return; }
+    if (matchesKeybinding(e, "files_tab")) { e.preventDefault(); switchSidebarTab("files"); return; }
+    if (matchesKeybinding(e, "git_tab")) { e.preventDefault(); switchSidebarTab("git"); return; }
+    if (matchesKeybinding(e, "search_tab")) { e.preventDefault(); switchSidebarTab("search"); return; }
+    if (matchesKeybinding(e, "outline_tab")) { e.preventDefault(); switchSidebarTab("outline"); return; }
+    if (matchesKeybinding(e, "commit")) { e.preventDefault(); doCommit(); return; }
+    if (matchesKeybinding(e, "push")) { e.preventDefault(); doPush(); return; }
+    if (matchesKeybinding(e, "shortcuts")) { e.preventDefault(); showShortcutsPopup(); return; }
+    if (matchesKeybinding(e, "toggle_log")) { e.preventDefault(); toggleLog(); return; }
+    if (matchesKeybinding(e, "toggle_sidebar")) { e.preventDefault(); toggleSidebar(); return; }
     if (matchesKeybinding(e, "replace")) {
       e.preventDefault();
       if (S.editorView) openSearchPanel(S.editorView);
+      return;
     }
-    if (matchesKeybinding(e, "quick_open")) { e.preventDefault(); openQuickOpen(); }
-    if (matchesKeybinding(e, "layout_editor")) { e.preventDefault(); setLayout("editor"); }
-    if (matchesKeybinding(e, "layout_split")) { e.preventDefault(); setLayout("split"); }
-    if (matchesKeybinding(e, "layout_pdf")) { e.preventDefault(); setLayout("pdf"); }
+    if (matchesKeybinding(e, "quick_open")) { e.preventDefault(); openQuickOpen(); return; }
+    if (matchesKeybinding(e, "layout_editor")) { e.preventDefault(); setLayout("editor"); return; }
+    if (matchesKeybinding(e, "layout_split")) { e.preventDefault(); setLayout("split"); return; }
+    if (matchesKeybinding(e, "layout_pdf")) { e.preventDefault(); setLayout("pdf"); return; }
     if (matchesKeybinding(e, "close_tab")) {
       if (S.activeTab) { e.preventDefault(); closeTab(S.activeTab); }
     }
-    if (matchesKeybinding(e, "next_tab") || matchesKeybinding(e, "prev_tab")) {
+    const isPrev = matchesKeybinding(e, "prev_tab");
+    if (isPrev || matchesKeybinding(e, "next_tab")) {
       e.preventDefault();
-      cycleTabs(matchesKeybinding(e, "prev_tab") ? -1 : 1);
+      cycleTabs(isPrev ? -1 : 1);
+      return;
     }
     if (matchesKeybinding(e, "pdf_search")) {
       const pdfPane = document.getElementById("pdf-pane");
