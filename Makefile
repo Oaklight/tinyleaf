@@ -1,6 +1,6 @@
 IMAGE_NAME = oaklight/tinyleaf
 REGISTRY_MIRROR ?= docker.io
-VERSION := $(shell grep -oP '__version__\s*=\s*"\K[^"]+' src/tinyleaf/__init__.py)
+VERSION := $(shell sed -n 's/^__version__ = "\(.*\)"/\1/p' src/tinyleaf/__init__.py)
 
 BUILD_ARGS = --build-arg REGISTRY_MIRROR=$(REGISTRY_MIRROR)
 
@@ -156,7 +156,7 @@ help:
 	@echo ""
 	@echo "Binary:"
 	@echo "  build-binary     - Build native Nuitka binary"
-	@echo "  build-binary-musl- Build musl-linked binary (Docker)"
+	@echo "  build-binary-musl - Build musl-linked binary (Docker)"
 	@echo "  clean-binary     - Clean build artifacts (keep binaries)"
 	@echo "  clean-binary-all - Clean all binary artifacts"
 	@echo ""

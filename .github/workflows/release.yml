@@ -81,6 +81,7 @@ jobs:
 
   github-release:
     needs: [build-publish, binaries]
+    if: always() && needs.build-publish.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -92,6 +93,7 @@ jobs:
           path: dist/
 
       - name: Download binary artifacts
+        if: needs.binaries.result == 'success'
         uses: actions/download-artifact@v4
         with:
           pattern: tinyleaf-${{ inputs.version }}-*
@@ -102,8 +104,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ls -lh dist/ binaries/
-          gh release create "v${{ inputs.version }}" dist/* binaries/* \
+          ls -lh dist/
+          ls -lh binaries/ 2>/dev/null || echo "No binary artifacts"
+          gh release create "v${{ inputs.version }}" dist/* $(ls binaries/* 2>/dev/null) \
             --repo "${{ github.repository }}" \
             --title "v${{ inputs.version }}" \
             --generate-notes
