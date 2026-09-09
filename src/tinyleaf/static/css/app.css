@@ -1296,6 +1296,8 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
 .shortcut-row.rebindable:hover { background: var(--bg-hover); border-radius: 4px; }
 .shortcut-row.recording { background: var(--accent-bg, rgba(99,102,241,0.1)); border-radius: 4px; }
 kbd.recording { background: var(--accent); color: white; animation: pulse 1s infinite; }
+.reset-btn { background: none; border: none; color: var(--fg-muted); cursor: pointer; font-size: 14px; padding: 0 4px; opacity: 0.6; }
+.reset-btn:hover { opacity: 1; color: var(--accent); }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 
 /* ── Word count popup ── */
