@@ -51,6 +51,22 @@ def _print_version():
         print("  ✓ up to date")
 
 
+def _check_port_available(host: str, port: int):
+    """Exit with a clean message if the port is already in use."""
+    import socket
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((host, port))
+    except OSError:
+        print(
+            f"Error: port {port} is already in use. Use --port to specify a different port.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="tinyleaf",
@@ -188,6 +204,8 @@ def main():
     else:
         print(f"  Config:   {config_dir}")
     print(f"  URL:      {url}")
+
+    _check_port_available(args.host, args.port)
 
     if not args.no_browser:
         webbrowser.open(url)

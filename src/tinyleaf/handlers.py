@@ -685,6 +685,9 @@ def handle_get_output(config, name, file_path):
     project_dir = _get_project_dir(config, name)
     full_path = _ensure_within_project(project_dir, file_path)
 
+    if not os.path.isfile(full_path):
+        abort(404, "Output file not found")
+
     ext = os.path.splitext(file_path)[1].lower()
     content_type = _OUTPUT_MIME_MAP.get(ext, "application/octet-stream")
 
