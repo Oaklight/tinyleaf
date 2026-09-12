@@ -1,7 +1,11 @@
 # tinyleaf
 
 <p align="center">
-  <img src="assets/brand/tinyleaf-leafpen-readme-light.svg" alt="Tinyleaf" width="560">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/tinyleaf-leafpen-readme-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/brand/tinyleaf-leafpen-readme-light.svg">
+    <img src="assets/brand/tinyleaf-leafpen-readme.svg" alt="Tinyleaf" width="560">
+  </picture>
 </p>
 
 [![PyPI version](https://img.shields.io/pypi/v/tinyleaf?color=green)](https://pypi.org/project/tinyleaf/)

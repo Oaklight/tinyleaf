@@ -16,8 +16,10 @@ The Tinyleaf 0.5.0 brand refresh uses:
 - `assets/logo.svg` — primary icon
 - `assets/logo-dark.svg` — primary icon for dark contexts
 - `assets/brand/tinyleaf-leafpen-icon.svg`
+- `assets/brand/tinyleaf-leafpen-wordmark.svg` — unified wordmark, auto-switches via `prefers-color-scheme`
 - `assets/brand/tinyleaf-leafpen-wordmark-light.svg`
 - `assets/brand/tinyleaf-leafpen-wordmark-dark.svg`
+- `assets/brand/tinyleaf-leafpen-readme.svg` — unified readme banner, auto-switches via `prefers-color-scheme`
 - `assets/brand/tinyleaf-leafpen-readme-light.svg`
 - `assets/brand/tinyleaf-leafpen-readme-dark.svg`
 
