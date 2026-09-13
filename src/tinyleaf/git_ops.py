@@ -26,6 +26,55 @@ def has_git(project_dir):
     return os.path.isdir(os.path.join(project_dir, ".git"))
 
 
+def list_branches(project_dir):
+    """List local and remote branches.
+
+    Returns:
+        Dict with current branch name, local branch list, and remote branch list.
+    """
+    if not has_git(project_dir):
+        return {"current": "", "local": [], "remote": []}
+
+    # Current branch
+    rc, out, _ = _run_git(project_dir, "branch", "--show-current")
+    current = out.strip() if rc == 0 else ""
+
+    # Local branches
+    local = []
+    rc, out, _ = _run_git(project_dir, "branch", "--list", "--no-color")
+    if rc == 0:
+        for line in out.split("\n"):
+            line = line.lstrip("* ").strip()
+            if line:
+                local.append(line)
+
+    # Remote branches
+    remote = []
+    rc, out, _ = _run_git(project_dir, "branch", "-r", "--list", "--no-color")
+    if rc == 0:
+        for line in out.split("\n"):
+            line = line.strip()
+            if line and "HEAD ->" not in line:
+                remote.append(line)
+
+    return {"current": current, "local": local, "remote": remote}
+
+
+def fetch(project_dir):
+    """Fetch from all remotes.
+
+    Returns:
+        Dict with success status and message.
+    """
+    if not has_git(project_dir):
+        return {"success": False, "message": "Not a git repository"}
+
+    rc, out, err = _run_git(project_dir, "fetch", "--all")
+    if rc != 0:
+        return {"success": False, "message": err or out}
+    return {"success": True, "message": (out + err).strip()}
+
+
 def status(project_dir):
     """Get git status as structured data.
 
