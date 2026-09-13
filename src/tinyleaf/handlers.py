@@ -1122,10 +1122,12 @@ def handle_git_branches(query_params, config, name):
     """List branches, optionally fetching first."""
     project_dir = _get_project_dir(config, name)
 
-    result = git_ops.list_branches(project_dir)
+    fetch_info = None
     if query_params.get("fetch", [""])[0] == "true":
-        fetch_result = git_ops.fetch(project_dir)
-        result["fetch"] = fetch_result
+        fetch_info = git_ops.fetch(project_dir)
+    result = git_ops.list_branches(project_dir)
+    if fetch_info is not None:
+        result["fetch"] = fetch_info
     return result
 
 
@@ -1248,6 +1250,8 @@ def handle_git_worktree_add(body, config, name):
         abort(400, "Branch name required")
     # Default path: sibling directory named <project>--<branch>
     wt_name = body.get("name", "").strip() or branch.replace("/", "-")
+    if os.sep in wt_name or wt_name.startswith(".") or ".." in wt_name:
+        abort(400, "Invalid worktree name")
     parent_dir = os.path.dirname(os.path.abspath(project_dir))
     project_basename = os.path.basename(os.path.abspath(project_dir))
     wt_path = os.path.join(parent_dir, f"{project_basename}--{wt_name}")

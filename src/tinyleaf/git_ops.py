@@ -141,7 +141,7 @@ def delete_branch(project_dir, name, force=False):
         return {"success": False, "message": f"Cannot delete the current branch: {name}"}
 
     flag = "-D" if force else "-d"
-    rc, out, err = _run_git(project_dir, "branch", flag, name)
+    rc, out, err = _run_git(project_dir, "branch", flag, "--", name)
     if rc != 0:
         return {"success": False, "message": (err or out).strip()}
     return {"success": True, "message": (out + err).strip()}

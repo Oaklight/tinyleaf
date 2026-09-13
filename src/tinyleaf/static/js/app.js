@@ -3804,7 +3804,7 @@ async function showBranchDropdown() {
       const nameSpan = document.createElement("span");
       nameSpan.className = "branch-name";
       nameSpan.textContent = b;
-      nameSpan.style.color = "var(--fg-muted)";
+      nameSpan.style.color = "var(--text-dim)";
       item.appendChild(nameSpan);
       // Extract local name from remote ref (e.g., "origin/feature" → "feature")
       const localName = b.includes("/") ? b.substring(b.indexOf("/") + 1) : b;
@@ -4054,12 +4054,16 @@ async function refreshWorktrees() {
 
 async function switchWorktree(path) {
   // Check for unsaved editor changes before switching
-  if (S.currentFile && S.modified.has(S.currentFile)) {
+  if (S.modified && S.modified.size > 0) {
     const action = await new Promise((resolve) => {
       const overlay = document.createElement("div");
       overlay.className = "git-dialog-overlay";
       const dialog = document.createElement("div");
       dialog.className = "git-dialog";
+
+      const closeDialog = () => { overlay.remove(); document.removeEventListener("keydown", escHandler); resolve("cancel"); };
+      const escHandler = (e) => { if (e.key === "Escape") closeDialog(); };
+      document.addEventListener("keydown", escHandler);
 
       const title = document.createElement("h3");
       title.textContent = t("unsaved_changes");
@@ -4071,17 +4075,17 @@ async function switchWorktree(path) {
       const cancelBtn = document.createElement("button");
       cancelBtn.className = "sm";
       cancelBtn.textContent = t("cancel");
-      cancelBtn.onclick = () => { overlay.remove(); resolve("cancel"); };
+      cancelBtn.onclick = () => closeDialog();
 
       const discardBtn = document.createElement("button");
       discardBtn.className = "sm";
       discardBtn.textContent = t("discard_and_continue");
-      discardBtn.onclick = () => { overlay.remove(); resolve("discard"); };
+      discardBtn.onclick = () => { overlay.remove(); document.removeEventListener("keydown", escHandler); resolve("discard"); };
 
       const saveBtn = document.createElement("button");
       saveBtn.className = "sm primary";
       saveBtn.textContent = t("save_and_continue");
-      saveBtn.onclick = () => { overlay.remove(); resolve("save"); };
+      saveBtn.onclick = () => { overlay.remove(); document.removeEventListener("keydown", escHandler); resolve("save"); };
 
       btns.appendChild(cancelBtn);
       btns.appendChild(discardBtn);
@@ -4090,11 +4094,11 @@ async function switchWorktree(path) {
 
       overlay.appendChild(dialog);
       document.body.appendChild(overlay);
-      overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); resolve("cancel"); } };
+      overlay.onclick = (e) => { if (e.target === overlay) closeDialog(); };
     });
     if (action === "cancel") return;
     if (action === "save") await saveCurrentFile();
-    if (action === "discard") S.modified.delete(S.currentFile);
+    if (action === "discard") S.modified.clear();
   }
 
   setStatus(t("worktree_switching"));
@@ -4140,7 +4144,7 @@ async function addWorktreeDialog() {
   const selectDiv = document.createElement("div");
   selectDiv.style.cssText = "margin-bottom:12px";
   const selectLabel = document.createElement("label");
-  selectLabel.style.cssText = "font-size:12px;color:var(--fg-muted);display:block;margin-bottom:4px";
+  selectLabel.style.cssText = "font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px";
   selectLabel.textContent = t("select_branch");
   selectDiv.appendChild(selectLabel);
 
