@@ -75,6 +75,96 @@ def fetch(project_dir):
     return {"success": True, "message": (out + err).strip()}
 
 
+def switch_branch(project_dir, branch):
+    """Switch to an existing branch.
+
+    Returns:
+        Dict with success status and message.
+    """
+    if not has_git(project_dir):
+        return {"success": False, "message": "Not a git repository"}
+
+    rc, out, err = _run_git(project_dir, "switch", branch)
+    if rc != 0:
+        return {"success": False, "message": (err or out).strip()}
+    return {"success": True, "message": (out + err).strip()}
+
+
+def create_branch(project_dir, name, start_point=None):
+    """Create and switch to a new branch.
+
+    Returns:
+        Dict with success status and message.
+    """
+    if not has_git(project_dir):
+        return {"success": False, "message": "Not a git repository"}
+
+    # Validate branch name
+    rc, _, err = _run_git(project_dir, "check-ref-format", "--branch", name)
+    if rc != 0:
+        return {"success": False, "message": f"Invalid branch name: {name}"}
+
+    args = ["switch", "-c", name]
+    if start_point:
+        args.append(start_point)
+
+    rc, out, err = _run_git(project_dir, *args)
+    if rc != 0:
+        return {"success": False, "message": (err or out).strip()}
+    return {"success": True, "message": (out + err).strip()}
+
+
+def delete_branch(project_dir, name, force=False):
+    """Delete a branch.
+
+    Returns:
+        Dict with success status and message.
+    """
+    if not has_git(project_dir):
+        return {"success": False, "message": "Not a git repository"}
+
+    # Refuse to delete the current branch
+    rc, out, _ = _run_git(project_dir, "branch", "--show-current")
+    if rc == 0 and out.strip() == name:
+        return {"success": False, "message": f"Cannot delete the current branch: {name}"}
+
+    flag = "-D" if force else "-d"
+    rc, out, err = _run_git(project_dir, "branch", flag, name)
+    if rc != 0:
+        return {"success": False, "message": (err or out).strip()}
+    return {"success": True, "message": (out + err).strip()}
+
+
+def stash(project_dir):
+    """Stash working directory changes.
+
+    Returns:
+        Dict with success status and message.
+    """
+    if not has_git(project_dir):
+        return {"success": False, "message": "Not a git repository"}
+
+    rc, out, err = _run_git(project_dir, "stash")
+    if rc != 0:
+        return {"success": False, "message": (err or out).strip()}
+    return {"success": True, "message": (out + err).strip()}
+
+
+def stash_pop(project_dir):
+    """Pop the latest stash.
+
+    Returns:
+        Dict with success status and message.
+    """
+    if not has_git(project_dir):
+        return {"success": False, "message": "Not a git repository"}
+
+    rc, out, err = _run_git(project_dir, "stash", "pop")
+    if rc != 0:
+        return {"success": False, "message": (err or out).strip()}
+    return {"success": True, "message": (out + err).strip()}
+
+
 def status(project_dir):
     """Get git status as structured data.
 

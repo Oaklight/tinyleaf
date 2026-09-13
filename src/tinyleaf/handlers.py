@@ -1128,6 +1128,39 @@ def handle_git_branches(query_params, config, name):
     return git_ops.list_branches(project_dir)
 
 
+def handle_git_switch_branch(body, config, name):
+    project_dir = _get_project_dir(config, name)
+    branch = body.get("branch", "").strip()
+    if not branch:
+        abort(400, "Branch name required")
+    return git_ops.switch_branch(project_dir, branch)
+
+
+def handle_git_create_branch(body, config, name):
+    project_dir = _get_project_dir(config, name)
+    branch_name = body.get("name", "").strip()
+    if not branch_name:
+        abort(400, "Branch name required")
+    start_point = body.get("start_point", "").strip() or None
+    return git_ops.create_branch(project_dir, branch_name, start_point=start_point)
+
+
+def handle_git_delete_branch(body, config, name, branch_name):
+    project_dir = _get_project_dir(config, name)
+    force = body.get("force", False)
+    return git_ops.delete_branch(project_dir, branch_name, force=force)
+
+
+def handle_git_stash(config, name):
+    project_dir = _get_project_dir(config, name)
+    return git_ops.stash(project_dir)
+
+
+def handle_git_stash_pop(config, name):
+    project_dir = _get_project_dir(config, name)
+    return git_ops.stash_pop(project_dir)
+
+
 def handle_git_status(config, name):
     project_dir = _get_project_dir(config, name)
     return git_ops.status(project_dir)
