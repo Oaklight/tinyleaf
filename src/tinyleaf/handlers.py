@@ -1196,3 +1196,46 @@ def handle_git_pull(config, name):
 def handle_git_log(config, name):
     project_dir = _get_project_dir(config, name)
     return git_ops.log(project_dir)
+
+
+# ── Git Worktrees ──
+
+
+def handle_git_worktree_list(config, name):
+    project_dir = _get_project_dir(config, name)
+    return git_ops.worktree_list(project_dir)
+
+
+def handle_git_worktree_add(body, config, name):
+    project_dir = _get_project_dir(config, name)
+    branch = body.get("branch", "").strip()
+    if not branch:
+        abort(400, "Branch name required")
+    # Default path: sibling directory named <project>--<branch>
+    wt_name = body.get("name", "").strip() or branch.replace("/", "-")
+    parent_dir = os.path.dirname(os.path.abspath(project_dir))
+    project_basename = os.path.basename(os.path.abspath(project_dir))
+    wt_path = os.path.join(parent_dir, f"{project_basename}--{wt_name}")
+    return git_ops.worktree_add(project_dir, wt_path, branch)
+
+
+def handle_git_worktree_remove(body, config, name):
+    project_dir = _get_project_dir(config, name)
+    path = body.get("path", "").strip()
+    if not path:
+        abort(400, "Worktree path required")
+    force = body.get("force", False)
+    return git_ops.worktree_remove(project_dir, path, force=force)
+
+
+def handle_git_worktree_switch(body, config, name):
+    """Switch the active project to a different worktree path."""
+    path = body.get("path", "").strip()
+    if not path:
+        abort(400, "Worktree path required")
+    if not os.path.isdir(path):
+        abort(404, f"Worktree directory not found: {path}")
+
+    if config["mode"] == "single":
+        config["project_path"] = path
+    return {"success": True, "path": path}

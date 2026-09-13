@@ -450,6 +450,34 @@ def api_git_pull(request, name):
     return handle_git_pull(_config, name)
 
 
+@app.get("/api/projects/<name>/git/worktrees")
+def api_git_worktree_list(request, name):
+    from tinyleaf.handlers import handle_git_worktree_list
+
+    return handle_git_worktree_list(_config, name)
+
+
+@app.post("/api/projects/<name>/git/worktrees")
+def api_git_worktree_add(request, name):
+    from tinyleaf.handlers import handle_git_worktree_add
+
+    return handle_git_worktree_add(request.json(), _config, name)
+
+
+@app.delete("/api/projects/<name>/git/worktrees")
+def api_git_worktree_remove(request, name):
+    from tinyleaf.handlers import handle_git_worktree_remove
+
+    return handle_git_worktree_remove(request.json(), _config, name)
+
+
+@app.post("/api/projects/<name>/git/worktrees/switch")
+def api_git_worktree_switch(request, name):
+    from tinyleaf.handlers import handle_git_worktree_switch
+
+    return handle_git_worktree_switch(request.json(), _config, name)
+
+
 # ── CORS middleware ──
 
 
