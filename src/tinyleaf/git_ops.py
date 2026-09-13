@@ -78,8 +78,13 @@ def fetch(project_dir):
     return {"success": True, "message": (out + err).strip()}
 
 
-def switch_branch(project_dir, branch):
+def switch_branch(project_dir, branch, force=False):
     """Switch to an existing branch.
+
+    Args:
+        project_dir: Project directory.
+        branch: Branch name to switch to.
+        force: If True, use --discard-changes to force switch.
 
     Returns:
         Dict with success status and message.
@@ -87,7 +92,11 @@ def switch_branch(project_dir, branch):
     if not has_git(project_dir):
         return {"success": False, "message": "Not a git repository"}
 
-    rc, out, err = _run_git(project_dir, "switch", branch)
+    args = ["switch"]
+    if force:
+        args.append("--discard-changes")
+    args.extend(["--", branch])
+    rc, out, err = _run_git(project_dir, *args)
     if rc != 0:
         return {"success": False, "message": (err or out).strip()}
     return {"success": True, "message": (out + err).strip()}
@@ -107,7 +116,7 @@ def create_branch(project_dir, name, start_point=None):
     if rc != 0:
         return {"success": False, "message": f"Invalid branch name: {name}"}
 
-    args = ["switch", "-c", name]
+    args = ["switch", "-c", name, "--"]
     if start_point:
         args.append(start_point)
 

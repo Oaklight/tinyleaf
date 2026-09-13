@@ -415,7 +415,7 @@ def api_git_create_branch(request, name):
     return handle_git_create_branch(request.json(), _config, name)
 
 
-@app.delete("/api/projects/<name>/git/branches/<branch_name>")
+@app.delete("/api/projects/<name>/git/branches/<path:branch_name>")
 def api_git_delete_branch(request, name, branch_name):
     from tinyleaf.handlers import handle_git_delete_branch
 

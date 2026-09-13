@@ -118,6 +118,7 @@ const I18N = {
     save_and_continue: "Save & Continue",
     discard_and_continue: "Continue without saving",
     dirty_working_tree: "You have uncommitted changes",
+    dirty_working_tree_desc: "Choose how to handle your changes before switching.",
     dirty_stash_and_switch: "Stash & Switch",
     dirty_discard_and_switch: "Switch anyway",
     cancel: "Cancel",
@@ -381,6 +382,7 @@ const I18N = {
     save_and_continue: "保存并继续",
     discard_and_continue: "不保存直接继续",
     dirty_working_tree: "存在未提交的更改",
+    dirty_working_tree_desc: "请选择如何处理更改后再切换。",
     dirty_stash_and_switch: "暂存并切换",
     dirty_discard_and_switch: "直接切换",
     cancel: "取消",
@@ -3718,6 +3720,8 @@ async function doPush() {
 
 // ── Branch selector ──
 
+let _branchDropdownCloser = null;
+
 async function loadBranches() {
   try {
     return await api("GET", `/api/projects/${enc(S.projectName)}/git/branches`);
@@ -3730,6 +3734,10 @@ function toggleBranchDropdown() {
     showBranchDropdown();
   } else {
     dd.style.display = "none";
+    if (_branchDropdownCloser) {
+      document.removeEventListener("click", _branchDropdownCloser);
+      _branchDropdownCloser = null;
+    }
   }
 }
 
@@ -3796,19 +3804,28 @@ async function showBranchDropdown() {
       const nameSpan = document.createElement("span");
       nameSpan.className = "branch-name";
       nameSpan.textContent = b;
-      nameSpan.style.color = "var(--text-dim)";
+      nameSpan.style.color = "var(--fg-muted)";
       item.appendChild(nameSpan);
+      // Extract local name from remote ref (e.g., "origin/feature" → "feature")
+      const localName = b.includes("/") ? b.substring(b.indexOf("/") + 1) : b;
+      item.style.cursor = "pointer";
+      item.onclick = () => switchBranch(localName);
       list.appendChild(item);
     }
   }
 
   // Close on outside click
+  if (_branchDropdownCloser) {
+    document.removeEventListener("click", _branchDropdownCloser);
+  }
   const closer = (e) => {
     if (!document.getElementById("git-branch-selector").contains(e.target)) {
       dd.style.display = "none";
       document.removeEventListener("click", closer);
+      _branchDropdownCloser = null;
     }
   };
+  _branchDropdownCloser = closer;
   setTimeout(() => document.addEventListener("click", closer), 0);
 }
 
@@ -3825,10 +3842,10 @@ async function switchBranch(branch) {
   await doSwitchBranch(branch);
 }
 
-async function doSwitchBranch(branch) {
+async function doSwitchBranch(branch, force = false) {
   setStatus(t("switching"));
   try {
-    const result = await api("POST", `/api/projects/${enc(S.projectName)}/git/branches/switch`, { branch });
+    const result = await api("POST", `/api/projects/${enc(S.projectName)}/git/branches/switch`, { branch, force });
     if (result.success) {
       setStatus(`${t("branch_switched")} ${branch}`, "success");
       await refreshFiles();
@@ -3852,7 +3869,7 @@ function showDirtyDialog(targetBranch) {
 
   dialog.innerHTML = `
     <h3>${t("dirty_working_tree")}</h3>
-    <p>${t("dirty_working_tree")}</p>
+    <p>${t("dirty_working_tree_desc")}</p>
     <div class="git-dialog-buttons">
       <button class="sm" id="dirty-cancel">${t("cancel")}</button>
       <button class="sm" id="dirty-discard">${t("dirty_discard_and_switch")}</button>
@@ -3862,16 +3879,20 @@ function showDirtyDialog(targetBranch) {
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);
 
-  document.getElementById("dirty-cancel").onclick = () => overlay.remove();
-  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  const escHandler = (e) => { if (e.key === "Escape") closeDialog(); };
+  const closeDialog = () => { overlay.remove(); document.removeEventListener("keydown", escHandler); };
+  document.addEventListener("keydown", escHandler);
+
+  document.getElementById("dirty-cancel").onclick = () => closeDialog();
+  overlay.onclick = (e) => { if (e.target === overlay) closeDialog(); };
 
   document.getElementById("dirty-discard").onclick = async () => {
-    overlay.remove();
-    await doSwitchBranch(targetBranch);
+    closeDialog();
+    await doSwitchBranch(targetBranch, true);
   };
 
   document.getElementById("dirty-stash").onclick = async () => {
-    overlay.remove();
+    closeDialog();
     setStatus(t("stashing"));
     try {
       await api("POST", `/api/projects/${enc(S.projectName)}/git/stash`);
@@ -3910,14 +3931,18 @@ async function createBranchDialog() {
 
   document.getElementById("new-branch-name").focus();
 
-  document.getElementById("create-branch-cancel").onclick = () => overlay.remove();
-  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  const escHandler = (e) => { if (e.key === "Escape") closeDialog(); };
+  const closeDialog = () => { overlay.remove(); document.removeEventListener("keydown", escHandler); };
+  document.addEventListener("keydown", escHandler);
+
+  document.getElementById("create-branch-cancel").onclick = () => closeDialog();
+  overlay.onclick = (e) => { if (e.target === overlay) closeDialog(); };
 
   document.getElementById("create-branch-ok").onclick = async () => {
     const name = document.getElementById("new-branch-name").value.trim();
     if (!name) return;
     const startPoint = document.getElementById("new-branch-start").value.trim() || undefined;
-    overlay.remove();
+    closeDialog();
     try {
       const result = await api("POST", `/api/projects/${enc(S.projectName)}/git/branches`, { name, start_point: startPoint });
       if (result.success) {
@@ -4157,13 +4182,17 @@ async function addWorktreeDialog() {
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);
 
-  cancelBtn.onclick = () => overlay.remove();
-  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  const escHandler = (e) => { if (e.key === "Escape") closeDialog(); };
+  const closeDialog = () => { overlay.remove(); document.removeEventListener("keydown", escHandler); };
+  document.addEventListener("keydown", escHandler);
+
+  cancelBtn.onclick = () => closeDialog();
+  overlay.onclick = (e) => { if (e.target === overlay) closeDialog(); };
 
   okBtn.onclick = async () => {
     const branch = select.value;
     if (!branch) return;
-    overlay.remove();
+    closeDialog();
     setStatus(t("loading"));
     try {
       const result = await api("POST", `/api/projects/${enc(S.projectName)}/git/worktrees`, { branch });
@@ -4196,12 +4225,10 @@ async function removeWorktree(path, branchName) {
     const cancelBtn = document.createElement("button");
     cancelBtn.className = "sm";
     cancelBtn.textContent = t("cancel");
-    cancelBtn.onclick = () => { overlay.remove(); resolve(false); };
 
     const okBtn = document.createElement("button");
     okBtn.className = "sm primary";
     okBtn.textContent = t("remove_worktree");
-    okBtn.onclick = () => { overlay.remove(); resolve(true); };
 
     btns.appendChild(cancelBtn);
     btns.appendChild(okBtn);
@@ -4209,7 +4236,14 @@ async function removeWorktree(path, branchName) {
 
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
-    overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } };
+
+    const escHandler = (e) => { if (e.key === "Escape") { closeDialog(); resolve(false); } };
+    const closeDialog = () => { overlay.remove(); document.removeEventListener("keydown", escHandler); };
+    document.addEventListener("keydown", escHandler);
+
+    cancelBtn.onclick = () => { closeDialog(); resolve(false); };
+    okBtn.onclick = () => { closeDialog(); resolve(true); };
+    overlay.onclick = (e) => { if (e.target === overlay) { closeDialog(); resolve(false); } };
   });
   if (!confirmed) return;
 
