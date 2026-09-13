@@ -1134,7 +1134,8 @@ def handle_git_switch_branch(body, config, name):
     branch = body.get("branch", "").strip()
     if not branch:
         abort(400, "Branch name required")
-    return git_ops.switch_branch(project_dir, branch)
+    force = body.get("force", False)
+    return git_ops.switch_branch(project_dir, branch, force=force)
 
 
 def handle_git_create_branch(body, config, name):
