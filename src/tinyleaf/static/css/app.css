@@ -645,6 +645,26 @@ tr.diff-row-ctx .diff-code { color: var(--text); }
 .git-branch-dropdown-footer { border-top: 1px solid var(--border); padding: 6px; }
 .git-branch-dropdown-footer button { width: 100%; text-align: left; }
 
+/* ── Worktree versions ── */
+.git-worktree-item { padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--border); font-size: 12px; display: flex; align-items: center; gap: 8px; }
+.git-worktree-item:hover { background: var(--bg-hover); }
+.git-worktree-item.current { border-left: 3px solid var(--accent); }
+.git-worktree-branch { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.git-worktree-head { font-family: var(--mono); font-size: 11px; color: var(--accent); }
+.git-worktree-path { font-size: 10px; color: var(--fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.git-worktree-main-badge { font-size: 9px; background: var(--accent); color: white; padding: 1px 5px; border-radius: 3px; flex-shrink: 0; }
+.git-worktree-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.git-worktree-actions button { opacity: 0; font-size: 10px; color: var(--red); background: none; border: none; cursor: pointer; padding: 2px 4px; }
+.git-worktree-item:hover .git-worktree-actions button { opacity: 0.7; }
+.git-worktree-actions button:hover { opacity: 1 !important; }
+.git-worktree-empty { padding: 20px; text-align: center; color: var(--fg-muted); font-size: 12px; }
+#btn-git-add-worktree { width: 100%; text-align: left; }
+
+/* ── Branch worktree icon in dropdown ── */
+.branch-worktree { opacity: 0; color: var(--accent); cursor: pointer; font-size: 12px; }
+.git-branch-item:hover .branch-worktree { opacity: 0.7; }
+.branch-worktree:hover { opacity: 1 !important; }
+
 /* ── Dirty State Dialog ── */
 .git-dialog-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: center; justify-content: center; }
 .git-dialog { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; min-width: 320px; max-width: 420px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); }

@@ -107,6 +107,7 @@
             <div class="git-sub-tabs">
               <button class="git-sub-tab active" data-git-tab="changes" data-i18n="changes">Changes</button>
               <button class="git-sub-tab" data-git-tab="history" data-i18n="history">History</button>
+              <button class="git-sub-tab" data-git-tab="versions" data-i18n="versions">Versions</button>
             </div>
             <div id="git-changes-panel">
             <div id="git-files"></div>
@@ -121,6 +122,12 @@
             </div>
             <div id="git-history-panel" style="display:none">
               <div id="git-log-list"></div>
+            </div>
+            <div id="git-versions-panel" style="display:none">
+              <div id="git-worktree-list"></div>
+              <div style="padding:6px 8px;border-top:1px solid var(--border)">
+                <button class="sm" id="btn-git-add-worktree" data-i18n="add_worktree">+ Add worktree</button>
+              </div>
             </div>
           </div>
           <div id="sidebar-search">
