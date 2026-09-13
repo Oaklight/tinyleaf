@@ -1122,10 +1122,11 @@ def handle_git_branches(query_params, config, name):
     """List branches, optionally fetching first."""
     project_dir = _get_project_dir(config, name)
 
+    result = git_ops.list_branches(project_dir)
     if query_params.get("fetch", [""])[0] == "true":
-        git_ops.fetch(project_dir)
-
-    return git_ops.list_branches(project_dir)
+        fetch_result = git_ops.fetch(project_dir)
+        result["fetch"] = fetch_result
+    return result
 
 
 def handle_git_switch_branch(body, config, name):
@@ -1262,13 +1263,21 @@ def handle_git_worktree_remove(body, config, name):
 
 
 def handle_git_worktree_switch(body, config, name):
-    """Switch the active project to a different worktree path."""
+    """Switch the active project to a different worktree path.
+
+    Only supported in single-project mode. The change is ephemeral —
+    on server restart, project_path reverts to the original value.
+    """
+    if config["mode"] != "single":
+        abort(400, "Worktree switch is only supported in single-project mode")
+
     path = body.get("path", "").strip()
     if not path:
         abort(400, "Worktree path required")
     if not os.path.isdir(path):
         abort(404, f"Worktree directory not found: {path}")
+    if not git_ops.has_git(path):
+        abort(400, f"Not a git repository or worktree: {path}")
 
-    if config["mode"] == "single":
-        config["project_path"] = path
+    config["project_path"] = path
     return {"success": True, "path": path}
