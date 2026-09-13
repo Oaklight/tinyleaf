@@ -45,7 +45,9 @@ def list_branches(project_dir):
     rc, out, _ = _run_git(project_dir, "branch", "--list", "--no-color")
     if rc == 0:
         for line in out.split("\n"):
-            line = line.lstrip("* ").strip()
+            line = line.removeprefix("* ").strip()
+            if line.startswith("("):
+                continue
             if line:
                 local.append(line)
 
@@ -408,6 +410,12 @@ def worktree_list(project_dir):
             worktrees.append(current)
             current = {}
 
+    if current:
+        current.setdefault("head", "")
+        current.setdefault("branch", "")
+        current["is_main"] = len(worktrees) == 0
+        worktrees.append(current)
+
     return worktrees
 
 
@@ -425,7 +433,7 @@ def worktree_add(project_dir, path, branch):
     if not has_git(project_dir):
         return {"success": False, "path": "", "message": "Not a git repository"}
 
-    rc, out, err = _run_git(project_dir, "worktree", "add", path, branch)
+    rc, out, err = _run_git(project_dir, "worktree", "add", "--", path, branch)
     if rc != 0:
         return {"success": False, "path": "", "message": err or out}
     return {"success": True, "path": os.path.abspath(path), "message": (out + err).strip()}
@@ -445,9 +453,10 @@ def worktree_remove(project_dir, path, force=False):
     if not has_git(project_dir):
         return {"success": False, "message": "Not a git repository"}
 
-    args = ["worktree", "remove", path]
+    args = ["worktree", "remove"]
     if force:
         args.append("--force")
+    args.extend(["--", path])
     rc, out, err = _run_git(project_dir, *args)
     if rc != 0:
         return {"success": False, "message": err or out}

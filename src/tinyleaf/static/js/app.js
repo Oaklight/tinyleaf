@@ -112,6 +112,11 @@ const I18N = {
     worktree_main: "main",
     worktree_switching: "Switching worktree...",
     open_as_worktree: "Open as worktree",
+    create_worktree: "Create worktree",
+    select_branch: "Branch",
+    unsaved_changes: "You have unsaved changes in the editor",
+    save_and_continue: "Save & Continue",
+    discard_and_continue: "Continue without saving",
     dirty_working_tree: "You have uncommitted changes",
     dirty_stash_and_switch: "Stash & Switch",
     dirty_discard_and_switch: "Switch anyway",
@@ -370,6 +375,11 @@ const I18N = {
     worktree_main: "主",
     worktree_switching: "切换工作树中...",
     open_as_worktree: "在工作树中打开",
+    create_worktree: "创建工作树",
+    select_branch: "分支",
+    unsaved_changes: "编辑器中有未保存的更改",
+    save_and_continue: "保存并继续",
+    discard_and_continue: "不保存直接继续",
     dirty_working_tree: "存在未提交的更改",
     dirty_stash_and_switch: "暂存并切换",
     dirty_discard_and_switch: "直接切换",
@@ -3997,6 +4007,8 @@ async function refreshWorktrees() {
 
       item.appendChild(info);
 
+      item.onclick = () => switchWorktree(wt.path);
+
       if (!wt.is_main) {
         const actions = document.createElement("div");
         actions.className = "git-worktree-actions";
@@ -4006,8 +4018,6 @@ async function refreshWorktrees() {
         removeBtn.onclick = (e) => { e.stopPropagation(); removeWorktree(wt.path, wt.branch); };
         actions.appendChild(removeBtn);
         item.appendChild(actions);
-
-        item.onclick = () => switchWorktree(wt.path);
       }
 
       list.appendChild(item);
@@ -4018,6 +4028,50 @@ async function refreshWorktrees() {
 }
 
 async function switchWorktree(path) {
+  // Check for unsaved editor changes before switching
+  if (S.currentFile && S.modified.has(S.currentFile)) {
+    const action = await new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.className = "git-dialog-overlay";
+      const dialog = document.createElement("div");
+      dialog.className = "git-dialog";
+
+      const title = document.createElement("h3");
+      title.textContent = t("unsaved_changes");
+      dialog.appendChild(title);
+
+      const btns = document.createElement("div");
+      btns.className = "git-dialog-buttons";
+
+      const cancelBtn = document.createElement("button");
+      cancelBtn.className = "sm";
+      cancelBtn.textContent = t("cancel");
+      cancelBtn.onclick = () => { overlay.remove(); resolve("cancel"); };
+
+      const discardBtn = document.createElement("button");
+      discardBtn.className = "sm";
+      discardBtn.textContent = t("discard_and_continue");
+      discardBtn.onclick = () => { overlay.remove(); resolve("discard"); };
+
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "sm primary";
+      saveBtn.textContent = t("save_and_continue");
+      saveBtn.onclick = () => { overlay.remove(); resolve("save"); };
+
+      btns.appendChild(cancelBtn);
+      btns.appendChild(discardBtn);
+      btns.appendChild(saveBtn);
+      dialog.appendChild(btns);
+
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
+      overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); resolve("cancel"); } };
+    });
+    if (action === "cancel") return;
+    if (action === "save") await saveCurrentFile();
+    if (action === "discard") S.modified.delete(S.currentFile);
+  }
+
   setStatus(t("worktree_switching"));
   try {
     const result = await api("POST", `/api/projects/${enc(S.projectName)}/git/worktrees/switch`, { path });
@@ -4038,49 +4092,84 @@ async function switchWorktree(path) {
 }
 
 async function addWorktreeDialog() {
-  // Reuse the git-dialog pattern from the branch selector
   const overlay = document.createElement("div");
   overlay.className = "git-dialog-overlay";
   const dialog = document.createElement("div");
   dialog.className = "git-dialog";
 
-  // Fetch branches for dropdown
-  const branches = await loadBranches();
+  let branches;
+  try {
+    branches = await loadBranches();
+  } catch {
+    setStatus("Failed to load branches", "error");
+    return;
+  }
   const availableBranches = branches.local.filter(b => b !== branches.current);
 
-  let branchOptions = availableBranches.map(b => `<option value="${b}">${b}</option>`).join("");
-  if (branchOptions === "") {
-    branchOptions = `<option value="" disabled>${t("no_worktrees")}</option>`;
-  }
+  // Title
+  const title = document.createElement("h3");
+  title.textContent = t("add_worktree").replace(/^\+\s*/, "");
+  dialog.appendChild(title);
 
-  dialog.innerHTML = `
-    <h3>${t("add_worktree")}</h3>
-    <div style="margin-bottom:12px">
-      <label style="font-size:12px;color:var(--fg-muted);display:block;margin-bottom:4px">${t("switch_branch")}</label>
-      <select id="worktree-branch-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);font-size:13px;box-sizing:border-box">
-        ${branchOptions}
-      </select>
-    </div>
-    <div class="git-dialog-buttons">
-      <button class="sm" id="worktree-cancel">${t("cancel")}</button>
-      <button class="sm primary" id="worktree-ok">${t("create_branch")}</button>
-    </div>
-  `;
+  // Branch select
+  const selectDiv = document.createElement("div");
+  selectDiv.style.cssText = "margin-bottom:12px";
+  const selectLabel = document.createElement("label");
+  selectLabel.style.cssText = "font-size:12px;color:var(--fg-muted);display:block;margin-bottom:4px";
+  selectLabel.textContent = t("select_branch");
+  selectDiv.appendChild(selectLabel);
+
+  const select = document.createElement("select");
+  select.id = "worktree-branch-select";
+  select.style.cssText = "width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);font-size:13px;box-sizing:border-box";
+
+  if (availableBranches.length === 0) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.disabled = true;
+    opt.textContent = t("no_worktrees");
+    select.appendChild(opt);
+  } else {
+    for (const b of availableBranches) {
+      const opt = document.createElement("option");
+      opt.value = b;
+      opt.textContent = b;
+      select.appendChild(opt);
+    }
+  }
+  selectDiv.appendChild(select);
+  dialog.appendChild(selectDiv);
+
+  // Buttons
+  const btns = document.createElement("div");
+  btns.className = "git-dialog-buttons";
+  const cancelBtn = document.createElement("button");
+  cancelBtn.className = "sm";
+  cancelBtn.textContent = t("cancel");
+  const okBtn = document.createElement("button");
+  okBtn.className = "sm primary";
+  okBtn.textContent = t("create_worktree");
+  if (availableBranches.length === 0) okBtn.disabled = true;
+  btns.appendChild(cancelBtn);
+  btns.appendChild(okBtn);
+  dialog.appendChild(btns);
+
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);
 
-  document.getElementById("worktree-cancel").onclick = () => overlay.remove();
+  cancelBtn.onclick = () => overlay.remove();
   overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
 
-  document.getElementById("worktree-ok").onclick = async () => {
-    const branch = document.getElementById("worktree-branch-select").value;
+  okBtn.onclick = async () => {
+    const branch = select.value;
     if (!branch) return;
     overlay.remove();
+    setStatus(t("loading"));
     try {
       const result = await api("POST", `/api/projects/${enc(S.projectName)}/git/worktrees`, { branch });
       if (result.success) {
         setStatus(`${t("worktree_created")}: ${branch}`, "success");
-        refreshWorktrees();
+        await refreshWorktrees();
       } else {
         setStatus(result.message, "error");
       }
@@ -4091,12 +4180,44 @@ async function addWorktreeDialog() {
 }
 
 async function removeWorktree(path, branchName) {
-  if (!confirm(t("confirm_remove_worktree").replace("{name}", branchName))) return;
+  const confirmed = await new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "git-dialog-overlay";
+    const dialog = document.createElement("div");
+    dialog.className = "git-dialog";
+
+    const title = document.createElement("h3");
+    title.textContent = t("confirm_remove_worktree").replace("{name}", branchName);
+    dialog.appendChild(title);
+
+    const btns = document.createElement("div");
+    btns.className = "git-dialog-buttons";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "sm";
+    cancelBtn.textContent = t("cancel");
+    cancelBtn.onclick = () => { overlay.remove(); resolve(false); };
+
+    const okBtn = document.createElement("button");
+    okBtn.className = "sm primary";
+    okBtn.textContent = t("remove_worktree");
+    okBtn.onclick = () => { overlay.remove(); resolve(true); };
+
+    btns.appendChild(cancelBtn);
+    btns.appendChild(okBtn);
+    dialog.appendChild(btns);
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } };
+  });
+  if (!confirmed) return;
+
   try {
     const result = await api("DELETE", `/api/projects/${enc(S.projectName)}/git/worktrees`, { path });
     if (result.success) {
       setStatus(`${t("worktree_removed")}: ${branchName}`, "success");
-      refreshWorktrees();
+      await refreshWorktrees();
     } else {
       setStatus(result.message, "error");
     }
@@ -4106,11 +4227,12 @@ async function removeWorktree(path, branchName) {
 }
 
 async function openAsWorktree(branch) {
+  setStatus(t("loading"));
   try {
     const result = await api("POST", `/api/projects/${enc(S.projectName)}/git/worktrees`, { branch });
     if (result.success) {
       setStatus(`${t("worktree_created")}: ${branch}`, "success");
-      // Switch to versions tab to show the new worktree
+      await switchWorktree(result.path);
       switchGitSubTab("versions");
     } else {
       setStatus(result.message, "error");
