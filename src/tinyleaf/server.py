@@ -394,6 +394,13 @@ def api_upload(request, name):
 # ── Git routes ──
 
 
+@app.get("/api/projects/<name>/git/branches")
+def api_git_branches(request, name):
+    from tinyleaf.handlers import handle_git_branches
+
+    return handle_git_branches(request.query_params, _config, name)
+
+
 @app.get("/api/projects/<name>/git/status")
 def api_git_status(request, name):
     from tinyleaf.handlers import handle_git_status

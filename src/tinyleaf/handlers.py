@@ -1118,6 +1118,16 @@ def handle_project_symbols(config, name):
 # ── Git ──
 
 
+def handle_git_branches(query_params, config, name):
+    """List branches, optionally fetching first."""
+    project_dir = _get_project_dir(config, name)
+
+    if query_params.get("fetch", [""])[0] == "true":
+        git_ops.fetch(project_dir)
+
+    return git_ops.list_branches(project_dir)
+
+
 def handle_git_status(config, name):
     project_dir = _get_project_dir(config, name)
     return git_ops.status(project_dir)
