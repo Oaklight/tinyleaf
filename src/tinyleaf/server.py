@@ -401,6 +401,41 @@ def api_git_branches(request, name):
     return handle_git_branches(request.query_params, _config, name)
 
 
+@app.post("/api/projects/<name>/git/branches/switch")
+def api_git_switch_branch(request, name):
+    from tinyleaf.handlers import handle_git_switch_branch
+
+    return handle_git_switch_branch(request.json(), _config, name)
+
+
+@app.post("/api/projects/<name>/git/branches")
+def api_git_create_branch(request, name):
+    from tinyleaf.handlers import handle_git_create_branch
+
+    return handle_git_create_branch(request.json(), _config, name)
+
+
+@app.delete("/api/projects/<name>/git/branches/<branch_name>")
+def api_git_delete_branch(request, name, branch_name):
+    from tinyleaf.handlers import handle_git_delete_branch
+
+    return handle_git_delete_branch(_json_body(request), _config, name, branch_name)
+
+
+@app.post("/api/projects/<name>/git/stash")
+def api_git_stash(request, name):
+    from tinyleaf.handlers import handle_git_stash
+
+    return handle_git_stash(_config, name)
+
+
+@app.post("/api/projects/<name>/git/stash/pop")
+def api_git_stash_pop(request, name):
+    from tinyleaf.handlers import handle_git_stash_pop
+
+    return handle_git_stash_pop(_config, name)
+
+
 @app.get("/api/projects/<name>/git/status")
 def api_git_status(request, name):
     from tinyleaf.handlers import handle_git_status
