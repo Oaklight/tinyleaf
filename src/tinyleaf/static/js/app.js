@@ -92,6 +92,24 @@ const I18N = {
     commit_selected: "Commit Selected",
     pushing: "Pushing...",
     pushed: "Pushed",
+    switch_branch: "Switch branch",
+    new_branch: "+ New branch",
+    create_branch: "Create branch",
+    branch_name: "Branch name",
+    start_point: "Start point (optional)",
+    branch_created: "Branch created",
+    branch_deleted: "Branch deleted",
+    branch_switched: "Switched to",
+    delete_branch: "Delete branch",
+    confirm_delete_branch: "Delete branch \"{name}\"?",
+    dirty_working_tree: "You have uncommitted changes",
+    dirty_stash_and_switch: "Stash & Switch",
+    dirty_discard_and_switch: "Switch anyway",
+    cancel: "Cancel",
+    local_branches: "Local",
+    remote_branches: "Remote",
+    stashing: "Stashing...",
+    switching: "Switching...",
     compile_success: "Compilation successful",
     compile_failed: "Compilation failed",
     compile_cancelled: "Compilation cancelled",
@@ -322,6 +340,24 @@ const I18N = {
     commit_selected: "提交所选",
     pushing: "推送中...",
     pushed: "已推送",
+    switch_branch: "切换分支",
+    new_branch: "+ 新建分支",
+    create_branch: "创建分支",
+    branch_name: "分支名称",
+    start_point: "起始点（可选）",
+    branch_created: "分支已创建",
+    branch_deleted: "分支已删除",
+    branch_switched: "已切换至",
+    delete_branch: "删除分支",
+    confirm_delete_branch: "确认删除分支「{name}」？",
+    dirty_working_tree: "存在未提交的更改",
+    dirty_stash_and_switch: "暂存并切换",
+    dirty_discard_and_switch: "直接切换",
+    cancel: "取消",
+    local_branches: "本地",
+    remote_branches: "远程",
+    stashing: "暂存中...",
+    switching: "切换中...",
     compile_success: "编译成功",
     compile_failed: "编译失败",
     compile_cancelled: "编译已取消",
@@ -3650,6 +3686,234 @@ async function doPush() {
   refreshGit();
 }
 
+// ── Branch selector ──
+
+async function loadBranches() {
+  try {
+    return await api("GET", `/api/projects/${enc(S.projectName)}/git/branches`);
+  } catch { return { current: "", local: [], remote: [] }; }
+}
+
+function toggleBranchDropdown() {
+  const dd = document.getElementById("git-branch-dropdown");
+  if (dd.style.display === "none") {
+    showBranchDropdown();
+  } else {
+    dd.style.display = "none";
+  }
+}
+
+async function showBranchDropdown() {
+  const dd = document.getElementById("git-branch-dropdown");
+  const list = document.getElementById("git-branch-list");
+  dd.style.display = "block";
+  list.innerHTML = `<div style="padding:8px 12px;font-size:12px;color:var(--text-dim)">${t("loading")}</div>`;
+
+  const branches = await loadBranches();
+  list.innerHTML = "";
+
+  // Local branches
+  if (branches.local.length > 0) {
+    const label = document.createElement("div");
+    label.className = "git-branch-section-label";
+    label.textContent = t("local_branches");
+    list.appendChild(label);
+
+    for (const b of branches.local) {
+      const item = document.createElement("div");
+      item.className = "git-branch-item" + (b === branches.current ? " current" : "");
+
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "branch-name";
+      nameSpan.textContent = b;
+      item.appendChild(nameSpan);
+
+      if (b !== branches.current) {
+        const del = document.createElement("span");
+        del.className = "branch-delete";
+        del.textContent = "✕";
+        del.title = t("delete_branch");
+        del.onclick = (e) => { e.stopPropagation(); deleteBranch(b); };
+        item.appendChild(del);
+
+        item.onclick = () => switchBranch(b);
+      }
+      list.appendChild(item);
+    }
+  }
+
+  // Remote branches
+  if (branches.remote.length > 0) {
+    const label = document.createElement("div");
+    label.className = "git-branch-section-label";
+    label.textContent = t("remote_branches");
+    list.appendChild(label);
+
+    for (const b of branches.remote) {
+      const item = document.createElement("div");
+      item.className = "git-branch-item";
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "branch-name";
+      nameSpan.textContent = b;
+      nameSpan.style.color = "var(--text-dim)";
+      item.appendChild(nameSpan);
+      list.appendChild(item);
+    }
+  }
+
+  // Close on outside click
+  const closer = (e) => {
+    if (!document.getElementById("git-branch-selector").contains(e.target)) {
+      dd.style.display = "none";
+      document.removeEventListener("click", closer);
+    }
+  };
+  setTimeout(() => document.addEventListener("click", closer), 0);
+}
+
+async function switchBranch(branch) {
+  document.getElementById("git-branch-dropdown").style.display = "none";
+
+  // Check for dirty state
+  const st = await api("GET", `/api/projects/${enc(S.projectName)}/git/status`);
+  if (st.files && st.files.length > 0) {
+    showDirtyDialog(branch);
+    return;
+  }
+
+  await doSwitchBranch(branch);
+}
+
+async function doSwitchBranch(branch) {
+  setStatus(t("switching"));
+  try {
+    const result = await api("POST", `/api/projects/${enc(S.projectName)}/git/branches/switch`, { branch });
+    if (result.success) {
+      setStatus(`${t("branch_switched")} ${branch}`, "success");
+      await refreshFiles();
+      await refreshGit();
+      if (S.currentFile) {
+        openFile(S.currentFile);
+      }
+    } else {
+      setStatus(result.message, "error");
+    }
+  } catch (e) {
+    setStatus(e.message, "error");
+  }
+}
+
+function showDirtyDialog(targetBranch) {
+  const overlay = document.createElement("div");
+  overlay.className = "git-dialog-overlay";
+  const dialog = document.createElement("div");
+  dialog.className = "git-dialog";
+
+  dialog.innerHTML = `
+    <h3>${t("dirty_working_tree")}</h3>
+    <p>${t("dirty_working_tree")}</p>
+    <div class="git-dialog-buttons">
+      <button class="sm" id="dirty-cancel">${t("cancel")}</button>
+      <button class="sm" id="dirty-discard">${t("dirty_discard_and_switch")}</button>
+      <button class="sm primary" id="dirty-stash">${t("dirty_stash_and_switch")}</button>
+    </div>
+  `;
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  document.getElementById("dirty-cancel").onclick = () => overlay.remove();
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+  document.getElementById("dirty-discard").onclick = async () => {
+    overlay.remove();
+    await doSwitchBranch(targetBranch);
+  };
+
+  document.getElementById("dirty-stash").onclick = async () => {
+    overlay.remove();
+    setStatus(t("stashing"));
+    try {
+      await api("POST", `/api/projects/${enc(S.projectName)}/git/stash`);
+      await doSwitchBranch(targetBranch);
+    } catch (e) {
+      setStatus(e.message, "error");
+    }
+  };
+}
+
+async function createBranchDialog() {
+  document.getElementById("git-branch-dropdown").style.display = "none";
+
+  const overlay = document.createElement("div");
+  overlay.className = "git-dialog-overlay";
+  const dialog = document.createElement("div");
+  dialog.className = "git-dialog";
+
+  dialog.innerHTML = `
+    <h3>${t("create_branch")}</h3>
+    <div style="margin-bottom:12px">
+      <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">${t("branch_name")}</label>
+      <input type="text" id="new-branch-name" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box" />
+    </div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px">${t("start_point")}</label>
+      <input type="text" id="new-branch-start" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text);font-size:13px;box-sizing:border-box" placeholder="HEAD" />
+    </div>
+    <div class="git-dialog-buttons">
+      <button class="sm" id="create-branch-cancel">${t("cancel")}</button>
+      <button class="sm primary" id="create-branch-ok">${t("create_branch")}</button>
+    </div>
+  `;
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  document.getElementById("new-branch-name").focus();
+
+  document.getElementById("create-branch-cancel").onclick = () => overlay.remove();
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+  document.getElementById("create-branch-ok").onclick = async () => {
+    const name = document.getElementById("new-branch-name").value.trim();
+    if (!name) return;
+    const startPoint = document.getElementById("new-branch-start").value.trim() || undefined;
+    overlay.remove();
+    try {
+      const result = await api("POST", `/api/projects/${enc(S.projectName)}/git/branches`, { name, start_point: startPoint });
+      if (result.success) {
+        setStatus(`${t("branch_created")}: ${name}`, "success");
+        await refreshFiles();
+        await refreshGit();
+      } else {
+        setStatus(result.message, "error");
+      }
+    } catch (e) {
+      setStatus(e.message, "error");
+    }
+  };
+
+  // Allow Enter to submit
+  document.getElementById("new-branch-name").onkeydown = (e) => {
+    if (e.key === "Enter") document.getElementById("create-branch-ok").click();
+  };
+}
+
+async function deleteBranch(name) {
+  if (!confirm(t("confirm_delete_branch").replace("{name}", name))) return;
+  try {
+    const result = await api("DELETE", `/api/projects/${enc(S.projectName)}/git/branches/${enc(name)}`);
+    if (result.success) {
+      setStatus(`${t("branch_deleted")}: ${name}`, "success");
+      // Refresh dropdown if open
+      const dd = document.getElementById("git-branch-dropdown");
+      if (dd.style.display !== "none") showBranchDropdown();
+    } else {
+      setStatus(result.message, "error");
+    }
+  } catch (e) {
+    setStatus(e.message, "error");
+  }
+}
+
 function switchGitSubTab(tabName) {
   document.querySelectorAll(".git-sub-tab").forEach(b => b.classList.toggle("active", b.dataset.gitTab === tabName));
   document.getElementById("git-changes-panel").style.display = tabName === "changes" ? "" : "none";
@@ -4250,6 +4514,8 @@ document.getElementById("auto-compile-toggle").onchange = (e) => {
 document.getElementById("btn-git-commit-selected").onclick = doCommit;
 document.getElementById("btn-git-push").onclick = doPush;
 document.getElementById("btn-git-refresh").onclick = refreshGit;
+document.getElementById("git-branch-btn").onclick = toggleBranchDropdown;
+document.getElementById("btn-git-create-branch").onclick = createBranchDialog;
 document.querySelectorAll(".git-sub-tab").forEach(b => b.onclick = () => switchGitSubTab(b.dataset.gitTab));
 document.getElementById("btn-diff-close").onclick = closeDiffPane;
 document.getElementById("btn-diff-refresh").onclick = () => {
