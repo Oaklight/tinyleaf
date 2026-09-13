@@ -22,8 +22,9 @@ def _run_git(project_dir, *args):
 
 
 def has_git(project_dir):
-    """Check if a directory is a git repository."""
-    return os.path.isdir(os.path.join(project_dir, ".git"))
+    """Check if a directory is a git repository or worktree."""
+    git_path = os.path.join(project_dir, ".git")
+    return os.path.isdir(git_path) or os.path.isfile(git_path)
 
 
 def list_branches(project_dir):
@@ -283,3 +284,81 @@ def show_commit(project_dir, commit_hash):
         return ""
     rc, out, _ = _run_git(project_dir, "show", "--format=", "--patch", "--", commit_hash)
     return out if rc == 0 else ""
+
+
+def worktree_list(project_dir):
+    """List all worktrees for the repository.
+
+    Returns:
+        List of dicts with path, branch, head, and is_main for each worktree.
+    """
+    if not has_git(project_dir):
+        return []
+
+    rc, out, _ = _run_git(project_dir, "worktree", "list", "--porcelain")
+    if rc != 0:
+        return []
+
+    worktrees = []
+    current = {}
+    for line in out.split("\n"):
+        if line.startswith("worktree "):
+            current = {"path": line[9:]}
+        elif line.startswith("HEAD "):
+            current["head"] = line[5:13]
+        elif line.startswith("branch "):
+            ref = line[7:]
+            current["branch"] = ref.removeprefix("refs/heads/")
+        elif line == "detached":
+            current["branch"] = "(detached)"
+        elif line == "" and current:
+            current.setdefault("head", "")
+            current.setdefault("branch", "")
+            current["is_main"] = len(worktrees) == 0
+            worktrees.append(current)
+            current = {}
+
+    return worktrees
+
+
+def worktree_add(project_dir, path, branch):
+    """Create a new worktree for an existing branch.
+
+    Args:
+        project_dir: Project directory (can be any worktree of the repo).
+        path: Absolute path for the new worktree directory.
+        branch: Branch to check out in the worktree.
+
+    Returns:
+        Dict with success, path, and message.
+    """
+    if not has_git(project_dir):
+        return {"success": False, "path": "", "message": "Not a git repository"}
+
+    rc, out, err = _run_git(project_dir, "worktree", "add", path, branch)
+    if rc != 0:
+        return {"success": False, "path": "", "message": err or out}
+    return {"success": True, "path": os.path.abspath(path), "message": (out + err).strip()}
+
+
+def worktree_remove(project_dir, path, force=False):
+    """Remove a worktree.
+
+    Args:
+        project_dir: Project directory.
+        path: Path of the worktree to remove.
+        force: Force removal even with uncommitted changes.
+
+    Returns:
+        Dict with success status and message.
+    """
+    if not has_git(project_dir):
+        return {"success": False, "message": "Not a git repository"}
+
+    args = ["worktree", "remove", path]
+    if force:
+        args.append("--force")
+    rc, out, err = _run_git(project_dir, *args)
+    if rc != 0:
+        return {"success": False, "message": err or out}
+    return {"success": True, "message": (out + err).strip()}
