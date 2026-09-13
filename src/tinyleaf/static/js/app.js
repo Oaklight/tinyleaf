@@ -102,6 +102,16 @@ const I18N = {
     branch_switched: "Switched to",
     delete_branch: "Delete branch",
     confirm_delete_branch: "Delete branch \"{name}\"?",
+    versions: "Versions",
+    add_worktree: "+ Add worktree",
+    worktree_created: "Worktree created",
+    worktree_removed: "Worktree removed",
+    remove_worktree: "Remove worktree",
+    confirm_remove_worktree: "Remove worktree for branch \"{name}\"?",
+    no_worktrees: "No additional worktrees",
+    worktree_main: "main",
+    worktree_switching: "Switching worktree...",
+    open_as_worktree: "Open as worktree",
     dirty_working_tree: "You have uncommitted changes",
     dirty_stash_and_switch: "Stash & Switch",
     dirty_discard_and_switch: "Switch anyway",
@@ -350,6 +360,16 @@ const I18N = {
     branch_switched: "已切换至",
     delete_branch: "删除分支",
     confirm_delete_branch: "确认删除分支「{name}」？",
+    versions: "版本",
+    add_worktree: "+ 添加工作树",
+    worktree_created: "工作树已创建",
+    worktree_removed: "工作树已移除",
+    remove_worktree: "移除工作树",
+    confirm_remove_worktree: "确认移除分支「{name}」的工作树？",
+    no_worktrees: "暂无其他工作树",
+    worktree_main: "主",
+    worktree_switching: "切换工作树中...",
+    open_as_worktree: "在工作树中打开",
     dirty_working_tree: "存在未提交的更改",
     dirty_stash_and_switch: "暂存并切换",
     dirty_discard_and_switch: "直接切换",
@@ -3729,6 +3749,17 @@ async function showBranchDropdown() {
       item.appendChild(nameSpan);
 
       if (b !== branches.current) {
+        const wt = document.createElement("span");
+        wt.className = "branch-worktree";
+        wt.textContent = "⧉";
+        wt.title = t("open_as_worktree");
+        wt.onclick = (e) => {
+          e.stopPropagation();
+          dd.style.display = "none";
+          openAsWorktree(b);
+        };
+        item.appendChild(wt);
+
         const del = document.createElement("span");
         del.className = "branch-delete";
         del.textContent = "✕";
@@ -3914,11 +3945,188 @@ async function deleteBranch(name) {
   }
 }
 
+// ── Worktree management ──
+
+async function refreshWorktrees() {
+  const list = document.getElementById("git-worktree-list");
+  list.innerHTML = `<div style="padding:8px 12px;font-size:12px;color:var(--text-dim)">${t("loading")}</div>`;
+
+  try {
+    const worktrees = await api("GET", `/api/projects/${enc(S.projectName)}/git/worktrees`);
+    list.innerHTML = "";
+
+    if (worktrees.length <= 1) {
+      list.innerHTML = `<div class="git-worktree-empty">${t("no_worktrees")}</div>`;
+      return;
+    }
+
+    for (const wt of worktrees) {
+      const item = document.createElement("div");
+      item.className = "git-worktree-item" + (wt.is_main ? " current" : "");
+
+      const info = document.createElement("div");
+      info.style.cssText = "flex:1;min-width:0";
+
+      const topRow = document.createElement("div");
+      topRow.style.cssText = "display:flex;align-items:center;gap:6px";
+
+      const branchSpan = document.createElement("span");
+      branchSpan.className = "git-worktree-branch";
+      branchSpan.textContent = wt.branch;
+      topRow.appendChild(branchSpan);
+
+      const headSpan = document.createElement("span");
+      headSpan.className = "git-worktree-head";
+      headSpan.textContent = wt.head;
+      topRow.appendChild(headSpan);
+
+      if (wt.is_main) {
+        const badge = document.createElement("span");
+        badge.className = "git-worktree-main-badge";
+        badge.textContent = t("worktree_main");
+        topRow.appendChild(badge);
+      }
+
+      info.appendChild(topRow);
+
+      const pathSpan = document.createElement("div");
+      pathSpan.className = "git-worktree-path";
+      pathSpan.textContent = wt.path;
+      pathSpan.title = wt.path;
+      info.appendChild(pathSpan);
+
+      item.appendChild(info);
+
+      if (!wt.is_main) {
+        const actions = document.createElement("div");
+        actions.className = "git-worktree-actions";
+        const removeBtn = document.createElement("button");
+        removeBtn.textContent = "✕";
+        removeBtn.title = t("remove_worktree");
+        removeBtn.onclick = (e) => { e.stopPropagation(); removeWorktree(wt.path, wt.branch); };
+        actions.appendChild(removeBtn);
+        item.appendChild(actions);
+
+        item.onclick = () => switchWorktree(wt.path);
+      }
+
+      list.appendChild(item);
+    }
+  } catch {
+    list.innerHTML = `<div class="git-worktree-empty">${t("no_worktrees")}</div>`;
+  }
+}
+
+async function switchWorktree(path) {
+  setStatus(t("worktree_switching"));
+  try {
+    const result = await api("POST", `/api/projects/${enc(S.projectName)}/git/worktrees/switch`, { path });
+    if (result.success) {
+      setStatus(t("worktree_switching"), "success");
+      // Reload everything — files, editor, git status
+      await refreshFiles();
+      await refreshGit();
+      if (S.currentFile) {
+        openFile(S.currentFile);
+      }
+    } else {
+      setStatus(result.message || "Switch failed", "error");
+    }
+  } catch (e) {
+    setStatus(e.message, "error");
+  }
+}
+
+async function addWorktreeDialog() {
+  // Reuse the git-dialog pattern from the branch selector
+  const overlay = document.createElement("div");
+  overlay.className = "git-dialog-overlay";
+  const dialog = document.createElement("div");
+  dialog.className = "git-dialog";
+
+  // Fetch branches for dropdown
+  const branches = await loadBranches();
+  const availableBranches = branches.local.filter(b => b !== branches.current);
+
+  let branchOptions = availableBranches.map(b => `<option value="${b}">${b}</option>`).join("");
+  if (branchOptions === "") {
+    branchOptions = `<option value="" disabled>${t("no_worktrees")}</option>`;
+  }
+
+  dialog.innerHTML = `
+    <h3>${t("add_worktree")}</h3>
+    <div style="margin-bottom:12px">
+      <label style="font-size:12px;color:var(--fg-muted);display:block;margin-bottom:4px">${t("switch_branch")}</label>
+      <select id="worktree-branch-select" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);font-size:13px;box-sizing:border-box">
+        ${branchOptions}
+      </select>
+    </div>
+    <div class="git-dialog-buttons">
+      <button class="sm" id="worktree-cancel">${t("cancel")}</button>
+      <button class="sm primary" id="worktree-ok">${t("create_branch")}</button>
+    </div>
+  `;
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  document.getElementById("worktree-cancel").onclick = () => overlay.remove();
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+  document.getElementById("worktree-ok").onclick = async () => {
+    const branch = document.getElementById("worktree-branch-select").value;
+    if (!branch) return;
+    overlay.remove();
+    try {
+      const result = await api("POST", `/api/projects/${enc(S.projectName)}/git/worktrees`, { branch });
+      if (result.success) {
+        setStatus(`${t("worktree_created")}: ${branch}`, "success");
+        refreshWorktrees();
+      } else {
+        setStatus(result.message, "error");
+      }
+    } catch (e) {
+      setStatus(e.message, "error");
+    }
+  };
+}
+
+async function removeWorktree(path, branchName) {
+  if (!confirm(t("confirm_remove_worktree").replace("{name}", branchName))) return;
+  try {
+    const result = await api("DELETE", `/api/projects/${enc(S.projectName)}/git/worktrees`, { path });
+    if (result.success) {
+      setStatus(`${t("worktree_removed")}: ${branchName}`, "success");
+      refreshWorktrees();
+    } else {
+      setStatus(result.message, "error");
+    }
+  } catch (e) {
+    setStatus(e.message, "error");
+  }
+}
+
+async function openAsWorktree(branch) {
+  try {
+    const result = await api("POST", `/api/projects/${enc(S.projectName)}/git/worktrees`, { branch });
+    if (result.success) {
+      setStatus(`${t("worktree_created")}: ${branch}`, "success");
+      // Switch to versions tab to show the new worktree
+      switchGitSubTab("versions");
+    } else {
+      setStatus(result.message, "error");
+    }
+  } catch (e) {
+    setStatus(e.message, "error");
+  }
+}
+
 function switchGitSubTab(tabName) {
   document.querySelectorAll(".git-sub-tab").forEach(b => b.classList.toggle("active", b.dataset.gitTab === tabName));
   document.getElementById("git-changes-panel").style.display = tabName === "changes" ? "" : "none";
   document.getElementById("git-history-panel").style.display = tabName === "history" ? "" : "none";
+  document.getElementById("git-versions-panel").style.display = tabName === "versions" ? "" : "none";
   if (tabName === "history") refreshGitLog();
+  if (tabName === "versions") refreshWorktrees();
 }
 
 async function refreshGitLog() {
@@ -4516,6 +4724,7 @@ document.getElementById("btn-git-push").onclick = doPush;
 document.getElementById("btn-git-refresh").onclick = refreshGit;
 document.getElementById("git-branch-btn").onclick = toggleBranchDropdown;
 document.getElementById("btn-git-create-branch").onclick = createBranchDialog;
+document.getElementById("btn-git-add-worktree").onclick = addWorktreeDialog;
 document.querySelectorAll(".git-sub-tab").forEach(b => b.onclick = () => switchGitSubTab(b.dataset.gitTab));
 document.getElementById("btn-diff-close").onclick = closeDiffPane;
 document.getElementById("btn-diff-refresh").onclick = () => {
