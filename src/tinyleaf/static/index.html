@@ -89,7 +89,18 @@
           </div>
           <div id="sidebar-git">
             <div class="sidebar-header">
-              <span id="git-branch">Git</span>
+              <div id="git-branch-selector" style="position:relative">
+                <button id="git-branch-btn" class="git-branch-btn" title="Switch branch">
+                  <span id="git-branch">master</span>
+                  <span class="git-branch-arrow">▾</span>
+                </button>
+                <div id="git-branch-dropdown" class="git-branch-dropdown" style="display:none">
+                  <div id="git-branch-list"></div>
+                  <div class="git-branch-dropdown-footer">
+                    <button id="btn-git-create-branch" class="sm" data-i18n="new_branch">+ New branch</button>
+                  </div>
+                </div>
+              </div>
               <span style="flex:1"></span>
               <button class="sm" id="btn-git-refresh" style="font-size:10px;padding:1px 6px" title="Refresh" data-i18n-title="refresh">&#x21bb;</button>
             </div>
