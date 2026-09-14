@@ -12,6 +12,31 @@ hide:
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.7.0) - 2026-09-14
+
+### 新增
+
+- Git 分支管理：分支选择器下拉框、切换/创建/删除分支及 stash 操作，带脏状态保护
+- Git worktree 操作：创建/移除 worktree、项目目录热切换、以 worktree 打开操作
+- Worktree 版本面板，显示当前分支和 worktree 状态
+- 分支列表及 fetch API 端点
+
+### 变更
+
+- 统一明暗模式品牌 SVG，使用 `<picture>` 元素在 README 中自动适配主题
+- 端口可用性检查改用 `getaddrinfo` 以支持 IPv6，并提供更具体的错误信息
+
+### 修复
+
+- 仅 PDF 布局模式下侧边栏可通过 Ctrl+B 和工具栏按钮正常切换
+- Git fetch 顺序修正：先 fetch 再列出分支，确保 `?fetch=true` 返回最新数据
+- Worktree 创建增加路径遍历防护，拒绝包含分隔符、前导点号或 `..` 的名称
+- 切换 worktree 时未保存文件检查扩展至所有已修改文件
+- 请求未编译 PDF 的子文件输出时返回 404 而非崩溃
+- 端口占用检测改为输出清晰错误信息，不再显示 asyncio 回溯
+- 分支删除增加 `--` 分隔符防止分支名被解释为命令行选项
+- Nuitka CI：改用 pip 安装 patchelf 以避免 apt 镜像哈希不匹配
+
 ## [0.6.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.6.0) - 2026-09-09
 
 ### 新增
