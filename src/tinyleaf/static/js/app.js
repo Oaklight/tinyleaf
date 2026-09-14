@@ -2999,7 +2999,6 @@ function setLayout(mode) {
   const pdfPane          = document.getElementById("pdf-pane");
   const resizeSidebar    = document.getElementById("resize-sidebar");
   const resizePdf        = document.getElementById("resize-pdf");
-  const btnSidebarToggle = document.getElementById("btn-sidebar-toggle");
 
   if (mode === "editor") {
     sidebar.classList.remove("collapsed");
@@ -3024,11 +3023,6 @@ function setLayout(mode) {
     resizePdf.classList.add("hidden");
   }
 
-  if (btnSidebarToggle) {
-    btnSidebarToggle.disabled = (mode === "pdf");
-    btnSidebarToggle.style.opacity = (mode === "pdf") ? "0.4" : "";
-  }
-
   document.querySelectorAll(".layout-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.layout === mode);
   });
@@ -3039,7 +3033,6 @@ function setLayout(mode) {
 }
 
 function toggleSidebar() {
-  if (S.layoutMode === "pdf") return;
   const sidebar = document.getElementById("sidebar");
   const resizeSidebar = document.getElementById("resize-sidebar");
   const editorView = document.getElementById("editor-view");
