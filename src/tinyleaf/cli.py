@@ -53,17 +53,27 @@ def _print_version():
 
 def _check_port_available(host: str, port: int):
     """Exit with a clean message if the port is already in use."""
+    import errno
     import socket
 
+    info = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    if not info:
+        print(f"Error: cannot resolve host {host!r}.", file=sys.stderr)
+        sys.exit(1)
+
+    af, socktype, proto, _canonname, sa = info[0]
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        with socket.socket(af, socktype, proto) as s:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            s.bind((host, port))
-    except OSError:
-        print(
-            f"Error: port {port} is already in use. Use --port to specify a different port.",
-            file=sys.stderr,
-        )
+            s.bind(sa)
+    except OSError as e:
+        if e.errno == errno.EADDRINUSE:
+            print(
+                f"Error: port {port} is already in use. Use --port to specify a different port.",
+                file=sys.stderr,
+            )
+        else:
+            print(f"Error: cannot bind to {host}:{port}: {e}", file=sys.stderr)
         sys.exit(1)
 
 
