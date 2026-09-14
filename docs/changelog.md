@@ -12,6 +12,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.7.0) - 2026-09-14
+
+### Added
+
+- Git branch management: branch selector dropdown, switch/create/delete branches, and stash operations with dirty-state guard
+- Git worktree operations: create/remove worktrees, project directory hot-swap, and open-as-worktree action
+- Worktree version panel showing current branch and worktree status
+- Branch listing and fetch API endpoint
+
+### Changed
+
+- Unified dark/light brand SVGs with `<picture>` element for automatic theme switching in READMEs
+- Port availability check uses `getaddrinfo` for IPv6 support with more specific error messages
+
+### Fixed
+
+- Sidebar toggle now works in PDF-only layout mode via Ctrl+B and toolbar button
+- Git fetch ordering: fetch before listing so `?fetch=true` returns up-to-date branch data
+- Path traversal guard in worktree creation rejects names containing separators, leading dots, or `..`
+- Unsaved-buffer check broadened to all modified files when switching worktrees
+- Return 404 instead of crashing when requesting output for sub-files without compiled PDF
+- Port-in-use detection with clean error message instead of asyncio traceback
+- Branch delete safety with `--` separator to prevent names from being interpreted as flags
+- Nuitka CI: install patchelf via pip instead of apt to avoid mirror hash mismatches
+
 ## [0.6.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.6.0) - 2026-09-09
 
 ### Added
