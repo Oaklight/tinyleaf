@@ -811,9 +811,6 @@ def _coerce_response(result: Any) -> Response | StreamingResponse:
     if isinstance(result, dict):
         return JSONResponse(result)
 
-    if isinstance(result, list):
-        return JSONResponse(result)
-
     if isinstance(result, tuple):
         if len(result) == 2:
             body, status = result
