@@ -246,7 +246,7 @@ class TestDownloadVendor:
         # Record mtimes
         import time
 
-        time.sleep(0.05)
+        time.sleep(0.1)
         mtimes = {}
         for f in os.listdir(vendor_dir):
             if f.endswith(".js"):

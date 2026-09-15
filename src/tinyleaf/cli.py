@@ -174,11 +174,11 @@ def main():
             print(f"  Using proxy: {proxy}")
 
         def _progress(done, total, name):
-            print(f"\r  Downloading JS modules... {done}/{total}", end="", flush=True)
+            print(f"\r  Downloading JS modules... {done}/{total}\033[K", end="", flush=True)
 
         try:
             vendor.download_vendor(vendor_dir, proxy=proxy, progress=_progress)
-            print("\r  JS modules ready" + " " * 20)
+            print("\r  JS modules ready\033[K")
         except Exception as e:
             print()
             print(f"  Warning: failed to download JS modules: {e}", file=sys.stderr)
