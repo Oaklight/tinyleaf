@@ -8,10 +8,10 @@ import hashlib
 import json
 import os
 import re
-import sys
 import threading
 import urllib.error
 import urllib.request
+import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
@@ -160,6 +160,34 @@ def _rewrite_imports(content, url_map):
     return _IMPORT_RE.sub(replace_import, content)
 
 
+def _drain_pdfjs(pdfjs_futures, vendor_dir, old_files, pdfjs_manifest, all_failures):
+    """Collect completed PDF.js futures, write files, stash manifest entries.
+
+    Returns:
+        Number of futures drained.
+    """
+    drained = 0
+    done = [f for f in pdfjs_futures if f.done()]
+    for future in done:
+        url, local_name, specifier = pdfjs_futures.pop(future)
+        try:
+            data = future.result()
+            file_hash = _sha256(data)
+            if old_files.get(local_name, {}).get("sha256") != file_hash:
+                filepath = os.path.join(vendor_dir, local_name)
+                with open(filepath, "wb") as f:
+                    f.write(data)
+            pdfjs_manifest[local_name] = {
+                "package": specifier,
+                "size": len(data),
+                "sha256": file_hash,
+            }
+        except Exception as e:
+            all_failures.append((url, local_name, e))
+        drained += 1
+    return drained
+
+
 def download_vendor(vendor_dir, proxy=None, progress=None):
     """Download all vendor JS modules to the given directory.
 
@@ -174,6 +202,9 @@ def download_vendor(vendor_dir, proxy=None, progress=None):
 
     Returns:
         The manifest dict that was written.
+
+    Warns:
+        UserWarning: If some files failed to download (partial failure).
     """
     global _opener
     with _lock:
@@ -187,6 +218,7 @@ def download_vendor(vendor_dir, proxy=None, progress=None):
         pkg_map = {}  # base package name -> local filename (dedup)
         contents = {}  # url -> raw content string
         all_failures = []
+        pdfjs_manifest = {}  # local_name -> manifest entry (stashed during download)
 
         # Pre-populate pkg_map with top-level packages
         for specifier, local_name in VENDOR_PACKAGES:
@@ -234,64 +266,68 @@ def download_vendor(vendor_dir, proxy=None, progress=None):
                         all_failures.append((url, name, e))
                     _report(name)
 
+                # Drain completed PDF.js futures between BFS levels
+                for _ in range(
+                    _drain_pdfjs(
+                        pdfjs_futures,
+                        vendor_dir,
+                        old_files,
+                        pdfjs_manifest,
+                        all_failures,
+                    )
+                ):
+                    _report("pdfjs")
+
                 if next_queue:
                     total_est += len(next_queue)
                 esm_queue = next_queue
 
-            # Collect PDF.js results
-            for future in as_completed(pdfjs_futures):
-                url, local_name, specifier = pdfjs_futures[future]
-                try:
-                    data = future.result()
-                    file_hash = _sha256(data)
-                    if old_files.get(local_name, {}).get("sha256") != file_hash:
-                        filepath = os.path.join(vendor_dir, local_name)
-                        with open(filepath, "wb") as f:
-                            f.write(data)
-                except Exception as e:
-                    all_failures.append((url, local_name, e))
-                _report(local_name)
+            # Drain any remaining PDF.js futures
+            for future in as_completed(pdfjs_futures.copy()):
+                _ = future  # ensure completion
+            for _ in range(
+                _drain_pdfjs(
+                    pdfjs_futures,
+                    vendor_dir,
+                    old_files,
+                    pdfjs_manifest,
+                    all_failures,
+                )
+            ):
+                _report("pdfjs")
 
-        # Rewrite imports and write ESM files (skip unchanged)
+        # Rewrite imports, write ESM files, and cache results for manifest
+        rewritten_cache = {}  # local_name -> (rewritten_content, sha256)
         for url, content in contents.items():
             local_name = url_map[url]
             rewritten = _rewrite_imports(content, url_map)
             file_hash = _sha256(rewritten)
+            rewritten_cache[local_name] = (rewritten, file_hash)
             if old_files.get(local_name, {}).get("sha256") != file_hash:
                 filepath = os.path.join(vendor_dir, local_name)
                 with open(filepath, "w", encoding="utf-8") as f:
                     f.write(rewritten)
 
-        # Build manifest
+        # Build manifest from cached results
         files = {}
         for specifier, local_name in VENDOR_PACKAGES:
-            url = _url_for_package(specifier)
-            if url in contents:
-                rewritten = _rewrite_imports(contents[url], url_map)
+            if local_name in rewritten_cache:
+                rewritten, file_hash = rewritten_cache[local_name]
                 files[local_name] = {
                     "package": specifier,
                     "size": len(rewritten.encode("utf-8")),
-                    "sha256": _sha256(rewritten),
+                    "sha256": file_hash,
                 }
 
-        for specifier, local_name in PDFJS_FILES:
-            filepath = os.path.join(vendor_dir, local_name)
-            if os.path.exists(filepath):
-                with open(filepath, "rb") as f:
-                    data = f.read()
-                files[local_name] = {
-                    "package": specifier,
-                    "size": len(data),
-                    "sha256": _sha256(data),
-                }
+        files.update(pdfjs_manifest)
 
         for url, dep_name in url_map.items():
-            if dep_name not in files and url in contents:
-                rewritten = _rewrite_imports(contents[url], url_map)
+            if dep_name not in files and dep_name in rewritten_cache:
+                rewritten, file_hash = rewritten_cache[dep_name]
                 files[dep_name] = {
                     "package": url.replace(CDN_BASE + "/npm/", "").replace("/+esm", ""),
                     "size": len(rewritten.encode("utf-8")),
-                    "sha256": _sha256(rewritten),
+                    "sha256": file_hash,
                 }
 
         manifest = {
@@ -307,9 +343,10 @@ def download_vendor(vendor_dir, proxy=None, progress=None):
 
         if all_failures:
             names = [name for _, name, _ in all_failures]
-            print(
-                f"  Warning: failed to download {len(names)} file(s): {', '.join(names)}",
-                file=sys.stderr,
+            warnings.warn(
+                f"Failed to download {len(names)} file(s): {', '.join(names)}. "
+                "Editor will use CDN fallback for missing modules.",
+                stacklevel=2,
             )
 
         return manifest
