@@ -170,13 +170,17 @@ def main():
     vendor_dir = os.path.join(config_dir, "vendor")
     if not vendor.is_vendor_ready(vendor_dir):
         proxy = vendor.load_proxy(config_dir)
-        print("  Downloading JS modules...")
         if proxy:
             print(f"  Using proxy: {proxy}")
+
+        def _progress(done, total, name):
+            print(f"\r  Downloading JS modules... {done}/{total}", end="", flush=True)
+
         try:
-            vendor.download_vendor(vendor_dir, proxy=proxy)
-            print("  JS modules ready")
+            vendor.download_vendor(vendor_dir, proxy=proxy, progress=_progress)
+            print("\r  JS modules ready" + " " * 20)
         except Exception as e:
+            print()
             print(f"  Warning: failed to download JS modules: {e}", file=sys.stderr)
             print("  Editor will try CDN as fallback", file=sys.stderr)
 

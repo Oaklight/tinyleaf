@@ -8,9 +8,11 @@ import hashlib
 import json
 import os
 import re
+import sys
 import threading
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 CDN_BASE = "https://cdn.jsdelivr.net"
@@ -41,6 +43,8 @@ PDFJS_FILES = [
 ]
 
 MANIFEST_FILE = "manifest.json"
+_MANIFEST_VERSION = 2
+_MAX_WORKERS = 8
 
 # Matches jsdelivr ESM cross-references: from"/npm/pkg@ver/+esm" or from "/npm/..."
 _IMPORT_RE = re.compile(r"""(from\s*["'])(/npm/[^"']+)(["'])""")
@@ -63,7 +67,6 @@ def _build_opener(proxy=None):
     else:
         os.environ.pop("http_proxy", None)
         os.environ.pop("https_proxy", None)
-    # Use ProxyHandler with empty dict to force re-reading env vars
     return urllib.request.build_opener(urllib.request.ProxyHandler())
 
 
@@ -83,6 +86,13 @@ def _fetch_binary(url):
         return resp.read()
 
 
+def _sha256(content):
+    """Compute SHA-256 hex digest of string or bytes content."""
+    if isinstance(content, str):
+        content = content.encode("utf-8")
+    return hashlib.sha256(content).hexdigest()
+
+
 def _url_for_package(specifier):
     """Build the jsdelivr ESM URL for a package specifier."""
     return f"{CDN_BASE}/npm/{specifier}/+esm"
@@ -91,8 +101,6 @@ def _url_for_package(specifier):
 def _dep_filename(url):
     """Generate a stable filename for a dependency URL."""
     h = hashlib.sha1(url.encode()).hexdigest()[:10]
-    # Extract a readable portion from the URL
-    # e.g. /npm/@lezer/common@1.2.3/+esm -> lezer-common-1.2.3
     match = re.search(r"/npm/(@?[^/+]+(?:/[^/+]+)?@[^/+]+)", url)
     if match:
         name = match.group(1).replace("/", "-").replace("@", "").lstrip("-")
@@ -110,64 +118,59 @@ def _pkg_base_name(ref_path):
     return match.group(1) if match else ref_path
 
 
-def _download_esm(url, local_name, vendor_dir, url_map, pkg_map):
-    """Download an ESM file, recursively resolve imports, rewrite paths.
+def _discover_deps(content, url_map, pkg_map):
+    """Parse ESM content for import references, return new deps to fetch.
 
     Args:
-        url: Full jsdelivr URL to download.
-        local_name: Local filename to save as.
-        vendor_dir: Destination directory.
-        url_map: Dict mapping URLs to local filenames (shared across calls).
-        pkg_map: Dict mapping base package names to local filenames for dedup.
-    """
-    if url in url_map:
-        return
+        content: Raw ESM source text.
+        url_map: URL -> local_name mapping (mutated to register new deps).
+        pkg_map: base package name -> local_name mapping (mutated).
 
-    url_map[url] = local_name
-    content = _fetch(url)
+    Returns:
+        List of (url, local_name) tuples for deps not yet fetched.
+    """
+    new_deps = []
+    for m in _IMPORT_RE.finditer(content):
+        ref_path = m.group(2)
+        ref_url = CDN_BASE + ref_path
+        if ref_url in url_map:
+            continue
+        base = _pkg_base_name(ref_path)
+        if base in pkg_map:
+            url_map[ref_url] = pkg_map[base]
+            continue
+        dep_name = _dep_filename(ref_path)
+        pkg_map[base] = dep_name
+        url_map[ref_url] = dep_name
+        new_deps.append((ref_url, dep_name))
+    return new_deps
+
+
+def _rewrite_imports(content, url_map):
+    """Rewrite jsdelivr cross-package imports to local relative paths."""
 
     def replace_import(m):
         prefix, ref_path, suffix = m.group(1), m.group(2), m.group(3)
         ref_url = CDN_BASE + ref_path
+        local = url_map.get(ref_url)
+        if local:
+            return f"{prefix}./{local}{suffix}"
+        return m.group(0)
 
-        if ref_url in url_map:
-            return f"{prefix}./{url_map[ref_url]}{suffix}"
-
-        # Deduplicate: if we already downloaded a different version of the
-        # same package, reuse that file instead of downloading again.
-        base = _pkg_base_name(ref_path)
-        if base in pkg_map:
-            url_map[ref_url] = pkg_map[base]
-            return f"{prefix}./{pkg_map[base]}{suffix}"
-
-        dep_name = _dep_filename(ref_path)
-        pkg_map[base] = dep_name
-        _download_esm(ref_url, dep_name, vendor_dir, url_map, pkg_map)
-        return f"{prefix}./{url_map[ref_url]}{suffix}"
-
-    rewritten = _IMPORT_RE.sub(replace_import, content)
-
-    filepath = os.path.join(vendor_dir, local_name)
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(rewritten)
+    return _IMPORT_RE.sub(replace_import, content)
 
 
-def _download_pdfjs(vendor_dir):
-    """Download PDF.js files (self-contained, no rewriting needed)."""
-    for specifier, local_name in PDFJS_FILES:
-        url = f"{CDN_BASE}/npm/{specifier}"
-        data = _fetch_binary(url)
-        filepath = os.path.join(vendor_dir, local_name)
-        with open(filepath, "wb") as f:
-            f.write(data)
-
-
-def download_vendor(vendor_dir, proxy=None):
+def download_vendor(vendor_dir, proxy=None, progress=None):
     """Download all vendor JS modules to the given directory.
+
+    Fetches packages in parallel, resolves transitive dependencies level
+    by level, and writes rewritten ESM files. Supports incremental updates
+    by comparing content hashes with the existing manifest.
 
     Args:
         vendor_dir: Destination directory for vendor files.
         proxy: Optional HTTP proxy URL (e.g. "http://localhost:7890").
+        progress: Optional callback(done, total, filename) for progress.
 
     Returns:
         The manifest dict that was written.
@@ -177,48 +180,122 @@ def download_vendor(vendor_dir, proxy=None):
         _opener = _build_opener(proxy)
         os.makedirs(vendor_dir, exist_ok=True)
 
-        url_map = {}  # jsdelivr URL → local filename
-        pkg_map = {}  # base package name → local filename (dedup)
+        old_manifest = get_manifest(vendor_dir)
+        old_files = old_manifest.get("files", {}) if old_manifest else {}
 
-        # Pre-populate pkg_map with top-level packages so that when
-        # e.g. cm-view.js references @codemirror/state internally,
-        # it resolves to cm-state.js (our top-level file) instead of
-        # creating a separate dep file. This ensures a single module
-        # instance for shared packages like @codemirror/state.
+        url_map = {}  # jsdelivr URL -> local filename
+        pkg_map = {}  # base package name -> local filename (dedup)
+        contents = {}  # url -> raw content string
+        all_failures = []
+
+        # Pre-populate pkg_map with top-level packages
         for specifier, local_name in VENDOR_PACKAGES:
-            # "@codemirror/view@6" -> "@codemirror/view"
             base = re.sub(r"@[^/]*$", "", specifier)
             pkg_map[base] = local_name
 
-        # Download CodeMirror ESM packages
+        # Build initial work list
+        esm_queue = []
         for specifier, local_name in VENDOR_PACKAGES:
             url = _url_for_package(specifier)
-            _download_esm(url, local_name, vendor_dir, url_map, pkg_map)
+            url_map[url] = local_name
+            esm_queue.append((url, local_name))
 
-        # Download PDF.js
-        _download_pdfjs(vendor_dir)
+        total_est = len(esm_queue) + len(PDFJS_FILES)
+        done_count = [0]
+
+        def _report(name):
+            done_count[0] += 1
+            if progress:
+                progress(done_count[0], total_est, name)
+
+        with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
+            # Start PDF.js downloads alongside ESM packages
+            pdfjs_futures = {}
+            for specifier, local_name in PDFJS_FILES:
+                url = f"{CDN_BASE}/npm/{specifier}"
+                pdfjs_futures[executor.submit(_fetch_binary, url)] = (
+                    url,
+                    local_name,
+                    specifier,
+                )
+
+            # BFS: fetch ESM packages level by level, discovering deps
+            while esm_queue:
+                future_map = {executor.submit(_fetch, url): (url, name) for url, name in esm_queue}
+                next_queue = []
+                for future in as_completed(future_map):
+                    url, name = future_map[future]
+                    try:
+                        content = future.result()
+                        contents[url] = content
+                        new_deps = _discover_deps(content, url_map, pkg_map)
+                        next_queue.extend(new_deps)
+                    except Exception as e:
+                        all_failures.append((url, name, e))
+                    _report(name)
+
+                if next_queue:
+                    total_est += len(next_queue)
+                esm_queue = next_queue
+
+            # Collect PDF.js results
+            for future in as_completed(pdfjs_futures):
+                url, local_name, specifier = pdfjs_futures[future]
+                try:
+                    data = future.result()
+                    file_hash = _sha256(data)
+                    if old_files.get(local_name, {}).get("sha256") != file_hash:
+                        filepath = os.path.join(vendor_dir, local_name)
+                        with open(filepath, "wb") as f:
+                            f.write(data)
+                except Exception as e:
+                    all_failures.append((url, local_name, e))
+                _report(local_name)
+
+        # Rewrite imports and write ESM files (skip unchanged)
+        for url, content in contents.items():
+            local_name = url_map[url]
+            rewritten = _rewrite_imports(content, url_map)
+            file_hash = _sha256(rewritten)
+            if old_files.get(local_name, {}).get("sha256") != file_hash:
+                filepath = os.path.join(vendor_dir, local_name)
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write(rewritten)
 
         # Build manifest
         files = {}
-        for specifier, local_name in VENDOR_PACKAGES + PDFJS_FILES:
-            filepath = os.path.join(vendor_dir, local_name)
-            if os.path.exists(filepath):
+        for specifier, local_name in VENDOR_PACKAGES:
+            url = _url_for_package(specifier)
+            if url in contents:
+                rewritten = _rewrite_imports(contents[url], url_map)
                 files[local_name] = {
                     "package": specifier,
-                    "size": os.path.getsize(filepath),
+                    "size": len(rewritten.encode("utf-8")),
+                    "sha256": _sha256(rewritten),
                 }
 
-        # Include dependency files
+        for specifier, local_name in PDFJS_FILES:
+            filepath = os.path.join(vendor_dir, local_name)
+            if os.path.exists(filepath):
+                with open(filepath, "rb") as f:
+                    data = f.read()
+                files[local_name] = {
+                    "package": specifier,
+                    "size": len(data),
+                    "sha256": _sha256(data),
+                }
+
         for url, dep_name in url_map.items():
-            filepath = os.path.join(vendor_dir, dep_name)
-            if dep_name not in files and os.path.exists(filepath):
+            if dep_name not in files and url in contents:
+                rewritten = _rewrite_imports(contents[url], url_map)
                 files[dep_name] = {
                     "package": url.replace(CDN_BASE + "/npm/", "").replace("/+esm", ""),
-                    "size": os.path.getsize(filepath),
+                    "size": len(rewritten.encode("utf-8")),
+                    "sha256": _sha256(rewritten),
                 }
 
         manifest = {
-            "version": 1,
+            "version": _MANIFEST_VERSION,
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "file_count": len(files),
             "files": files,
@@ -227,6 +304,13 @@ def download_vendor(vendor_dir, proxy=None):
         manifest_path = os.path.join(vendor_dir, MANIFEST_FILE)
         with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2, ensure_ascii=False)
+
+        if all_failures:
+            names = [name for _, name, _ in all_failures]
+            print(
+                f"  Warning: failed to download {len(names)} file(s): {', '.join(names)}",
+                file=sys.stderr,
+            )
 
         return manifest
 
@@ -250,7 +334,6 @@ def is_vendor_ready(vendor_dir):
     manifest = get_manifest(vendor_dir)
     if not manifest:
         return False
-    # Check that at least the main files exist
     for _, local_name in VENDOR_PACKAGES + PDFJS_FILES:
         if not os.path.exists(os.path.join(vendor_dir, local_name)):
             return False
@@ -267,7 +350,6 @@ def save_proxy(config_dir, proxy):
         with open(path, "w", encoding="utf-8") as f:
             f.write(proxy.strip())
     else:
-        # Clear proxy
         try:
             os.remove(path)
         except FileNotFoundError:
