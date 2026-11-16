@@ -376,6 +376,100 @@ def commit(project_dir, message, files=None):
     return {"success": True, "message": out.strip()}
 
 
+_GITIGNORE_HEADER = "# LaTeX build artifacts (tinyleaf)"
+
+
+def artifact_gitignore_patterns():
+    """Return one ``*.ext`` gitignore pattern per artifact extension."""
+    return [f"*{ext}" for ext in sorted(ARTIFACT_EXTENSIONS)]
+
+
+def _tracked_artifacts(project_dir):
+    """Return tracked paths that match the artifact set."""
+    rc, out, _ = _run_git(project_dir, "ls-files", "-z")
+    if rc != 0:
+        return []
+    return [path for path in out.split("\0") if path and is_build_artifact(path)]
+
+
+def add_artifact_gitignore(project_dir, dry_run=False):
+    """Add missing artifact patterns to the project ``.gitignore``.
+
+    Existing content is preserved and a header is added once. The file is
+    replaced atomically.
+
+    Args:
+        project_dir: Project directory.
+        dry_run: Compute the changes without writing.
+
+    Returns:
+        Dict with ``created`` (whether the file would be created) and
+        ``added`` (patterns that were missing).
+    """
+    path = os.path.join(project_dir, ".gitignore")
+    exists = os.path.isfile(path)
+    content = ""
+    if exists:
+        with open(path, encoding="utf-8") as gitignore_file:
+            content = gitignore_file.read()
+
+    existing = {line.strip() for line in content.splitlines()}
+    missing = [pattern for pattern in artifact_gitignore_patterns() if pattern not in existing]
+    if not missing:
+        return {"created": False, "added": []}
+    if dry_run:
+        return {"created": not exists, "added": missing}
+
+    lines = content.splitlines()
+    if _GITIGNORE_HEADER not in existing:
+        lines.append(_GITIGNORE_HEADER)
+    lines.extend(missing)
+    tmp_path = path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as gitignore_file:
+        gitignore_file.write("\n".join(lines) + "\n")
+    os.replace(tmp_path, path)
+    return {"created": not exists, "added": missing}
+
+
+def ignore_build_artifacts(project_dir, dry_run=False, untrack=True):
+    """Add artifact patterns to .gitignore and optionally untrack artifacts.
+
+    ``git rm --cached`` removes paths from the index only; files on disk are
+    never deleted.
+
+    Args:
+        project_dir: Project directory.
+        dry_run: Report intended changes without writing or touching the index.
+        untrack: Remove tracked artifact paths from the index.
+
+    Returns:
+        Dict with ``dry_run``, ``gitignore``, ``removed_from_index``, and
+        ``failed`` entries (``{path, message}``).
+    """
+    gitignore = add_artifact_gitignore(project_dir, dry_run=dry_run)
+    removed = []
+    failed = []
+    if untrack:
+        tracked = _tracked_artifacts(project_dir)
+        if dry_run:
+            removed = tracked
+        else:
+            for path in tracked:
+                rc, out, err = _run_git(
+                    project_dir, "rm", "--cached", "--ignore-unmatch", "--", path
+                )
+                if rc == 0:
+                    removed.append(path)
+                else:
+                    failed.append({"path": path, "message": (err or out).strip()})
+    return {
+        "dry_run": dry_run,
+        "gitignore": gitignore,
+        "removed_from_index": removed,
+        "failed": failed,
+    }
+
+
 def push(project_dir):
     """Push to remote."""
     if not has_git(project_dir):

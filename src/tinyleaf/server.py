@@ -875,6 +875,13 @@ def api_git_commit(request, name):
     return handle_git_commit(request.json(), _config, name)
 
 
+@app.post("/api/projects/<name>/git/ignore-artifacts")
+def api_git_ignore_artifacts(request, name):
+    from tinyleaf.handlers import handle_git_ignore_artifacts
+
+    return handle_git_ignore_artifacts(request.json(), _config, name)
+
+
 @app.post("/api/projects/<name>/git/push")
 def api_git_push(request, name):
     from tinyleaf.handlers import handle_git_push
