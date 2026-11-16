@@ -1,7 +1,9 @@
 """HTTP server for tinyleaf, built on zerodep httpserver."""
 
 import email.utils
+import logging
 import os
+import ssl
 
 from tinyleaf._vendor.httpserver import (
     App,
@@ -18,7 +20,13 @@ _CORS_HEADERS = {
     "Access-Control-Allow-Headers": "Content-Type",
 }
 
-app = App(max_body_size=50 * 1024 * 1024)
+logger = logging.getLogger(__name__)
+
+app = App(
+    max_body_size=50 * 1024 * 1024,
+    keep_alive=True,
+    keep_alive_timeout=30.0,
+)
 
 _config: dict = {}
 
@@ -530,10 +538,54 @@ def add_cors_headers(request, response):
     return response
 
 
+# ── Lifecycle hooks ──
+
+
+@app.on_request_rejected
+async def log_rejected_request(rejection):
+    """Log requests rejected while being read (malformed, too large, timeout)."""
+    logger.warning(
+        "Rejected request %s id=%s reason=%s client=%s",
+        rejection.status_code,
+        rejection.request_id,
+        rejection.reason,
+        rejection.client_addr,
+    )
+
+
+@app.on_client_disconnect
+def log_client_disconnect(request):
+    """Log a client that dropped while a response was being written."""
+    logger.debug(
+        "Client disconnected: %s %s from %s",
+        request.method,
+        request.path,
+        request.client_addr,
+    )
+
+
+@app.on_shutdown
+def shutdown_running_jobs():
+    """Stop compile jobs and image pulls when the server exits."""
+    from tinyleaf import compiler
+
+    compiler.shutdown_all()
+
+
 def run_server(config: dict):
     """Start the HTTP server (blocking)."""
     global _config
     _config = config
     host = config["host"]
     port = config["port"]
-    app.run(host=host, port=port)
+
+    ssl_context = None
+    if config.get("ssl_cert"):
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ssl_context.load_cert_chain(
+            certfile=config["ssl_cert"],
+            keyfile=config.get("ssl_key") or None,
+        )
+        logger.info("TLS enabled with certificate %s", config["ssl_cert"])
+
+    app.run(host=host, port=port, ssl_context=ssl_context)
