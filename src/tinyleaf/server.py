@@ -181,7 +181,12 @@ def handle_unexpected_exception(request, exception):
 
 
 # Paths reachable without a token; everything else under /api/ requires one.
-_PUBLIC_API_PATHS = {"/api/health", "/api/version", "/api/auth/session"}
+_PUBLIC_API_PATHS = {
+    "/api/health",
+    "/api/version",
+    "/api/auth/session",
+    "/api/auth/logout",
+}
 
 _SESSION_COOKIE = "tinyleaf_session"
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
@@ -201,11 +206,23 @@ def _host_name(host_header):
     return _normalize_host(name)
 
 
+def _normalize_allowed_host(value):
+    """Normalize an allow-list entry, ignoring any port and IPv6 brackets."""
+    value = value.strip()
+    if value.startswith("["):
+        end = value.find("]")
+        return _normalize_host(value[1:end] if end != -1 else value)
+    # A bare IPv6 address has more than one colon; only host:port has one.
+    if value.count(":") == 1:
+        value = value.split(":", 1)[0]
+    return _normalize_host(value)
+
+
 def _allowed_host_names(config):
     names = {"localhost", "127.0.0.1", "::1"}
     if config.get("host"):
-        names.add(_normalize_host(config["host"]))
-    names.update(_normalize_host(host) for host in (config.get("allowed_hosts") or []))
+        names.add(_normalize_allowed_host(config["host"]))
+    names.update(_normalize_allowed_host(host) for host in (config.get("allowed_hosts") or []))
     return names
 
 
@@ -265,7 +282,7 @@ def enforce_access(request):
     if (
         _config.get("read_only")
         and request.method not in _SAFE_METHODS
-        and request.path != "/api/auth/session"
+        and request.path not in ("/api/auth/session", "/api/auth/logout")
     ):
         return _error_envelope(request, 403, "Server is read-only", "read_only")
 
@@ -482,6 +499,23 @@ def api_auth_session(request):
     response.set_cookie(
         _SESSION_COOKIE,
         token,
+        httponly=True,
+        samesite="Strict",
+        secure=bool(_config.get("ssl_cert")),
+        path="/",
+    )
+    return response
+
+
+@app.post("/api/auth/logout")
+def api_auth_logout(request):
+    """Clear the session cookie. Public and idempotent."""
+    response = JSONResponse({"authenticated": False})
+    response.headers["Cache-Control"] = "no-store"
+    response.set_cookie(
+        _SESSION_COOKIE,
+        "",
+        max_age=0,
         httponly=True,
         samesite="Strict",
         secure=bool(_config.get("ssl_cert")),
