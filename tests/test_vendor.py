@@ -119,7 +119,7 @@ class TestDownloadVendor:
     def _mock_fetch(self, url_content_map):
         """Create a mock _fetch that returns content from a dict."""
 
-        def fake_fetch(url):
+        def fake_fetch(url, opener=None):
             if url in url_content_map:
                 return url_content_map[url]
             raise urllib.error.URLError(f"Not found: {url}")
@@ -142,7 +142,8 @@ class TestDownloadVendor:
         with (
             patch("tinyleaf.vendor._fetch", side_effect=self._mock_fetch(url_content)),
             patch(
-                "tinyleaf.vendor._fetch_binary", side_effect=lambda url: url_content.get(url, b"")
+                "tinyleaf.vendor._fetch_binary",
+                side_effect=lambda url, opener=None: url_content.get(url, b""),
             ),
         ):
             manifest = download_vendor(vendor_dir)
@@ -175,7 +176,8 @@ class TestDownloadVendor:
         with (
             patch("tinyleaf.vendor._fetch", side_effect=self._mock_fetch(url_content)),
             patch(
-                "tinyleaf.vendor._fetch_binary", side_effect=lambda url: url_content.get(url, b"")
+                "tinyleaf.vendor._fetch_binary",
+                side_effect=lambda url, opener=None: url_content.get(url, b""),
             ),
         ):
             download_vendor(vendor_dir, progress=on_progress)
@@ -208,7 +210,8 @@ class TestDownloadVendor:
         with (
             patch("tinyleaf.vendor._fetch", side_effect=self._mock_fetch(url_content)),
             patch(
-                "tinyleaf.vendor._fetch_binary", side_effect=lambda url: url_content.get(url, b"")
+                "tinyleaf.vendor._fetch_binary",
+                side_effect=lambda url, opener=None: url_content.get(url, b""),
             ),
         ):
             manifest = download_vendor(vendor_dir)
@@ -238,7 +241,8 @@ class TestDownloadVendor:
         with (
             patch("tinyleaf.vendor._fetch", side_effect=self._mock_fetch(url_content)),
             patch(
-                "tinyleaf.vendor._fetch_binary", side_effect=lambda url: url_content.get(url, b"")
+                "tinyleaf.vendor._fetch_binary",
+                side_effect=lambda url, opener=None: url_content.get(url, b""),
             ),
         ):
             download_vendor(vendor_dir)
@@ -256,7 +260,8 @@ class TestDownloadVendor:
         with (
             patch("tinyleaf.vendor._fetch", side_effect=self._mock_fetch(url_content)),
             patch(
-                "tinyleaf.vendor._fetch_binary", side_effect=lambda url: url_content.get(url, b"")
+                "tinyleaf.vendor._fetch_binary",
+                side_effect=lambda url, opener=None: url_content.get(url, b""),
             ),
         ):
             download_vendor(vendor_dir)
@@ -285,7 +290,8 @@ class TestDownloadVendor:
         with (
             patch("tinyleaf.vendor._fetch", side_effect=self._mock_fetch(url_content)),
             patch(
-                "tinyleaf.vendor._fetch_binary", side_effect=lambda url: url_content.get(url, b"")
+                "tinyleaf.vendor._fetch_binary",
+                side_effect=lambda url, opener=None: url_content.get(url, b""),
             ),
         ):
             manifest = download_vendor(vendor_dir)
@@ -312,7 +318,8 @@ class TestDownloadVendor:
         with (
             patch("tinyleaf.vendor._fetch", side_effect=self._mock_fetch(url_content)),
             patch(
-                "tinyleaf.vendor._fetch_binary", side_effect=lambda url: url_content.get(url, b"")
+                "tinyleaf.vendor._fetch_binary",
+                side_effect=lambda url, opener=None: url_content.get(url, b""),
             ),
         ):
             manifest = download_vendor(vendor_dir)

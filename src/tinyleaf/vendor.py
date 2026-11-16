@@ -51,37 +51,29 @@ _IMPORT_RE = re.compile(r"""(from\s*["'])(/npm/[^"']+)(["'])""")
 
 _lock = threading.Lock()
 
-# Module-level opener, set by _build_opener() when proxy is configured
-_opener = None
-
 
 def _build_opener(proxy=None):
-    """Build a urllib opener, optionally with proxy support.
+    """Build a urllib opener with an explicit ProxyHandler.
 
-    For HTTPS through HTTP proxy, we set environment variables instead of
-    using ProxyHandler, which avoids SSL tunnel issues.
+    ``proxy=None`` disables proxies instead of inheriting them from the
+    environment, so the result never depends on global process state.
     """
-    if proxy:
-        os.environ["http_proxy"] = proxy
-        os.environ["https_proxy"] = proxy
-    else:
-        os.environ.pop("http_proxy", None)
-        os.environ.pop("https_proxy", None)
-    return urllib.request.build_opener(urllib.request.ProxyHandler())
+    proxies = {"http": proxy, "https": proxy} if proxy else {}
+    return urllib.request.build_opener(urllib.request.ProxyHandler(proxies))
 
 
-def _fetch(url):
+def _fetch(url, opener=None):
     """Download a URL and return content as string."""
     req = urllib.request.Request(url, headers={"User-Agent": "tinyleaf-vendor/1.0"})
-    opener = _opener or urllib.request.build_opener()
+    opener = opener or urllib.request.build_opener()
     with opener.open(req, timeout=30) as resp:
         return resp.read().decode("utf-8")
 
 
-def _fetch_binary(url):
+def _fetch_binary(url, opener=None):
     """Download a URL and return content as bytes."""
     req = urllib.request.Request(url, headers={"User-Agent": "tinyleaf-vendor/1.0"})
-    opener = _opener or urllib.request.build_opener()
+    opener = opener or urllib.request.build_opener()
     with opener.open(req, timeout=60) as resp:
         return resp.read()
 
@@ -206,9 +198,8 @@ def download_vendor(vendor_dir, proxy=None, progress=None):
     Warns:
         UserWarning: If some files failed to download (partial failure).
     """
-    global _opener
     with _lock:
-        _opener = _build_opener(proxy)
+        opener = _build_opener(proxy)
         os.makedirs(vendor_dir, exist_ok=True)
 
         old_manifest = get_manifest(vendor_dir)
@@ -245,7 +236,7 @@ def download_vendor(vendor_dir, proxy=None, progress=None):
             pdfjs_futures = {}
             for specifier, local_name in PDFJS_FILES:
                 url = f"{CDN_BASE}/npm/{specifier}"
-                pdfjs_futures[executor.submit(_fetch_binary, url)] = (
+                pdfjs_futures[executor.submit(_fetch_binary, url, opener)] = (
                     url,
                     local_name,
                     specifier,
@@ -253,7 +244,9 @@ def download_vendor(vendor_dir, proxy=None, progress=None):
 
             # BFS: fetch ESM packages level by level, discovering deps
             while esm_queue:
-                future_map = {executor.submit(_fetch, url): (url, name) for url, name in esm_queue}
+                future_map = {
+                    executor.submit(_fetch, url, opener): (url, name) for url, name in esm_queue
+                }
                 next_queue = []
                 for future in as_completed(future_map):
                     url, name = future_map[future]
