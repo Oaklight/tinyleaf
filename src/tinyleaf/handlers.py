@@ -92,10 +92,25 @@ def _write_settings(config_dir, data):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
+def _is_within_project(project_dir, full_path):
+    """Return True when full_path resolves inside project_dir.
+
+    Uses realpath so a symlink cannot escape the project, and commonpath so
+    a sibling directory such as ``/a/proj-secret`` is not mistaken for
+    ``/a/proj`` (a plain string-prefix check allowed that).
+    """
+    base = os.path.realpath(project_dir)
+    target = os.path.realpath(full_path)
+    try:
+        return os.path.commonpath([base, target]) == base
+    except ValueError:
+        return False
+
+
 def _ensure_within_project(project_dir, file_path):
     """Validate that file_path resolves inside project_dir."""
     full_path = os.path.join(project_dir, file_path)
-    if not os.path.abspath(full_path).startswith(os.path.abspath(project_dir)):
+    if not _is_within_project(project_dir, full_path):
         abort(403, "Access denied")
     return full_path
 
@@ -445,6 +460,11 @@ def handle_delete_file(config, name, file_path):
     project_dir = _get_project_dir(config, name)
     full_path = _ensure_within_project(project_dir, file_path)
 
+    # "." and "sub/.." resolve to the project root; rmtree would wipe the
+    # whole project. Refuse before checking existence.
+    if os.path.realpath(full_path) == os.path.realpath(project_dir):
+        abort(400, "Cannot delete the project root")
+
     if not os.path.exists(full_path):
         abort(404, "File not found")
 
@@ -483,6 +503,9 @@ def handle_rename_path(body, config, name):
 
     old_full = _ensure_within_project(project_dir, old_path)
     new_full = _ensure_within_project(project_dir, new_path)
+
+    if os.path.realpath(old_full) == os.path.realpath(project_dir):
+        abort(400, "Cannot rename the project root")
 
     if not os.path.exists(old_full):
         abort(404, "Source not found")
@@ -558,7 +581,7 @@ def handle_upload(request, config, name):
 
         rel_path = os.path.join(target_dir, filename) if target_dir else filename
         full_path = os.path.join(project_dir, rel_path)
-        if not os.path.abspath(full_path).startswith(os.path.abspath(project_dir)):
+        if not _is_within_project(project_dir, full_path):
             continue
 
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
