@@ -1001,7 +1001,20 @@ async function api(method, path, body = null) {
 }
 
 function enc(s) { return encodeURIComponent(s); }
-function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+/**
+ * Escape a value for safe interpolation into HTML text or a quoted attribute.
+ * Escapes & < > " ' so a name containing quotes cannot break out of an
+ * attribute or close an element. Use this for every dynamic value that goes
+ * through innerHTML; prefer setting textContent or element.value where possible.
+ */
+function escapeHtml(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 function setStatus(msg, level = "info") {
   const el = document.getElementById("status-left");
   el.textContent = msg;
@@ -1415,7 +1428,7 @@ function fileContextMenu(e, node) {
 
 function showRenameModal(node) {
   const oldName = node.name;
-  showModal(t("rename_title"), `<input id="inp-rename" value="${esc(oldName)}" autofocus>`, [
+  showModal(t("rename_title"), `<input id="inp-rename" autofocus>`, [
     { label: t("cancel"), action: closeModal },
     { label: t("rename"), primary: true, action: async () => {
       const newName = document.getElementById("inp-rename").value.trim();
@@ -1453,13 +1466,13 @@ function showRenameModal(node) {
   ]);
   setTimeout(() => {
     const inp = document.getElementById("inp-rename");
-    if (inp) { inp.focus(); inp.select(); }
+    if (inp) { inp.value = oldName; inp.focus(); inp.select(); }
   }, 50);
 }
 
 function confirmDelete(node) {
   const msg = t("confirm_delete").replace("{name}", node.name);
-  showModal(t("delete"), `<p style="margin-bottom:14px">${esc(msg)}</p>`, [
+  showModal(t("delete"), `<p style="margin-bottom:14px">${escapeHtml(msg)}</p>`, [
     { label: t("cancel"), action: closeModal },
     { label: t("delete"), primary: true, action: async () => {
       try {
@@ -1581,9 +1594,9 @@ async function showProjectList() {
       ? new Date(p.last_opened).toLocaleString()
       : (p.added_at ? new Date(p.added_at).toLocaleString() : "");
     const gitBadge = p.git ? `<span class="git-badge" title="Git repository"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></span>` : "";
-    card.innerHTML = `<h3>${esc(p.name)} ${gitBadge}</h3>`
-      + `<div class="project-path">${esc(p.path || "")}</div>`
-      + `<div class="project-time">${esc(timeStr)}</div>`
+    card.innerHTML = `<h3>${escapeHtml(p.name)} ${gitBadge}</h3>`
+      + `<div class="project-path">${escapeHtml(p.path || "")}</div>`
+      + `<div class="project-time">${escapeHtml(timeStr)}</div>`
       + `<button class="rename-btn" title="${t("rename_project")}"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>`
       + `<button class="remove-btn" title="${t("remove_project")}"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
     if (p.exists !== false) {
@@ -1675,7 +1688,7 @@ function showOpenFolderModal() {
 
 function showRenameProjectModal(name) {
   showModal(t("rename_project_title"),
-    `<input type="text" id="inp-rename-project" value="${esc(name)}" placeholder="${t("project_name")}" autofocus>`,
+    `<input type="text" id="inp-rename-project" placeholder="${t("project_name")}" autofocus>`,
     [
       { label: t("cancel"), action: closeModal },
       { label: t("rename"), primary: true, action: async () => {
@@ -1693,14 +1706,14 @@ function showRenameProjectModal(name) {
     ]);
   setTimeout(() => {
     const inp = document.getElementById("inp-rename-project");
-    if (inp) { inp.focus(); inp.select(); }
+    if (inp) { inp.value = name; inp.focus(); inp.select(); }
   }, 50);
 }
 
 function showRemoveProjectModal(name) {
   const msg = t("remove_project_confirm").replace("{name}", name);
   showModal(t("remove_project_title"),
-    `<p style="margin-bottom:14px">${esc(msg)}</p>`
+    `<p style="margin-bottom:14px">${escapeHtml(msg)}</p>`
     + `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">`
     + `<input type="checkbox" id="chk-delete-files"> ${t("delete_files_too")}</label>`,
     [
@@ -1724,7 +1737,7 @@ async function loadDirBrowser(containerId, startPath) {
 
 function renderDirBrowser(containerId, currentPath, dirs) {
   const container = document.getElementById(containerId);
-  container.innerHTML = `<div class="dir-path">${esc(currentPath)}</div><div class="dir-list"></div>`;
+  container.innerHTML = `<div class="dir-path">${escapeHtml(currentPath)}</div><div class="dir-list"></div>`;
   const list = container.querySelector(".dir-list");
 
   // Auto-fill project name from path basename (Open Folder modal only)
@@ -1747,7 +1760,7 @@ function renderDirBrowser(containerId, currentPath, dirs) {
   for (const d of dirs) {
     const item = document.createElement("div");
     item.className = "dir-item";
-    item.innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>${esc(d)}`;
+    item.innerHTML = `<svg viewBox="0 0 24 24"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg>${escapeHtml(d)}`;
     const fullPath = currentPath === "/" ? "/" + d : currentPath + "/" + d;
     item.onclick = () => navigateDir(containerId, fullPath);
     list.appendChild(item);
@@ -1946,7 +1959,7 @@ function renderTreeNodes(nodes, parent, depth) {
       header.style.paddingLeft = (14 + depth * 16) + "px";
 
       const isOpen = expandedDirs.has(node.path);
-      header.innerHTML = `<span class="arrow ${isOpen ? "open" : ""}"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></span> ${esc(node.name)}`;
+      header.innerHTML = `<span class="arrow ${isOpen ? "open" : ""}"><svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></span> ${escapeHtml(node.name)}`;
       header.onclick = () => {
         if (expandedDirs.has(node.path)) expandedDirs.delete(node.path);
         else expandedDirs.add(node.path);
@@ -2556,7 +2569,7 @@ async function loadPDF(url, opts = {}) {
     // Extract text in the background for PDF search
     extractPdfText().catch(() => {});
   } catch (err) {
-    container.innerHTML = `<div class="pdf-placeholder">${t("pdf_error")}: ${esc(err.message)}</div>`;
+    container.innerHTML = `<div class="pdf-placeholder">${t("pdf_error")}: ${escapeHtml(err.message)}</div>`;
     setPdfStatus(t("pdf_error"));
   }
 }
@@ -3144,10 +3157,6 @@ function switchSidebarTab(tabName) {
 // ══════════════════════════════════════════
 let _searchTimer = null;
 
-function escapeHtml(s) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
 async function projectSearch(query) {
   const statusEl = document.getElementById("search-status");
   const resultsEl = document.getElementById("search-results");
@@ -3192,7 +3201,18 @@ function renderSearchResults(data, query, caseSensitive) {
     html += `<span>${escapeHtml(file)}</span><span class="match-count">${matches.length}</span></div>`;
     html += `<div>`;
     for (const m of matches) {
-      const safe = escapeHtml(m.text).replace(highlightRe, s => `<mark>${s}</mark>`);
+      // Highlight by escaping each segment separately. Escaping first would
+      // turn query characters like & " ' into entities, so the query would
+      // no longer match; this keeps the highlight and stays XSS-safe.
+      const parts = [];
+      let last = 0;
+      for (const hit of m.text.matchAll(highlightRe)) {
+        if (hit.index > last) parts.push(escapeHtml(m.text.slice(last, hit.index)));
+        parts.push(`<mark>${escapeHtml(hit[0])}</mark>`);
+        last = hit.index + hit[0].length;
+      }
+      if (last < m.text.length) parts.push(escapeHtml(m.text.slice(last)));
+      const safe = parts.join("");
       html += `<div class="search-match" data-file="${escapeHtml(file)}" data-line="${m.line}">`;
       html += `<span class="line-num">${m.line}</span><span class="line-text">${safe}</span></div>`;
     }
@@ -4295,14 +4315,14 @@ async function refreshGitLog() {
     for (const c of commits) {
       const entry = document.createElement("div");
       entry.className = "git-log-entry";
-      entry.innerHTML = `<div class="git-log-top"><span class="git-log-hash">${esc(c.hash)}</span><span class="git-log-date">${esc(new Date(c.date).toLocaleDateString())}</span></div>`
-        + `<div class="git-log-msg">${esc(c.message)}</div>`
-        + `<div class="git-log-author">${esc(c.author)}</div>`;
+      entry.innerHTML = `<div class="git-log-top"><span class="git-log-hash">${escapeHtml(c.hash)}</span><span class="git-log-date">${escapeHtml(new Date(c.date).toLocaleDateString())}</span></div>`
+        + `<div class="git-log-msg">${escapeHtml(c.message)}</div>`
+        + `<div class="git-log-author">${escapeHtml(c.author)}</div>`;
       entry.onclick = () => showCommitDiff(c.hash);
       list.appendChild(entry);
     }
   } catch (err) {
-    list.innerHTML = `<div class="git-log-empty">${esc(err.message)}</div>`;
+    list.innerHTML = `<div class="git-log-empty">${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -4321,7 +4341,7 @@ async function showCommitDiff(hash) {
     }
     _renderDiffText(text, content);
   } catch (err) {
-    content.innerHTML = `<div class="diff-no-changes">${esc(err.message)}</div>`;
+    content.innerHTML = `<div class="diff-no-changes">${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -4513,7 +4533,7 @@ async function showWordCount() {
       </div>
     `;
   } catch (err) {
-    container.innerHTML = `<div style="text-align:center;padding:16px;color:var(--red)">${t("wc_error")}: ${esc(err.message)}</div>`;
+    container.innerHTML = `<div style="text-align:center;padding:16px;color:var(--red)">${t("wc_error")}: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -4590,16 +4610,12 @@ function quickOpenFilter(query) {
   return scored.slice(0, QO.maxResults);
 }
 
-function _qoEscape(s) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
 function _qoHighlight(text, indices, offset = 0) {
-  if (!indices.length) return _qoEscape(text);
+  if (!indices.length) return escapeHtml(text);
   const set = new Set(indices.map((i) => i - offset));
   let out = "";
   for (let i = 0; i < text.length; i++) {
-    const ch = _qoEscape(text[i]);
+    const ch = escapeHtml(text[i]);
     out += set.has(i) ? `<span class="qo-match">${ch}</span>` : ch;
   }
   return out;
@@ -4619,7 +4635,7 @@ function renderQuickOpenResults() {
     const dir = slash >= 0 ? m.path.slice(0, slash + 1) : "";
     const nameHtml = _qoHighlight(name, m.indices, slash + 1);
     const dirHtml = dir ? _qoHighlight(dir, m.indices, 0) : "";
-    return `<div class="qo-row${idx === QO.active ? " active" : ""}" data-idx="${idx}" data-path="${_qoEscape(m.path)}">
+    return `<div class="qo-row${idx === QO.active ? " active" : ""}" data-idx="${idx}" data-path="${escapeHtml(m.path)}">
       <span class="qo-name">${nameHtml}</span>
       <span class="qo-dir">${dirHtml}</span>
     </div>`;
