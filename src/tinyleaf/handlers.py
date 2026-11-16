@@ -10,6 +10,7 @@ import json
 import os
 import re
 import subprocess
+import threading
 import zipfile
 
 from tinyleaf import compiler, git_ops, registry, vendor
@@ -19,6 +20,9 @@ from tinyleaf._vendor.httpserver import FileResponse, JSONResponse, Response, ab
 # Project config file name
 CONFIG_FILE = ".tinyleaf.json"
 SETTINGS_FILE = "settings.json"
+
+# Serialises settings read-modify-write cycles across request threads.
+_settings_lock = threading.Lock()
 
 
 # ── Helpers ──
@@ -86,10 +90,12 @@ def _read_settings(config_dir):
 
 
 def _write_settings(config_dir, data):
-    """Write global settings to config_dir/settings.json."""
+    """Write global settings to config_dir/settings.json atomically."""
     path = os.path.join(config_dir, SETTINGS_FILE)
-    with open(path, "w", encoding="utf-8") as f:
+    tmp_path = path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
+    os.replace(tmp_path, path)
 
 
 def _is_within_project(project_dir, full_path):
@@ -406,9 +412,10 @@ def handle_put_settings(body, config):
     config_dir = config.get("config_dir")
     if not config_dir:
         abort(400, "Not available in single mode")
-    existing = _read_settings(config_dir)
-    existing.update(body)
-    _write_settings(config_dir, existing)
+    with _settings_lock:
+        existing = _read_settings(config_dir)
+        existing.update(body)
+        _write_settings(config_dir, existing)
     return existing
 
 
