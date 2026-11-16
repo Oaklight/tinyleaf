@@ -317,3 +317,75 @@ class TestSessionBodyValidation:
         )
         response = server.api_auth_session(request)
         assert response.status_code == 401
+
+
+class TestAllowedHostNormalization:
+    def test_configured_host_with_port(self, config):
+        config["allowed_hosts"] = ["Papers.Example.COM:14159"]
+        request = _request(headers={"Host": "papers.example.com:14159"})
+        assert server.enforce_access(request) is None
+
+    def test_configured_ipv6_with_brackets_and_port(self, config):
+        config["allowed_hosts"] = ["[::1]:14159"]
+        request = _request(headers={"Host": "[::1]:14159"})
+        assert server.enforce_access(request) is None
+
+    def test_configured_bare_ipv6(self, config):
+        config["allowed_hosts"] = ["::1"]
+        request = _request(headers={"Host": "[::1]:14159"})
+        assert server.enforce_access(request) is None
+
+
+class TestLogout:
+    def test_clears_only_the_session_cookie(self, config):
+        config["token"] = TOKEN
+        request = _request(
+            method="POST",
+            path="/api/auth/logout",
+            headers={"Cookie": f"tinyleaf_session={TOKEN}; theme=dark"},
+        )
+
+        response = server.api_auth_logout(request)
+
+        assert _body(response) == {"authenticated": False}
+        assert response.headers["Cache-Control"] == "no-store"
+        assert len(response._cookie_headers) == 1
+        cookie = response._cookie_headers[0]
+        assert cookie.startswith('tinyleaf_session=""')
+        assert "Max-Age=0" in cookie
+        assert "Path=/" in cookie
+        assert "HttpOnly" in cookie
+        assert "SameSite=Strict" in cookie
+        assert "theme" not in cookie
+
+    def test_is_public_without_a_token(self, config):
+        config["token"] = TOKEN
+        request = _request(method="POST", path="/api/auth/logout")
+        assert server.enforce_access(request) is None
+
+    def test_allowed_in_read_only_mode(self, config):
+        config["token"] = TOKEN
+        config["read_only"] = True
+        request = _request(method="POST", path="/api/auth/logout")
+        assert server.enforce_access(request) is None
+
+    def test_idempotent_without_token_configured(self, config):
+        request = _request(method="POST", path="/api/auth/logout")
+
+        response = server.api_auth_logout(request)
+
+        assert _body(response) == {"authenticated": False}
+        assert len(response._cookie_headers) == 1
+
+    def test_secure_when_tls_enabled(self, config):
+        config["ssl_cert"] = "/tmp/cert.pem"
+        request = _request(method="POST", path="/api/auth/logout")
+
+        response = server.api_auth_logout(request)
+
+        assert "Secure" in response._cookie_headers[0]
+
+    def test_listed_in_schema(self, config):
+        config["token"] = TOKEN
+        paths = {(item["method"], item["path"]) for item in server._schema_payload()["routes"]}
+        assert ("POST", "/api/auth/logout") in paths

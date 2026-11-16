@@ -250,7 +250,7 @@ def main():
         "--allowed-host",
         metavar="HOST",
         action="append",
-        help="Additional Host header value to accept (repeatable)",
+        help="Additional hostname to accept; any port is ignored (repeatable)",
     )
     parser.add_argument(
         "--read-only",
