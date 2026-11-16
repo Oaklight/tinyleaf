@@ -5,19 +5,34 @@ import re
 import subprocess
 
 
-def _run_git(project_dir, *args):
+LOCAL_TIMEOUT = 30
+NETWORK_TIMEOUT = 300
+
+
+def _run_git(project_dir, *args, timeout=LOCAL_TIMEOUT):
     """Run a git command in the project directory.
 
+    Args:
+        project_dir: Directory to run the command in.
+        *args: Arguments passed to git.
+        timeout: Seconds before the command is killed. Network operations
+            should pass ``NETWORK_TIMEOUT``.
+
     Returns:
-        Tuple of (returncode, stdout, stderr).
+        Tuple of (returncode, stdout, stderr). A timeout returns returncode
+        124, empty stdout, and a diagnostic message in stderr.
     """
-    result = subprocess.run(
-        ["git", *args],
-        cwd=project_dir,
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        command = args[0] if args else "command"
+        return 124, "", f"git {command} timed out after {timeout}s"
     return result.returncode, result.stdout, result.stderr
 
 
@@ -72,7 +87,7 @@ def fetch(project_dir):
     if not has_git(project_dir):
         return {"success": False, "message": "Not a git repository"}
 
-    rc, out, err = _run_git(project_dir, "fetch", "--all")
+    rc, out, err = _run_git(project_dir, "fetch", "--all", timeout=NETWORK_TIMEOUT)
     if rc != 0:
         return {"success": False, "message": err or out}
     return {"success": True, "message": (out + err).strip()}
@@ -320,7 +335,7 @@ def push(project_dir):
     if not has_git(project_dir):
         return {"success": False, "message": "Not a git repository"}
 
-    rc, out, err = _run_git(project_dir, "push")
+    rc, out, err = _run_git(project_dir, "push", timeout=NETWORK_TIMEOUT)
     if rc != 0:
         return {"success": False, "message": err or out}
     return {"success": True, "message": (out + err).strip()}
@@ -331,7 +346,7 @@ def pull(project_dir):
     if not has_git(project_dir):
         return {"success": False, "message": "Not a git repository"}
 
-    rc, out, err = _run_git(project_dir, "pull")
+    rc, out, err = _run_git(project_dir, "pull", timeout=NETWORK_TIMEOUT)
     if rc != 0:
         return {"success": False, "message": err or out}
     return {"success": True, "message": (out + err).strip()}
