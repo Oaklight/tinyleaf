@@ -188,7 +188,7 @@ def _drain_pdfjs(pdfjs_futures, vendor_dir, old_files, pdfjs_manifest, all_failu
     return drained
 
 
-def download_vendor(vendor_dir, proxy=None, progress=None):
+def download_vendor(vendor_dir, proxy=None, progress=None, failures=None):
     """Download all vendor JS modules to the given directory.
 
     Fetches packages in parallel, resolves transitive dependencies level
@@ -199,6 +199,8 @@ def download_vendor(vendor_dir, proxy=None, progress=None):
         vendor_dir: Destination directory for vendor files.
         proxy: Optional HTTP proxy URL (e.g. "http://localhost:7890").
         progress: Optional callback(done, total, filename) for progress.
+        failures: Optional list that receives one dict per failed download,
+            with ``url``, ``name``, and ``error`` keys.
 
     Returns:
         The manifest dict that was written.
@@ -343,6 +345,11 @@ def download_vendor(vendor_dir, proxy=None, progress=None):
 
         if all_failures:
             names = [name for _, name, _ in all_failures]
+            if failures is not None:
+                failures.extend(
+                    {"url": url, "name": name, "error": str(error)}
+                    for url, name, error in all_failures
+                )
             warnings.warn(
                 f"Failed to download {len(names)} file(s): {', '.join(names)}. "
                 "Editor will use CDN fallback for missing modules.",
