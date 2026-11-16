@@ -2046,3 +2046,89 @@ button.mobile-home-btn { display: none; }
 
 /* [hidden] must win over the display rule that shows the mobile back button. */
 button.mobile-home-btn[hidden] { display: none; }
+
+/* ── Token prompt ── */
+.auth-prompt {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+.auth-prompt.open { display: flex; }
+.auth-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, 100%);
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+}
+.auth-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.auth-panel label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.auth-panel input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+.auth-error {
+  color: var(--red);
+  font-size: 12px;
+}
+.auth-error[hidden] { display: none; }
+
+/* ── API access panel ── */
+.settings-api h4 {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.api-state {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.api-state[data-state="token"] { color: var(--green); }
+.api-links { gap: 12px; }
+.api-links a {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+}
+.api-links a:hover { text-decoration: underline; }
+.api-logout {
+  width: 100%;
+  margin-top: 6px;
+}
+
+/* Command palette action rows */
+.qo-hint {
+  margin-left: auto;
+  padding-left: 8px;
+  font-family: var(--font);
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .auth-panel input { min-height: 44px; }
+  .auth-panel button { min-height: 44px; }
+}

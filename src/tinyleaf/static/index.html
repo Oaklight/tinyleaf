@@ -172,6 +172,7 @@
             <div id="editor-breadcrumb">
               <button class="icon-btn" id="btn-locate-file" title="Locate in tree" data-i18n-title="locate_in_tree"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/><line x1="12" y1="2" x2="12" y2="6" stroke="currentColor" stroke-width="2"/><line x1="12" y1="18" x2="12" y2="22" stroke="currentColor" stroke-width="2"/><line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" stroke-width="2"/><line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="2"/></svg></button>
               <span id="breadcrumb-path">—</span>
+              <button class="icon-btn" id="btn-copy-link" title="Copy link" data-i18n-title="copy_link" aria-label="Copy link" data-testid="copy-link"><svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
               <span style="flex:1"></span>
               <button class="icon-btn" id="btn-close-file" title="Close tab" data-i18n-title="close_tab" style="display:none;padding:2px 4px"><svg viewBox="0 0 24 24" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2"/></svg></button>
             </div>
@@ -351,6 +352,20 @@
       </div>
     </div>
     <div class="settings-divider"></div>
+    <!-- API access -->
+    <div class="settings-api" data-testid="api-access">
+      <h4 data-i18n="api_access">API access</h4>
+      <div class="settings-popup-item">
+        <label data-i18n="auth_state">Authentication</label>
+        <span id="api-auth-state" class="api-state" data-testid="api-auth-state">—</span>
+      </div>
+      <div class="settings-popup-item api-links">
+        <a href="/api/health" target="_blank" rel="noopener" data-testid="api-health-link">/api/health</a>
+        <a href="/api/schema" target="_blank" rel="noopener" data-testid="api-schema-link">/api/schema</a>
+      </div>
+      <button class="sm danger api-logout" id="btn-api-logout" data-i18n="sign_out" data-testid="api-logout" hidden>Sign out</button>
+    </div>
+    <div class="settings-divider"></div>
     <!-- About -->
     <div style="text-align:center;padding:4px 0 2px">
       <div class="about-brand"><img src="/static/assets/brand-wordmark-light.svg" alt="Tinyleaf" class="brand-wordmark about-wordmark"><span id="about-version" class="about-version-badge"></span></div>
@@ -391,16 +406,29 @@
 </div>
 
 <!-- Quick Open (Ctrl+P) -->
-<div id="quick-open-overlay">
+<div id="quick-open-overlay" role="dialog" aria-modal="true" aria-label="Command palette">
   <div class="quick-open-panel" onclick="event.stopPropagation()">
-    <input id="quick-open-input" type="text" autocomplete="off" spellcheck="false">
-    <div id="quick-open-results"></div>
+    <input id="quick-open-input" type="text" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="quick-open-results">
+    <div id="quick-open-results" role="listbox" aria-label="Results"></div>
     <div class="qo-footer">
       <span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="quick_open_hint_nav">navigate</span></span>
       <span><kbd>↵</kbd> <span data-i18n="quick_open_hint_open">open</span></span>
       <span><kbd>Esc</kbd> <span data-i18n="quick_open_hint_close">close</span></span>
+      <span data-i18n="quick_open_actions_hint">&gt; actions</span>
     </div>
   </div>
+</div>
+
+<!-- Token prompt: shown when /api/mode returns 401 -->
+<div id="auth-prompt" class="auth-prompt" role="dialog" aria-modal="true" aria-labelledby="auth-title" data-testid="auth-prompt">
+  <form class="auth-panel" id="auth-form">
+    <h3 id="auth-title" data-i18n="auth_title">Authentication required</h3>
+    <p class="auth-hint" data-i18n="auth_hint">Enter the server token. It is used only for this sign-in request.</p>
+    <label for="auth-token" data-i18n="auth_token_label">Access token</label>
+    <input id="auth-token" type="password" autocomplete="off" spellcheck="false" data-testid="auth-token">
+    <div id="auth-error" class="auth-error" role="alert" hidden data-testid="auth-error"></div>
+    <button type="submit" class="primary" id="auth-submit" data-i18n="auth_submit" data-testid="auth-submit">Sign in</button>
+  </form>
 </div>
 
 <script type="module" src="/static/js/app.js"></script>

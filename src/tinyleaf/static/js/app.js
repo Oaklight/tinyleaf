@@ -251,6 +251,34 @@ const I18N = {
     quick_open_hint_nav: "navigate",
     quick_open_hint_open: "open",
     quick_open_hint_close: "close",
+    quick_open_actions_placeholder: "Type an action…",
+    quick_open_no_actions: "No matching actions",
+    quick_open_actions_hint: "> actions",
+    action_switch_project: "Switch to {name}",
+    action_toggle_pdf: "Toggle PDF pane",
+    action_toggle_log: "Toggle compile log",
+    action_compile: "Compile project",
+    action_toggle_sidebar: "Toggle sidebar",
+    action_settings: "Open settings",
+    action_api_docs: "Open API schema",
+    action_copy_link: "Copy link to current location",
+    action_home: "Show project list",
+    copy_link: "Copy link",
+    link_copied: "Link copied",
+    deep_link_project_missing: "Project not found: {name}",
+    deep_link_file_missing: "File not found: {file}",
+    auth_title: "Authentication required",
+    auth_hint: "Enter the server token. It is used only for this sign-in request.",
+    auth_token_label: "Access token",
+    auth_submit: "Sign in",
+    auth_invalid: "Invalid token",
+    api_access: "API access",
+    auth_state: "Authentication",
+    auth_none: "No token configured",
+    auth_token_required: "Token required",
+    auth_signed_in: "Signed in",
+    sign_out: "Sign out",
+    load_error: "Failed to load",
     pdf_search_title: "Search in PDF",
     pdf_search_placeholder: "Search in PDF...",
     pdf_search_prev: "Previous match",
@@ -534,6 +562,34 @@ const I18N = {
     quick_open_hint_nav: "导航",
     quick_open_hint_open: "打开",
     quick_open_hint_close: "关闭",
+    quick_open_actions_placeholder: "输入操作…",
+    quick_open_no_actions: "没有匹配的操作",
+    quick_open_actions_hint: "> 操作",
+    action_switch_project: "切换到 {name}",
+    action_toggle_pdf: "切换 PDF 面板",
+    action_toggle_log: "切换编译日志",
+    action_compile: "编译项目",
+    action_toggle_sidebar: "切换侧边栏",
+    action_settings: "打开设置",
+    action_api_docs: "打开 API schema",
+    action_copy_link: "复制当前位置链接",
+    action_home: "显示项目列表",
+    copy_link: "复制链接",
+    link_copied: "链接已复制",
+    deep_link_project_missing: "未找到项目：{name}",
+    deep_link_file_missing: "未找到文件：{file}",
+    auth_title: "需要身份验证",
+    auth_hint: "输入服务器令牌，仅用于本次登录请求。",
+    auth_token_label: "访问令牌",
+    auth_submit: "登录",
+    auth_invalid: "令牌无效",
+    api_access: "API 访问",
+    auth_state: "身份验证",
+    auth_none: "未配置令牌",
+    auth_token_required: "需要令牌",
+    auth_signed_in: "已登录",
+    sign_out: "退出登录",
+    load_error: "加载失败",
     pdf_search_title: "在 PDF 中搜索",
     pdf_search_placeholder: "在 PDF 中搜索...",
     pdf_search_prev: "上一个匹配",
@@ -1350,7 +1406,20 @@ async function init() {
   setTheme(currentTheme);
   setLang(currentLang);
 
-  const info = await api("GET", "/api/mode");
+  let info;
+  try {
+    info = await api("GET", "/api/mode");
+  } catch (err) {
+    if (err.status === 401) {
+      // A token is configured and this browser has no session cookie yet.
+      // The prompt posts the token once; nothing is stored client-side.
+      showAuthPrompt();
+      return;
+    }
+    const overlay = document.getElementById("loading-overlay");
+    if (overlay) overlay.textContent = `${t("load_error")}: ${err.message}`;
+    throw err;
+  }
   S.mode = info.mode;
   syncHomeButton();
   S.useDocker = info.docker;
@@ -1381,16 +1450,20 @@ async function init() {
   } catch {}
   await loadDockerImages();
 
+  const deepLink = parseDeepLink(location.hash);
   if (S.mode === "multi") {
     const lastProject = localStorage.getItem("tinyleaf-project");
     const projects = await api("GET", "/api/projects");
     const names = projects.map(p => p.name);
-    if (lastProject && names.includes(lastProject)) {
+    if (deepLink) {
+      await applyDeepLink(deepLink, names);
+    } else if (lastProject && names.includes(lastProject)) {
       await openProject(lastProject);
     } else {
       showProjectList();
     }
   } else {
+    // Single-project mode ignores deep links; it always opens the one project.
     const projects = await api("GET", "/api/projects");
     if (projects.length > 0) openProject(projects[0].name);
   }
@@ -1404,10 +1477,17 @@ async function init() {
   setupUpload();
   setupLogClickHandler();
   setupQuickOpen();
+  loadApiInfo();
   startFileWatcher();
   setStatus(t("ready"));
+  if (S._deepLinkNotice) {
+    // Keep the deep-link failure message visible after the "Ready" status.
+    setStatus(S._deepLinkNotice, "warning");
+    S._deepLinkNotice = null;
+  }
 
   // Reveal UI
+  S._ready = true;
   document.getElementById("app").classList.add("ready");
   const overlay = document.getElementById("loading-overlay");
   overlay.classList.add("hidden");
@@ -1423,6 +1503,7 @@ function setupSettingsPopup() {
     e.stopPropagation();
     popup.classList.toggle("open");
     closeContextMenu();
+    if (popup.classList.contains("open")) loadApiInfo();
   };
 
   document.getElementById("btn-settings-close").onclick = () => {
@@ -1996,6 +2077,8 @@ function restoreCompileBadge(projectName) {
 
 async function showProjectList() {
   localStorage.removeItem("tinyleaf-project");
+  clearTimeout(_deepLinkTimer);
+  clearDeepLink();
   document.getElementById("app").classList.add("project-list-mode");
   document.getElementById("project-list-view").style.display = "block";
   document.getElementById("editor-view").style.display = "none";
@@ -2630,6 +2713,7 @@ function switchTab(path) {
   const outlineEl = document.getElementById("sidebar-outline");
   if (outlineEl && outlineEl.style.display !== "none") renderOutline();
   persistTabs();
+  scheduleDeepLinkUpdate();
 }
 
 // Close a tab. If dirty, prompt to save; aborts on cancel.
@@ -2768,6 +2852,7 @@ async function openFile(filePath) {
     // new document, so a stale render of the previous PDF cannot slip in.
     if (MOBILE_QUERY.matches) setMobilePane("pdf", false, false);
     await loadPDF(url);
+    writeDeepLink(filePath, 1);
     return;
   }
 
@@ -2778,6 +2863,7 @@ async function openFile(filePath) {
     showImagePreview(url, filePath);
     // Preview mode is "image" now, so this pane switch must not render the PDF.
     if (MOBILE_QUERY.matches) setMobilePane("pdf", false, false);
+    writeDeepLink(filePath, 1);
     return;
   }
 
@@ -2833,6 +2919,7 @@ async function openFile(filePath) {
         scheduleAutoSave();
         scheduleOutlineRefresh();
       }
+      if (update.selectionSet || update.docChanged) scheduleDeepLinkUpdate();
     }),
     EditorView.lineWrapping,
   ];
@@ -2855,6 +2942,11 @@ async function openFile(filePath) {
   }
 
   S.editors.set(filePath, { view, mtime: data.mtime || 0 });
+  // Keep the deep link's line in step with scrolling, without racing cursor
+  // updates (600 ms vs 400 ms).
+  view.scrollDOM.addEventListener("scroll", () => {
+    if (S.activeTab === filePath) scheduleDeepLinkUpdate(true, 600);
+  }, { passive: true });
   if (!S.tabs.includes(filePath)) S.tabs.push(filePath);
   switchTab(filePath);
   if (MOBILE_QUERY.matches) setMobilePane("editor");
@@ -3846,7 +3938,9 @@ function renderSearchResults(data, query, caseSensitive) {
 
 async function openFileAtLine(filePath, lineNum) {
   if (filePath !== S.currentFile) await openFile(filePath);
-  if (S.editorView) {
+  // PDFs and images open in the preview pane and keep the previous editor
+  // active; only jump when the requested file is the active editor tab.
+  if (S.currentFile === filePath && S.editorView) {
     const line = S.editorView.state.doc.line(Math.min(lineNum, S.editorView.state.doc.lines));
     S.editorView.dispatch({
       selection: { anchor: line.from },
@@ -5267,12 +5361,217 @@ async function showWordCount() {
 }
 
 // ══════════════════════════════════════════
-// Quick Open (Ctrl+P fuzzy file switcher)
+// Deep links (#/<project>/<file>:<line>)
+// ══════════════════════════════════════════
+
+/**
+ * Parse `#/<project>/<file>:<line>` into its parts. Returns null when the
+ * hash is not a deep link.
+ */
+function parseDeepLink(hash) {
+  if (!hash || !hash.startsWith("#/")) return null;
+  const rest = hash.slice(2);
+  const slash = rest.indexOf("/");
+  if (slash <= 0) return null;
+  let project;
+  try {
+    project = decodeURIComponent(rest.slice(0, slash));
+  } catch {
+    return null;
+  }
+  let filePart = rest.slice(slash + 1);
+  let line = null;
+  const lineMatch = filePart.match(/:(\d+)$/);
+  if (lineMatch) {
+    line = parseInt(lineMatch[1], 10);
+    filePart = filePart.slice(0, lineMatch.index);
+  }
+  if (!project || !filePart) return null;
+  let file;
+  try {
+    file = filePart.split("/").map(decodeURIComponent).join("/");
+  } catch {
+    return null;
+  }
+  if (!file) return null;
+  return { project, file, line };
+}
+
+/** Replace the hash without adding a history entry or firing hashchange. */
+function _setHash(hash) {
+  const target = hash || (location.pathname + location.search);
+  // `history` is the CodeMirror undo helper in this module; use the window
+  // property explicitly.
+  if (location.hash !== (hash || "")) {
+    window.history.replaceState(null, "", target);
+  }
+}
+
+function clearDeepLink() {
+  _setHash("");
+}
+
+function writeDeepLink(filePath, line = 1) {
+  if (!S.projectName || !filePath) return;
+  const project = encodeURIComponent(S.projectName);
+  const file = filePath.split("/").map(encodeURIComponent).join("/");
+  _setHash(`#/${project}/${file}:${line}`);
+}
+
+let _deepLinkTimer = null;
+
+function activeEditor() {
+  const entry = S.activeTab ? S.editors.get(S.activeTab) : null;
+  return entry ? entry.view : null;
+}
+
+function lineFromCursor(view) {
+  return view.state.doc.lineAt(view.state.selection.main.head).number;
+}
+
+function lineFromViewport(view) {
+  const block = view.lineBlockAtHeight(Math.max(0, view.scrollDOM.scrollTop + 4));
+  return view.state.doc.lineAt(block.from).number;
+}
+
+/** Debounced hash refresh from the active editor's cursor or viewport top. */
+function scheduleDeepLinkUpdate(useViewport = false, delay = 400) {
+  clearTimeout(_deepLinkTimer);
+  _deepLinkTimer = setTimeout(() => {
+    const view = activeEditor();
+    const listView = document.getElementById("project-list-view");
+    if (!view || !S.currentFile || !S.projectName) return;
+    if (listView && listView.style.display !== "none") return;
+    writeDeepLink(S.currentFile, useViewport ? lineFromViewport(view) : lineFromCursor(view));
+  }, delay);
+}
+
+/** Open a parsed deep link, falling back to the project list on failure. */
+async function applyDeepLink(link, projectNames) {
+  let names = projectNames;
+  if (!names) {
+    try {
+      names = (await api("GET", "/api/projects")).map((p) => p.name);
+    } catch {
+      names = [];
+    }
+  }
+  if (!names.includes(link.project)) {
+    clearDeepLink();
+    await showProjectList();
+    const msg = t("deep_link_project_missing").replace("{name}", link.project);
+    S._deepLinkNotice = msg;
+    setStatus(msg, "warning");
+    return false;
+  }
+  // The project list may be visible while S.projectName still holds the last
+  // project (e.g. after a failed deep link); reopen so the editor shows.
+  const listVisible =
+    document.getElementById("project-list-view").style.display !== "none";
+  if (S.projectName !== link.project || listVisible) await openProject(link.project);
+  if (!(S.files || []).includes(link.file)) {
+    clearDeepLink();
+    await showProjectList();
+    const msg = t("deep_link_file_missing").replace("{file}", link.file);
+    S._deepLinkNotice = msg;
+    setStatus(msg, "warning");
+    return false;
+  }
+  await openFileAtLine(link.file, link.line || 1);
+  return true;
+}
+
+async function handleHashChange() {
+  if (S.mode !== "multi" || !S._ready) return;
+  const link = parseDeepLink(location.hash);
+  if (!link) return;
+  await applyDeepLink(link);
+}
+
+async function copyDeepLink() {
+  const view = activeEditor();
+  if (view && S.currentFile) {
+    writeDeepLink(S.currentFile, lineFromCursor(view));
+  }
+  const url = location.href;
+  try {
+    await navigator.clipboard.writeText(url);
+    setStatus(t("link_copied"), "success");
+    showToast(t("link_copied"), "success");
+  } catch {
+    setStatus(url, "warning");
+  }
+}
+
+// ══════════════════════════════════════════
+// Token authentication (401 on first /api/mode)
+// ══════════════════════════════════════════
+function showAuthPrompt() {
+  const loading = document.getElementById("loading-overlay");
+  if (loading) loading.classList.add("hidden");
+  const prompt = document.getElementById("auth-prompt");
+  if (!prompt) return;
+  prompt.classList.add("open");
+  const input = document.getElementById("auth-token");
+  if (input) setTimeout(() => input.focus(), 0);
+}
+
+async function submitAuthToken(event) {
+  event.preventDefault();
+  const input = document.getElementById("auth-token");
+  const errorEl = document.getElementById("auth-error");
+  const submit = document.getElementById("auth-submit");
+  if (!input || !input.value) return;
+  const token = input.value;
+  // Clear the field immediately; the secret lives only in this local.
+  input.value = "";
+  errorEl.hidden = true;
+  submit.disabled = true;
+  try {
+    // The token goes straight to the server; it is never stored in JS state,
+    // localStorage, or the URL.
+    await api("POST", "/api/auth/session", { token });
+    window.location.reload();
+  } catch (err) {
+    input.value = "";
+    errorEl.textContent = err.status === 401 ? t("auth_invalid") : err.message;
+    errorEl.hidden = false;
+    input.focus();
+  } finally {
+    submit.disabled = false;
+  }
+}
+
+/** Load /api/schema and mirror the auth state into the settings panel. */
+async function loadApiInfo() {
+  const stateEl = document.getElementById("api-auth-state");
+  const logout = document.getElementById("btn-api-logout");
+  try {
+    const schema = await api("GET", "/api/schema");
+    const required = !!schema.auth_required;
+    if (stateEl) {
+      stateEl.textContent = required ? t("auth_signed_in") : t("auth_none");
+      stateEl.dataset.state = required ? "token" : "none";
+    }
+    if (logout) logout.hidden = !required;
+  } catch (err) {
+    if (stateEl) {
+      stateEl.textContent = err.status === 401 ? t("auth_token_required") : err.message;
+      stateEl.dataset.state = "error";
+    }
+    if (logout) logout.hidden = true;
+  }
+}
+
+// ══════════════════════════════════════════
+// Quick Open / command palette (Ctrl+P)
 // ══════════════════════════════════════════
 const QO = {
-  matches: [],     // [{path, indices, score}]
+  matches: [],     // files: [{path, indices, score}] or actions: [{label, run, ...}]
   active: 0,       // active row index
   maxResults: 50,
+  mode: "files",   // "files" or "actions"
+  projects: [],    // cached project list for the switch-project actions
 };
 
 /**
@@ -5339,6 +5638,54 @@ function quickOpenFilter(query) {
   return scored.slice(0, QO.maxResults);
 }
 
+/** Build the command-palette action list for the current app state. */
+function quickOpenActions() {
+  const actions = [];
+  if (S.mode === "multi") {
+    for (const p of QO.projects) {
+      actions.push({
+        label: t("action_switch_project").replace("{name}", p.name),
+        hint: t("projects"),
+        run: () => openProject(p.name),
+      });
+    }
+    actions.push({ label: t("action_home"), run: () => goHome() });
+  }
+  if (S.projectName) {
+    actions.push({
+      label: t("action_toggle_pdf"),
+      run: () => setLayout(S.layoutMode === "pdf" ? "split" : "pdf"),
+    });
+    actions.push({ label: t("action_toggle_log"), run: () => toggleLog() });
+    actions.push({ label: t("action_compile"), run: () => compile() });
+    actions.push({ label: t("action_toggle_sidebar"), run: () => toggleSidebar() });
+    actions.push({ label: t("action_copy_link"), run: () => copyDeepLink() });
+  }
+  actions.push({
+    label: t("action_settings"),
+    run: () => document.getElementById("btn-settings").click(),
+  });
+  actions.push({
+    label: t("action_api_docs"),
+    run: () => window.open("/api/schema", "_blank", "noopener"),
+  });
+  return actions;
+}
+
+/** Fuzzy-filter the action list with the same scorer as files. */
+function quickOpenFilterActions(query) {
+  const actions = quickOpenActions();
+  const q = query.trim();
+  if (!q) return actions.map((a) => ({ ...a, indices: [], score: 0 }));
+  const scored = [];
+  for (const action of actions) {
+    const r = quickOpenScore(q, action.label);
+    if (r) scored.push({ ...action, indices: r.indices, score: r.score });
+  }
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, QO.maxResults);
+}
+
 function _qoHighlight(text, indices, offset = 0) {
   if (!indices.length) return escapeHtml(text);
   const set = new Set(indices.map((i) => i - offset));
@@ -5350,21 +5697,45 @@ function _qoHighlight(text, indices, offset = 0) {
   return out;
 }
 
+/** Keep the combobox's aria-activedescendant in sync with the active row. */
+function updateQuickOpenAria() {
+  const input = document.getElementById("quick-open-input");
+  const overlay = document.getElementById("quick-open-overlay");
+  if (!input || !overlay) return;
+  const open = overlay.classList.contains("open");
+  input.setAttribute("aria-expanded", open ? "true" : "false");
+  if (open && QO.matches.length) {
+    input.setAttribute("aria-activedescendant", `qo-opt-${QO.active}`);
+  } else {
+    input.removeAttribute("aria-activedescendant");
+  }
+}
+
 function renderQuickOpenResults() {
   const container = document.getElementById("quick-open-results");
   if (!QO.matches.length) {
-    container.innerHTML = `<div class="qo-empty">${t("quick_open_no_results")}</div>`;
+    const msg = QO.mode === "actions" ? t("quick_open_no_actions") : t("quick_open_no_results");
+    container.innerHTML = `<div class="qo-empty">${msg}</div>`;
+    updateQuickOpenAria();
     return;
   }
   if (QO.active >= QO.matches.length) QO.active = QO.matches.length - 1;
   if (QO.active < 0) QO.active = 0;
   const html = QO.matches.map((m, idx) => {
+    const cls = `qo-row${idx === QO.active ? " active" : ""}`;
+    const selected = idx === QO.active ? "true" : "false";
+    if (QO.mode === "actions") {
+      return `<div class="${cls}" role="option" id="qo-opt-${idx}" aria-selected="${selected}" data-idx="${idx}">
+        <span class="qo-name">${_qoHighlight(m.label, m.indices)}</span>
+        ${m.hint ? `<span class="qo-hint">${escapeHtml(m.hint)}</span>` : ""}
+      </div>`;
+    }
     const slash = m.path.lastIndexOf("/");
     const name = slash >= 0 ? m.path.slice(slash + 1) : m.path;
     const dir = slash >= 0 ? m.path.slice(0, slash + 1) : "";
     const nameHtml = _qoHighlight(name, m.indices, slash + 1);
     const dirHtml = dir ? _qoHighlight(dir, m.indices, 0) : "";
-    return `<div class="qo-row${idx === QO.active ? " active" : ""}" data-idx="${idx}" data-path="${escapeHtml(m.path)}">
+    return `<div class="${cls}" role="option" id="qo-opt-${idx}" aria-selected="${selected}" data-idx="${idx}" data-path="${escapeHtml(m.path)}">
       <span class="qo-name">${nameHtml}</span>
       <span class="qo-dir">${dirHtml}</span>
     </div>`;
@@ -5372,38 +5743,61 @@ function renderQuickOpenResults() {
   container.innerHTML = html;
   const activeEl = container.querySelector(".qo-row.active");
   if (activeEl) activeEl.scrollIntoView({ block: "nearest" });
+  updateQuickOpenAria();
 }
 
-function quickOpenUpdate(query) {
-  QO.matches = quickOpenFilter(query);
+function quickOpenUpdate(value) {
+  QO.mode = value.startsWith(">") ? "actions" : "files";
+  const query = QO.mode === "actions" ? value.slice(1) : value;
+  QO.matches = QO.mode === "actions"
+    ? quickOpenFilterActions(query)
+    : quickOpenFilter(query);
   QO.active = 0;
+  const input = document.getElementById("quick-open-input");
+  if (input) {
+    input.placeholder = QO.mode === "actions"
+      ? t("quick_open_actions_placeholder")
+      : t("quick_open_placeholder");
+  }
   renderQuickOpenResults();
 }
 
-function openQuickOpen() {
-  if (!S.projectName) return;
+async function openQuickOpen(prefix = "") {
   const overlay = document.getElementById("quick-open-overlay");
   const input = document.getElementById("quick-open-input");
-  input.placeholder = t("quick_open_placeholder");
-  input.value = "";
+  if (!overlay || !input) return;
+  if (S.mode === "multi") {
+    try {
+      QO.projects = await api("GET", "/api/projects");
+    } catch { /* keep the cached list */ }
+  }
+  input.value = prefix;
   overlay.classList.add("open");
-  quickOpenUpdate("");
+  quickOpenUpdate(prefix);
   // Focus after the overlay becomes visible
   setTimeout(() => input.focus(), 0);
 }
 
 function closeQuickOpen() {
   const overlay = document.getElementById("quick-open-overlay");
-  if (!overlay.classList.contains("open")) return;
+  if (!overlay || !overlay.classList.contains("open")) return;
   overlay.classList.remove("open");
-  document.getElementById("quick-open-input").blur();
+  const input = document.getElementById("quick-open-input");
+  input.blur();
+  input.setAttribute("aria-expanded", "false");
+  input.removeAttribute("aria-activedescendant");
 }
 
 function quickOpenPick(idx) {
-  if (idx < 0 || idx >= QO.matches.length) return;
-  const path = QO.matches[idx].path;
+  const match = QO.matches[idx];
+  if (!match) return;
+  const mode = QO.mode;
   closeQuickOpen();
-  openFile(path);
+  if (mode === "actions") {
+    match.run();
+    return;
+  }
+  openFile(match.path);
 }
 
 function setupQuickOpen() {
@@ -5543,6 +5937,11 @@ function setupKeybindings() {
     if (matchesKeybinding(e, "replace")) {
       e.preventDefault();
       if (S.editorView) openSearchPanel(S.editorView);
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "p") {
+      e.preventDefault();
+      openQuickOpen(">");
       return;
     }
     if (matchesKeybinding(e, "quick_open")) { e.preventDefault(); openQuickOpen(); return; }
@@ -5887,6 +6286,21 @@ window.addEventListener("focus", () => {
     "tinyleaf-pdf-width", 200, window.innerWidth * 0.7, true
   );
 })();
+
+// Deep links, token prompt, and the API panel are wired before init() so the
+// 401 path still has working controls.
+const copyLinkBtn = document.getElementById("btn-copy-link");
+if (copyLinkBtn) copyLinkBtn.onclick = copyDeepLink;
+const authForm = document.getElementById("auth-form");
+if (authForm) authForm.addEventListener("submit", submitAuthToken);
+const logoutBtn = document.getElementById("btn-api-logout");
+if (logoutBtn) {
+  logoutBtn.onclick = async () => {
+    try { await api("POST", "/api/auth/logout"); } catch { /* clear best effort */ }
+    window.location.reload();
+  };
+}
+window.addEventListener("hashchange", handleHashChange);
 
 // ── Start ──
 init();
