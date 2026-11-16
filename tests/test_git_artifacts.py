@@ -165,6 +165,26 @@ class TestCommitGuard:
         assert result == {"success": False, "message": "No files to commit"}
         assert called == []
 
+    def test_allow_artifacts_requires_a_real_boolean(self, repo):
+        with pytest.raises(APIError) as excinfo:
+            handlers.handle_git_commit(
+                {"message": "x", "files": ["main.aux"], "allow_artifacts": "true"},
+                _single_config(repo),
+                "project",
+            )
+
+        assert excinfo.value.code == "artifacts_not_allowed"
+
+    @pytest.mark.parametrize("files", ["main.tex", [1], [""], {"path": "main.tex"}])
+    def test_files_must_be_a_list_of_paths(self, repo, files):
+        with pytest.raises(APIError) as excinfo:
+            handlers.handle_git_commit(
+                {"message": "x", "files": files}, _single_config(repo), "project"
+            )
+
+        assert excinfo.value.status_code == 400
+        assert excinfo.value.code == "bad_request"
+
 
 class TestCleanUsesSharedSet:
     def test_clean_removes_compound_artifact(self, tmp_path):

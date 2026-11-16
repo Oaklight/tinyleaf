@@ -1347,8 +1347,12 @@ def handle_git_commit(body, config, name):
     if not message:
         abort(400, "Commit message required")
 
-    allow_artifacts = bool(body.get("allow_artifacts", False))
+    allow_artifacts = body.get("allow_artifacts") is True
     files = body.get("files")
+    if files is not None and (
+        not isinstance(files, list) or not all(isinstance(path, str) and path for path in files)
+    ):
+        raise _api_error(400, "files must be a list of paths", "bad_request")
     if not allow_artifacts:
         if files:
             blocked = [path for path in files if git_ops.is_build_artifact(path)]
