@@ -1855,3 +1855,194 @@ textarea:focus-visible,
 @media (max-width: 380px) {
   #toolbar-project-name { display: none !important; }
 }
+
+/* ── Build artifacts, git grouping, compile feedback, project sort ── */
+.artifact-toggle-btn { position: relative; }
+.artifact-toggle-btn.active { color: var(--accent); }
+.artifact-count {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  line-height: 14px;
+  text-align: center;
+  font-family: var(--mono);
+}
+.artifact-count[hidden] { display: none; }
+
+.git-artifacts { border-top: 1px solid var(--border); }
+.git-artifacts-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.git-artifacts-header label { flex: 1; min-width: 0; cursor: pointer; }
+.git-artifacts-disclose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  background: none;
+  border: 0;
+  padding: 2px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.git-artifacts-disclose svg {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  transition: transform 0.15s;
+}
+.git-artifacts-disclose.open svg { transform: rotate(90deg); }
+.git-artifacts-list .git-file { padding-left: 22px; }
+.git-artifacts-list .git-file input:disabled { cursor: default; }
+
+#git-commit-btns { flex-wrap: wrap; }
+#git-commit-btns button { flex: 1 1 auto; }
+
+#project-sort { max-width: 132px; }
+
+.compile-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 11px;
+  font-family: var(--mono);
+}
+.compile-badge[hidden] { display: none; }
+.compile-badge.success { color: var(--green); border-color: currentColor; }
+.compile-badge.error { color: var(--red); border-color: currentColor; }
+.compile-badge.warning { color: var(--orange); border-color: currentColor; }
+
+#btn-compile.compiling { display: inline-flex; align-items: center; gap: 6px; }
+.compile-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+  animation: compile-spin 0.8s linear infinite;
+}
+@keyframes compile-spin { to { transform: rotate(360deg); } }
+#compile-elapsed { font-family: var(--mono); font-size: 11px; opacity: 0.9; }
+
+#toast-container {
+  position: fixed;
+  right: 16px;
+  bottom: 44px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 300;
+  pointer-events: none;
+}
+.toast {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  transition: opacity 0.25s, transform 0.25s;
+}
+.toast.success { border-color: var(--green); }
+.toast.error { border-color: var(--red); }
+.toast.hide { opacity: 0; transform: translateY(6px); }
+
+.project-card .open-btn { display: none; }
+.project-card .compile-card-badge {
+  margin-left: 6px;
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.project-card .compile-card-badge.success { color: var(--green); }
+.project-card .compile-card-badge.error { color: var(--red); }
+
+@media (pointer: coarse), (max-width: 900px) {
+  .project-card .open-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 44px;
+    margin-top: 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-hover);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .artifact-toggle-btn { min-width: 44px; min-height: 44px; }
+  .git-artifacts-header { min-height: 44px; }
+  .git-artifacts-disclose { min-width: 44px; min-height: 44px; }
+  #project-sort { min-height: 44px; max-width: 150px; }
+}
+
+@media (max-width: 900px) {
+  /* Project list needs no toolbar: the brand is hidden at this width, so the
+     bar would only be an empty 52 px band. */
+  #app.project-list-mode #toolbar { display: none; }
+  #project-sort { max-width: 108px; }
+}
+
+/* The project sort select lives inside the overflow menu on mobile. */
+#project-more-menu #project-sort { width: 100%; max-width: none; }
+
+/* Mobile back-to-projects button; the wordmark is hidden at this width. */
+button.mobile-home-btn { display: none; }
+@media (max-width: 900px) {
+  button.mobile-home-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  #toolbar-project #main-file-select { max-width: 84px; }
+}
+
+.git-ignore-btn {
+  width: 100%;
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.ignore-preview {
+  max-height: 120px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* At 320px the toolbar has no room for the result badge; the status bar and
+   toast still report the result. */
+@media (max-width: 380px) {
+  #compile-badge { display: none; }
+}
+
+/* [hidden] must win over the display rule that shows the mobile back button. */
+button.mobile-home-btn[hidden] { display: none; }

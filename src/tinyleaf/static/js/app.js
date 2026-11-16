@@ -270,6 +270,19 @@ const I18N = {
     wc_loading: "Counting words...",
     wc_error: "Word count failed",
     export_zip: "Export ZIP",
+    show_artifacts: "Show build artifacts",
+    hide_artifacts: "Hide build artifacts",
+    build_artifacts: "Build artifacts",
+    sources_only: "Sources only",
+    commit_artifacts_blocked: "Refusing to commit build artifacts",
+    stop_tracking_artifacts: "Stop tracking build artifacts",
+    ignore_confirm: "Add {added} .gitignore patterns and stop tracking {removed} files.",
+    ignore_done: "Updated .gitignore; stopped tracking {removed} files",
+    ignore_none: "Nothing to change",
+    sort_last_opened: "Last opened",
+    sort_name: "Name",
+    open: "Open",
+    sort_projects: "Sort projects",
     export_zip_title: "Export project as ZIP",
   },
   zh: {
@@ -540,6 +553,19 @@ const I18N = {
     wc_loading: "正在统计字数...",
     wc_error: "字数统计失败",
     export_zip: "导出 ZIP",
+    show_artifacts: "显示构建产物",
+    hide_artifacts: "隐藏构建产物",
+    build_artifacts: "构建产物",
+    sources_only: "仅选源文件",
+    commit_artifacts_blocked: "拒绝提交构建产物",
+    stop_tracking_artifacts: "停止跟踪构建产物",
+    ignore_confirm: "将添加 {added} 条 .gitignore 规则，并停止跟踪 {removed} 个文件。",
+    ignore_done: "已更新 .gitignore，停止跟踪 {removed} 个文件",
+    ignore_none: "无需更改",
+    sort_last_opened: "最近打开",
+    sort_name: "名称",
+    open: "打开",
+    sort_projects: "项目排序",
     export_zip_title: "导出项目为 ZIP",
   },
 };
@@ -557,6 +583,11 @@ function applyI18n() {
   });
   document.querySelectorAll("[data-i18n-title]").forEach((el) => {
     el.title = t(el.getAttribute("data-i18n-title"));
+  });
+  // Controls with a localized title and an existing aria-label must keep both
+  // in sync; otherwise a static English label survives a language switch.
+  document.querySelectorAll("[data-i18n-title][aria-label]").forEach((el) => {
+    el.setAttribute("aria-label", el.title);
   });
   document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
     el.placeholder = t(el.getAttribute("data-i18n-placeholder"));
@@ -578,6 +609,7 @@ function setLang(lang) {
   localStorage.setItem("tinyleaf-lang", lang);
   document.getElementById("lang-select").value = lang;
   applyI18n();
+  updateArtifactToggle();
   renderThemeOptions();
   renderHighlightOptions();
 }
@@ -860,16 +892,37 @@ function latexAutoCloseEnv() {
 }
 
 // ── Language extensions (loaded on demand) ──
-// LaTeX build artifact extensions (grayed out in file tree)
+// LaTeX build artifact extensions. Mirrors backend git_ops.ARTIFACT_EXTENSIONS
+// so the file tree, git selection, and commit guard agree on one definition.
+// `.pdf` is deliberately absent: figure PDFs are sources (#125).
 const ARTIFACT_EXTS = new Set([
   ".aux", ".bbl", ".bcf", ".blg", ".fdb_latexmk", ".fls", ".log", ".out",
   ".run.xml", ".synctex.gz", ".toc", ".lof", ".lot", ".nav", ".snm", ".vrb",
-  ".xdv", ".idx", ".ilg", ".ind", ".glo", ".gls", ".ist",
+  ".xdv",
 ]);
+const COMPOUND_ARTIFACT_SUFFIXES = [".synctex.gz", ".run.xml"];
+
 function isArtifact(name) {
-  if (name.endsWith(".synctex.gz")) return true;
-  const dot = name.lastIndexOf(".");
-  return dot >= 0 && ARTIFACT_EXTS.has(name.slice(dot));
+  const lower = String(name || "").toLowerCase();
+  if (COMPOUND_ARTIFACT_SUFFIXES.some((suffix) => lower.endsWith(suffix))) return true;
+  const dot = lower.lastIndexOf(".");
+  return dot >= 0 && ARTIFACT_EXTS.has(lower.slice(dot));
+}
+
+/** Count artifact files in a file-tree node list. */
+function countArtifacts(nodes) {
+  let total = 0;
+  const walk = (list) => {
+    for (const node of list || []) {
+      if (node.type === "file") {
+        if (isArtifact(node.name)) total += 1;
+      } else if (node.children) {
+        walk(node.children);
+      }
+    }
+  };
+  walk(nodes);
+  return total;
 }
 
 const LANG_MAP = {
@@ -956,6 +1009,16 @@ const S = {
   pdfTextPages: null,
   pdfSearchMatches: [],
   pdfSearchIndex: -1,
+  // "pdf" renders the PDF viewer; "image" shows a raster preview. Guards the
+  // mobile pane from re-rendering a stale PDF over an image preview.
+  pdfPreview: "pdf",
+  pdfRenderGen: 0,
+  pdfScrollTop: 0,
+  showArtifacts: localStorage.getItem("tinyleaf-show-artifacts") === "1",
+  artifactCount: 0,
+  projectSort: localStorage.getItem("tinyleaf-project-sort") || "last_opened",
+  compileStartedAt: 0,
+  compileTimer: null,
   autoSaveTimer: null,
   autoSaveInterval: 2000,
   useDocker: true,
@@ -1009,7 +1072,14 @@ async function api(method, path, body = null) {
   const ct = resp.headers.get("content-type") || "";
   if (ct.includes("application/json")) {
     const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+    if (!resp.ok) {
+      const err = new Error(data.error || `HTTP ${resp.status}`);
+      err.status = resp.status;
+      err.code = data.code;
+      err.detail = data.detail;
+      err.requestId = data.request_id;
+      throw err;
+    }
     return data;
   }
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -1130,6 +1200,7 @@ function setupResponsiveToolbar() {
     document.getElementById("btn-save"),
   ].filter(Boolean);
   const projectItems = [
+    document.getElementById("project-sort"),
     document.getElementById("btn-open-folder"),
     document.getElementById("btn-view-grid"),
     document.getElementById("btn-view-list"),
@@ -1150,10 +1221,12 @@ function setupResponsiveToolbar() {
     compileBtn.after(toolbarItems[2]);
     toolbarItems[2].after(toolbarItems[3]);
     projectToolbar.appendChild(toolbarItems[4]);
-    // Restore project toolbar: search, open folder, new project, grid, list.
-    projectListToolbar.insertBefore(projectItems[0], newProject);
-    projectMore.before(projectItems[1]);
+    // Restore project toolbar: search, sort, open folder, new project,
+    // grid, list. Insert open-folder first so sort can sit before it.
+    projectListToolbar.insertBefore(projectItems[1], newProject);
+    projectListToolbar.insertBefore(projectItems[0], projectItems[1]);
     projectMore.before(projectItems[2]);
+    projectMore.before(projectItems[3]);
     closeOverflowMenus();
   }
 
@@ -1203,19 +1276,42 @@ function setupMobilePanes() {
   if (MOBILE_QUERY.matches) setMobilePane(S.mobilePane, true);
 }
 
-function setMobilePane(pane, skipPersist = false) {
+/**
+ * Switch the single visible mobile pane.
+ *
+ * A tap on the already-active pane is a no-op: re-rendering would reset the
+ * PDF scroll position and page number. When the PDF pane becomes visible and
+ * a re-render is needed, the saved scroll offset is restored afterwards.
+ *
+ * @param {"files"|"editor"|"pdf"} pane
+ * @param {boolean} skipPersist  Do not write the choice to localStorage.
+ * @param {boolean} render  False defers PDF rendering to the caller.
+ */
+function setMobilePane(pane, skipPersist = false, render = true) {
+  const view = document.getElementById("editor-view");
+  const targetClass = "mobile-pane-" + pane;
+  if (view.classList.contains(targetClass)) return;
+
+  const pdfContainer = document.getElementById("pdf-container");
+  if (view.classList.contains("mobile-pane-pdf")) {
+    S.pdfScrollTop = pdfContainer.scrollTop;
+  }
+
   S.mobilePane = pane;
   if (!skipPersist) localStorage.setItem("tinyleaf-mobile-pane", pane);
-  const view = document.getElementById("editor-view");
   view.classList.remove("mobile-pane-files", "mobile-pane-editor", "mobile-pane-pdf");
-  view.classList.add("mobile-pane-" + pane);
+  view.classList.add(targetClass);
   document.querySelectorAll("#mobile-pane-switch [data-pane]").forEach((btn) => {
     const on = btn.dataset.pane === pane;
     btn.classList.toggle("active", on);
     btn.setAttribute("aria-selected", on ? "true" : "false");
   });
-  if (pane === "pdf" && S.pdfDoc) {
-    requestAnimationFrame(() => requestAnimationFrame(() => renderPDF()));
+  if (pane === "pdf" && render && S.pdfDoc && S.pdfPreview === "pdf") {
+    const restoreTop = S.pdfScrollTop || 0;
+    requestAnimationFrame(() => requestAnimationFrame(async () => {
+      await renderPDF();
+      pdfContainer.scrollTop = restoreTop;
+    }));
   }
 }
 
@@ -1256,6 +1352,7 @@ async function init() {
 
   const info = await api("GET", "/api/mode");
   S.mode = info.mode;
+  syncHomeButton();
   S.useDocker = info.docker;
   S.dockerImage = info.image || "oaklight/texlive:alpine-science-cn";
   document.getElementById("about-version").textContent = `v${info.version || "0.0.0"}`;
@@ -1853,8 +1950,53 @@ function showNewFolderInDirModal(dirPath) {
 // ══════════════════════════════════════════
 // Project List (multi-project)
 // ══════════════════════════════════════════
+// Per-project compile status. localStorage keeps this client-local: another
+// browser or device does not see it until the backend exposes a status field.
+const COMPILE_STATUS_KEY = "tinyleaf-compile-status:";
+
+function getCompileStatus(projectName) {
+  try {
+    return JSON.parse(localStorage.getItem(COMPILE_STATUS_KEY + projectName) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function setCompileStatus(projectName, status, elapsed = null) {
+  if (!projectName) return;
+  try {
+    localStorage.setItem(
+      COMPILE_STATUS_KEY + projectName,
+      JSON.stringify({ status, at: Date.now(), elapsed })
+    );
+  } catch { /* storage full or blocked */ }
+}
+
+/** Show the stored compile result for a project, or hide the toolbar badge. */
+function restoreCompileBadge(projectName) {
+  const badge = document.getElementById("compile-badge");
+  if (!badge) return;
+  badge.hidden = true;
+  badge.textContent = "";
+  badge.className = "compile-badge";
+  badge.title = "";
+  badge.removeAttribute("aria-label");
+  const state = getCompileStatus(projectName);
+  if (!state) return;
+  const ok = state.status === "success";
+  const cancelled = state.status === "cancelled";
+  const label = ok ? t("compile_success") : cancelled ? t("compile_cancelled") : t("compile_failed");
+  const elapsedText = state.elapsed != null ? formatCompileElapsed(state.elapsed) : "";
+  badge.hidden = false;
+  badge.className = "compile-badge " + (ok ? "success" : cancelled ? "warning" : "error");
+  badge.textContent = `${ok ? "✓" : cancelled ? "—" : "✕"} ${elapsedText}`.trim();
+  badge.title = `${label} · ${new Date(state.at).toLocaleString()}`;
+  badge.setAttribute("aria-label", badge.title);
+}
+
 async function showProjectList() {
   localStorage.removeItem("tinyleaf-project");
+  document.getElementById("app").classList.add("project-list-mode");
   document.getElementById("project-list-view").style.display = "block";
   document.getElementById("editor-view").style.display = "none";
   document.getElementById("toolbar-project").style.display = "none";
@@ -1864,8 +2006,12 @@ async function showProjectList() {
   document.getElementById("layout-switcher").style.display = "none";
 
   const projects = await api("GET", "/api/projects");
-  // Sort by last_opened (most recent first), then by name
+  // Sort by the persisted mode: last opened (default) or name.
+  S.projectSort = localStorage.getItem("tinyleaf-project-sort") || "last_opened";
+  const sortSelect = document.getElementById("project-sort");
+  if (sortSelect) sortSelect.value = S.projectSort;
   projects.sort((a, b) => {
+    if (S.projectSort === "name") return a.name.localeCompare(b.name);
     const ta = a.last_opened || "";
     const tb = b.last_opened || "";
     if (tb !== ta) return tb.localeCompare(ta);
@@ -1892,16 +2038,31 @@ async function showProjectList() {
       ? new Date(p.last_opened).toLocaleString()
       : (p.added_at ? new Date(p.added_at).toLocaleString() : "");
     const gitBadge = p.git ? `<span class="git-badge" title="Git repository"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></span>` : "";
-    card.innerHTML = `<h3>${escapeHtml(p.name)} ${gitBadge}</h3>`
+    const compileState = getCompileStatus(p.name);
+    const compileStatusText = compileState
+      ? `${t(compileState.status === "success" ? "compile_success" : "compile_failed")} · ${new Date(compileState.at).toLocaleString()}`
+      : "";
+    const compileBadge = compileState
+      ? `<span class="compile-card-badge ${compileState.status === "success" ? "success" : "error"}" data-testid="project-compile-badge" title="${escapeHtml(compileStatusText)}" aria-label="${escapeHtml(compileStatusText)}">${compileState.status === "success" ? "✓" : "✕"}</span>`
+      : "";
+    card.innerHTML = `<h3>${escapeHtml(p.name)} ${gitBadge}${compileBadge}</h3>`
       + `<div class="project-path" title="${escapeHtml(p.path || "")}">${escapeHtml(p.path || "")}</div>`
       + `<div class="project-time" data-testid="project-time">${escapeHtml(timeStr)}</div>`
       + `<button class="rename-btn" title="${t("rename_project")}" aria-label="${escapeHtml(t("rename_project"))}" data-testid="project-rename"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>`
-      + `<button class="remove-btn" title="${t("remove_project")}" aria-label="${escapeHtml(t("remove_project"))}" data-testid="project-remove"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+      + `<button class="remove-btn" title="${t("remove_project")}" aria-label="${escapeHtml(t("remove_project"))}" data-testid="project-remove"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`
+      + `<button class="open-btn" data-testid="project-open" aria-label="${escapeHtml(`${t("open")} ${p.name}`)}">${escapeHtml(t("open"))}</button>`;
     if (p.exists !== false) {
-      card.onclick = (e) => { if (!e.target.closest(".remove-btn") && !e.target.closest(".rename-btn")) openProject(p.name); };
+      card.onclick = (e) => {
+        if (!e.target.closest(".remove-btn") && !e.target.closest(".rename-btn") &&
+            !e.target.closest(".open-btn")) openProject(p.name);
+      };
     }
     card.querySelector(".rename-btn").onclick = (e) => { e.stopPropagation(); showRenameProjectModal(p.name); };
     card.querySelector(".remove-btn").onclick = (e) => { e.stopPropagation(); showRemoveProjectModal(p.name); };
+    card.querySelector(".open-btn").onclick = (e) => {
+      e.stopPropagation();
+      if (p.exists !== false) openProject(p.name);
+    };
     grid.appendChild(card);
   }
 
@@ -1927,6 +2088,14 @@ function applyViewMode(mode) {
 
 document.getElementById("btn-view-grid").onclick = () => applyViewMode("grid");
 document.getElementById("btn-view-list").onclick = () => applyViewMode("list");
+const projectSortSelect = document.getElementById("project-sort");
+if (projectSortSelect) {
+  projectSortSelect.onchange = (e) => {
+    localStorage.setItem("tinyleaf-project-sort", e.target.value);
+    closeOverflowMenus();
+    showProjectList();
+  };
+}
 document.getElementById("btn-open-folder").onclick = showOpenFolderModal;
 document.getElementById("btn-new-project").onclick = showCreateProjectModal;
 document.getElementById("project-search").oninput = (e) => {
@@ -2092,6 +2261,8 @@ async function openProject(name) {
   S.projectName = name;
   localStorage.setItem("tinyleaf-project", name);
   document.getElementById("project-name").textContent = name;
+  restoreCompileBadge(name);
+  document.getElementById("app").classList.remove("project-list-mode");
   document.getElementById("project-list-view").style.display = "none";
   document.getElementById("editor-view").style.display = "flex";
   document.getElementById("toolbar-project").style.display = "flex";
@@ -2182,8 +2353,10 @@ async function refreshFiles() {
     }
   }
   collect(S.fileTree);
+  S.artifactCount = countArtifacts(S.fileTree);
   renderFileTree();
   _populateMainFileSelect();
+  updateArtifactToggle();
 }
 
 function _detectMainFile() {
@@ -2218,20 +2391,66 @@ function saveExpandedDirs() {
   localStorage.setItem("tinyleaf-expanded-dirs", JSON.stringify([...expandedDirs]));
 }
 
+/**
+ * Return the file tree without build artifacts, dropping directories that
+ * become empty. Used while the "Show build artifacts" toggle is off.
+ */
+function _visibleFileTree(nodes) {
+  const visible = [];
+  for (const node of nodes || []) {
+    if (node.type === "file") {
+      if (!isArtifact(node.name)) visible.push(node);
+    } else if (node.type === "dir") {
+      const children = _visibleFileTree(node.children || []);
+      if (children.length > 0) visible.push({ ...node, children });
+    } else {
+      visible.push(node);
+    }
+  }
+  return visible;
+}
+
 function renderFileTree(searchFilter = "") {
   const container = document.getElementById("file-tree");
   container.innerHTML = "";
+  const nodes = S.showArtifacts ? (S.fileTree || []) : _visibleFileTree(S.fileTree || []);
   if (searchFilter) {
     renderFilteredFiles(searchFilter, container);
   } else {
-    renderTreeNodes(S.fileTree || [], container, 0);
+    renderTreeNodes(nodes, container, 0);
   }
+}
+
+/** Sync the artifact toggle's pressed state, label, and count badge. */
+function updateArtifactToggle() {
+  const btn = document.getElementById("btn-artifact-toggle");
+  const count = document.getElementById("artifact-count");
+  if (!btn) return;
+  const on = S.showArtifacts;
+  btn.classList.toggle("active", on);
+  btn.setAttribute("aria-pressed", on ? "true" : "false");
+  const label = t(on ? "hide_artifacts" : "show_artifacts");
+  btn.title = label;
+  btn.setAttribute("aria-label", label);
+  if (count) {
+    count.textContent = S.artifactCount ? String(S.artifactCount) : "";
+    count.hidden = !S.artifactCount;
+  }
+  btn.hidden = S.artifactCount === 0 && !on;
+}
+
+function toggleArtifacts() {
+  S.showArtifacts = !S.showArtifacts;
+  localStorage.setItem("tinyleaf-show-artifacts", S.showArtifacts ? "1" : "0");
+  renderFileTree(document.getElementById("file-search-input")?.value || "");
+  updateArtifactToggle();
 }
 
 function renderFilteredFiles(query, parent) {
   for (const filePath of S.files) {
     if (!filePath.toLowerCase().includes(query)) continue;
     const name = filePath.split("/").pop();
+    if (!S.showArtifacts && isArtifact(name)) continue;
     const div = document.createElement("div");
     div.className = "file-item" + (filePath === S.currentFile ? " active" : "") +
       (isArtifact(name) ? " artifact" : "");
@@ -2545,8 +2764,10 @@ async function openFile(filePath) {
   // PDF files: load in preview panel instead of editor
   if (filePath.endsWith(".pdf")) {
     const url = `/api/projects/${enc(S.projectName)}/output/${enc(filePath)}`;
-    loadPDF(url);
-    if (MOBILE_QUERY.matches) setMobilePane("pdf");
+    // Show the pane without rendering first; loadPDF owns rendering for the
+    // new document, so a stale render of the previous PDF cannot slip in.
+    if (MOBILE_QUERY.matches) setMobilePane("pdf", false, false);
+    await loadPDF(url);
     return;
   }
 
@@ -2555,7 +2776,8 @@ async function openFile(filePath) {
   if (imgExts.some(e => filePath.toLowerCase().endsWith(e))) {
     const url = `/api/projects/${enc(S.projectName)}/output/${enc(filePath)}`;
     showImagePreview(url, filePath);
-    if (MOBILE_QUERY.matches) setMobilePane("pdf");
+    // Preview mode is "image" now, so this pane switch must not render the PDF.
+    if (MOBILE_QUERY.matches) setMobilePane("pdf", false, false);
     return;
   }
 
@@ -2749,6 +2971,85 @@ document.addEventListener("visibilitychange", () => {
 // ══════════════════════════════════════════
 // Compile
 // ══════════════════════════════════════════
+/** Format milliseconds as a short elapsed label: 8s, 1:05. */
+function formatCompileElapsed(ms) {
+  const total = Math.max(0, Math.round(ms / 1000));
+  if (total < 60) return `${total}s`;
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+/** Refresh the elapsed counter inside the running Compile button. */
+function updateCompileElapsed() {
+  const el = document.getElementById("compile-elapsed");
+  if (el && S.compileStartedAt) {
+    el.textContent = formatCompileElapsed(Date.now() - S.compileStartedAt);
+  }
+}
+
+/** Turn the Compile button into a spinner + Cancel + elapsed counter. */
+function startCompileUI() {
+  S.compileStartedAt = Date.now();
+  const btn = document.getElementById("btn-compile");
+  btn.classList.add("compiling");
+  btn.innerHTML = '<span class="compile-spinner" aria-hidden="true"></span>'
+    + `<span>${escapeHtml(t("cancel"))}</span> `
+    + '<span id="compile-elapsed" data-testid="compile-elapsed">0s</span>';
+  const badge = document.getElementById("compile-badge");
+  if (badge) badge.hidden = true;
+  clearInterval(S.compileTimer);
+  S.compileTimer = setInterval(updateCompileElapsed, 1000);
+}
+
+/**
+ * Restore the Compile button and show the result badge plus a toast.
+ * @param {"success"|"failed"|"cancelled"} status
+ */
+function finishCompileUI(status) {
+  clearInterval(S.compileTimer);
+  S.compileTimer = null;
+  const elapsed = S.compileStartedAt ? Date.now() - S.compileStartedAt : 0;
+  const btn = document.getElementById("btn-compile");
+  btn.classList.remove("compiling");
+  btn.textContent = t("compile");
+  S.compileStartedAt = 0;
+
+  const ok = status === "success";
+  const label = ok ? t("compile_success")
+    : status === "cancelled" ? t("compile_cancelled") : t("compile_failed");
+  const elapsedText = formatCompileElapsed(elapsed);
+  const badge = document.getElementById("compile-badge");
+  if (badge) {
+    badge.hidden = false;
+    badge.className = "compile-badge " +
+      (ok ? "success" : status === "cancelled" ? "warning" : "error");
+    badge.textContent = `${ok ? "✓" : status === "cancelled" ? "—" : "✕"} ${elapsedText}`;
+    badge.title = `${label} · ${elapsedText}`;
+    badge.setAttribute("aria-label", badge.title);
+  }
+  setCompileStatus(S.projectName, status, elapsed);
+  showToast(`${label} (${elapsedText})`, ok ? "success" : status === "cancelled" ? "info" : "error");
+}
+
+/** Append a transient toast to the shared polite live region. */
+function showToast(message, level = "info") {
+  let host = document.getElementById("toast-container");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "toast-container";
+    // Visual only: #status-left already announces compile results, so a live
+    // toast would repeat the same message to screen readers.
+    document.body.appendChild(host);
+  }
+  const toast = document.createElement("div");
+  toast.className = "toast " + level;
+  toast.textContent = message;
+  host.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add("hide");
+    setTimeout(() => toast.remove(), 250);
+  }, 3500);
+}
+
 async function compile() {
   if (S.compiling) {
     // Cancel the running compilation
@@ -2770,8 +3071,7 @@ async function compile() {
   }
 
   const engine = document.getElementById("engine-select").value;
-  const btnCompile = document.getElementById("btn-compile");
-  btnCompile.textContent = t("cancel");
+  startCompileUI();
   openLog();
   clearLog();
   setStatus(t("compiling"));
@@ -2796,17 +3096,19 @@ async function compile() {
       evtSource.close();
       S.compiling = false;
       S.compileId = null;
-      btnCompile.textContent = t("compile");
 
       if (d.status === "success") {
         setStatus(t("compile_success"), "success");
         document.getElementById("log-status").innerHTML = `<span class="badge success">OK</span>`;
+        finishCompileUI("success");
       } else if (d.status === "cancelled") {
         setStatus(t("compile_cancelled"), "warning");
         document.getElementById("log-status").innerHTML = `<span class="badge warning">CANCELLED</span>`;
+        finishCompileUI("cancelled");
       } else {
         setStatus(t("compile_failed"), "error");
         document.getElementById("log-status").innerHTML = `<span class="badge error">FAILED</span>`;
+        finishCompileUI("failed");
       }
       if (d.pdf_url) loadPDF(d.pdf_url, S._preCompileView || {});
       S._preCompileView = null;
@@ -2819,14 +3121,14 @@ async function compile() {
       S.compiling = false;
       S.compileId = null;
       S._preCompileView = null;
-      btnCompile.textContent = t("compile");
+      finishCompileUI("failed");
       setStatus(t("connection_lost"), "error");
     };
   } catch (err) {
     S.compiling = false;
     S.compileId = null;
     S._preCompileView = null;
-    btnCompile.textContent = t("compile");
+    finishCompileUI("failed");
     setStatus(`${t("compile_error")}: ${err.message}`, "error");
   }
 }
@@ -2851,6 +3153,10 @@ async function doClean() {
 
 async function loadPDF(url, opts = {}) {
   const container = document.getElementById("pdf-container");
+  // A new document supersedes any image preview and every in-flight render.
+  S.pdfPreview = "pdf";
+  const gen = ++S.pdfRenderGen;
+  S.pdfDoc = null;
   container.innerHTML = "";
   setPdfStatus(t("loading_pdf"));
   S.pdfUrl = url;
@@ -2858,6 +3164,8 @@ async function loadPDF(url, opts = {}) {
   try {
     const pdfUrl = url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();
     const doc = await pdfjsLib.getDocument(pdfUrl).promise;
+    // Another load (or an image preview) started while this one was fetching.
+    if (gen !== S.pdfRenderGen || S.pdfPreview !== "pdf") return;
     S.pdfDoc = doc;
     if (!opts.preserveZoom) S.pdfZoom = 1.0;
     S.pdfTextPages = null;
@@ -2865,10 +3173,12 @@ async function loadPDF(url, opts = {}) {
     S.pdfSearchIndex = -1;
     updateZoomLabel();
     await renderPDF();
+    if (S.pdfDoc !== doc) return;
     if (opts.restoreLocation) await restoreViewPosition(opts.restoreLocation);
     // Extract text in the background for PDF search
     extractPdfText().catch(() => {});
   } catch (err) {
+    if (S.pdfPreview === "image") return;
     container.innerHTML = `<div class="pdf-placeholder">${t("pdf_error")}: ${escapeHtml(err.message)}</div>`;
     setPdfStatus(t("pdf_error"));
   }
@@ -2930,10 +3240,12 @@ function jumpToPdfPage(pageNum) {
 }
 
 async function renderPDF() {
-  if (!S.pdfDoc) return;
+  if (!S.pdfDoc || S.pdfPreview !== "pdf") return;
+  // Generation token: a newer render (or loadPDF) invalidates this one.
+  const gen = ++S.pdfRenderGen;
+  const doc = S.pdfDoc;
   const container = document.getElementById("pdf-container");
   container.innerHTML = "";
-  const doc = S.pdfDoc;
 
   // Show page nav, hide status text
   setPdfStatus(null);
@@ -2946,6 +3258,7 @@ async function renderPDF() {
 
   for (let i = 1; i <= doc.numPages; i++) {
     const page = await doc.getPage(i);
+    if (gen !== S.pdfRenderGen || S.pdfDoc !== doc) return;
     const baseScale = (container.clientWidth - 40) / page.getViewport({ scale: 1 }).width;
     const scale = baseScale * S.pdfZoom;
     const viewport = page.getViewport({ scale });
@@ -2974,7 +3287,9 @@ async function renderPDF() {
     const ctx = canvas.getContext("2d");
     ctx.scale(dpr, dpr);
     await page.render({ canvasContext: ctx, viewport }).promise;
+    if (gen !== S.pdfRenderGen || S.pdfDoc !== doc) return;
   }
+  if (gen !== S.pdfRenderGen || S.pdfDoc !== doc) return;
   setupPdfPageObserver();
   // Re-apply search highlights after re-render (e.g. zoom change)
   if (S.pdfSearchMatches.length > 0) {
@@ -3080,6 +3395,10 @@ async function syncTexForwardSearch() {
 }
 
 function showImagePreview(url, filePath) {
+  // Enter image mode and cancel any in-flight PDF render, whose canvas must
+  // not replace the image when it resolves.
+  S.pdfPreview = "image";
+  S.pdfRenderGen += 1;
   const container = document.getElementById("pdf-container");
   container.innerHTML = "";
   const name = filePath.split("/").pop();
@@ -3802,7 +4121,11 @@ function scheduleOutlineRefresh() {
 // ══════════════════════════════════════════
 async function refreshGit() {
   try {
-    const st = await api("GET", `/api/projects/${enc(S.projectName)}/git/status`);
+    // include_artifacts=1 returns both halves; the client groups them so the
+    // commit can opt in explicitly (allow_artifacts) and never stages by
+    // accident.
+    const st = await api("GET",
+      `/api/projects/${enc(S.projectName)}/git/status?include_artifacts=1`);
     if (!st.git) { return; }
     document.getElementById("git-branch").textContent =
       `${st.branch || "???"}` +
@@ -3810,6 +4133,9 @@ async function refreshGit() {
       (st.behind ? ` \u2193${st.behind}` : "");
 
     S.gitFiles = st.files || [];
+    const sources = S.gitFiles.filter((f) => !isArtifact(f.path));
+    const artifacts = S.gitFiles.filter((f) => isArtifact(f.path));
+
     const fd = document.getElementById("git-files");
     // Legacy diff view (sidebar widget) — keep hidden
     const legacyDiffView = document.getElementById("git-diff-view");
@@ -3822,28 +4148,166 @@ async function refreshGit() {
       return;
     }
 
-    for (const f of S.gitFiles) {
-      const cls = f.status === "??" ? "U" : f.status.includes("D") ? "D" : f.status.includes("A") ? "A" : "M";
-      const div = document.createElement("div");
-      div.className = "git-file";
-      const cb = document.createElement("input");
-      cb.type = "checkbox";
-      cb.checked = true;
-      cb.dataset.path = f.path;
-      div.appendChild(cb);
-      const statusSpan = document.createElement("span");
-      statusSpan.className = `git-status ${cls}`;
-      statusSpan.textContent = cls;
-      div.appendChild(statusSpan);
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "git-file-name";
-      nameSpan.textContent = f.path;
-      nameSpan.title = f.path;
-      div.appendChild(nameSpan);
-      nameSpan.onclick = () => showGitDiff(f.path, div);
-      fd.appendChild(div);
-    }
+    for (const f of sources) fd.appendChild(_gitFileRow(f, true));
+    if (artifacts.length > 0) fd.appendChild(_gitArtifactGroup(artifacts));
   } catch { /* git not available */ }
+}
+
+/** Build one git change row with a checkbox. */
+function _gitFileRow(f, checked) {
+  const cls = f.status === "??" ? "U" : f.status.includes("D") ? "D" : f.status.includes("A") ? "A" : "M";
+  const div = document.createElement("div");
+  div.className = "git-file";
+  div.dataset.path = f.path;
+  const cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = checked;
+  cb.dataset.path = f.path;
+  div.appendChild(cb);
+  const statusSpan = document.createElement("span");
+  statusSpan.className = `git-status ${cls}`;
+  statusSpan.textContent = cls;
+  div.appendChild(statusSpan);
+  const nameSpan = document.createElement("span");
+  nameSpan.className = "git-file-name";
+  nameSpan.textContent = f.path;
+  nameSpan.title = f.path;
+  div.appendChild(nameSpan);
+  nameSpan.onclick = () => showGitDiff(f.path, div);
+  return div;
+}
+
+/**
+ * Build the collapsed build-artifact group. Artifact rows are disabled until
+ * the group checkbox is explicitly ticked, which is also what makes doCommit
+ * send `allow_artifacts: true`.
+ */
+function _gitArtifactGroup(artifacts) {
+  const group = document.createElement("div");
+  group.className = "git-artifacts";
+  group.dataset.testid = "git-artifacts-group";
+
+  const header = document.createElement("div");
+  header.className = "git-artifacts-header";
+
+  const disclose = document.createElement("button");
+  disclose.type = "button";
+  disclose.className = "git-artifacts-disclose";
+  disclose.setAttribute("aria-expanded", "false");
+  disclose.setAttribute("aria-controls", "git-artifacts-list");
+  disclose.setAttribute("aria-label", t("build_artifacts"));
+  disclose.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>';
+  header.appendChild(disclose);
+
+  const include = document.createElement("input");
+  include.type = "checkbox";
+  include.id = "git-artifacts-toggle";
+  include.dataset.testid = "git-artifacts-toggle";
+  header.appendChild(include);
+
+  const label = document.createElement("label");
+  label.htmlFor = "git-artifacts-toggle";
+  label.textContent = `${t("build_artifacts")} (${artifacts.length})`;
+  header.appendChild(label);
+  group.appendChild(header);
+
+  const list = document.createElement("div");
+  list.id = "git-artifacts-list";
+  list.className = "git-artifacts-list";
+  list.hidden = true;
+  for (const f of artifacts) {
+    const row = _gitFileRow(f, false);
+    row.querySelector("input").disabled = true;
+    list.appendChild(row);
+  }
+  group.appendChild(list);
+
+  const setOpen = (open) => {
+    list.hidden = !open;
+    disclose.setAttribute("aria-expanded", open ? "true" : "false");
+    disclose.classList.toggle("open", open);
+  };
+  disclose.onclick = () => setOpen(list.hidden);
+  include.onchange = () => {
+    list.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+      cb.disabled = !include.checked;
+      cb.checked = include.checked;
+    });
+    if (include.checked) setOpen(true);
+    else setOpen(false);
+  };
+  return group;
+}
+
+/**
+ * Offer to add the artifact patterns to .gitignore and stop tracking any
+ * tracked artifacts. Runs a dry run first and shows exactly what would change.
+ */
+async function ignoreArtifacts() {
+  if (!S.projectName) return;
+  let dry;
+  try {
+    dry = await api("POST",
+      `/api/projects/${enc(S.projectName)}/git/ignore-artifacts`,
+      { dry_run: true, untrack: true });
+  } catch (err) {
+    setStatus(err.message, "error");
+    return;
+  }
+  const added = dry.gitignore?.added || [];
+  const removed = dry.removed_from_index || [];
+  if (added.length === 0 && removed.length === 0) {
+    setStatus(t("ignore_none"), "info");
+    showToast(t("ignore_none"), "info");
+    return;
+  }
+  const preview = (items) => {
+    const shown = items.slice(0, 12).map((item) => `<div>${escapeHtml(item)}</div>`).join("");
+    const more = items.length > 12 ? `<div>…</div>` : "";
+    return `<div class="ignore-preview">${shown}${more}</div>`;
+  };
+  const summary = t("ignore_confirm")
+    .replace("{added}", String(added.length))
+    .replace("{removed}", String(removed.length));
+  showModal(t("stop_tracking_artifacts"),
+    `<p style="margin-bottom:10px">${escapeHtml(summary)}</p>`
+    + (added.length ? preview(added) : "")
+    + (removed.length ? preview(removed) : ""),
+    [
+      { label: t("cancel"), action: closeModal },
+      { label: t("apply"), primary: true, action: async () => {
+        try {
+          const r = await api("POST",
+            `/api/projects/${enc(S.projectName)}/git/ignore-artifacts`,
+            { dry_run: false, untrack: true });
+          closeModal();
+          const count = (r.removed_from_index || []).length;
+          const msg = t("ignore_done").replace("{removed}", String(count));
+          if (r.failed?.length) {
+            setStatus(`${msg} · ${r.failed.length} failed`, "warning");
+          } else {
+            setStatus(msg, "success");
+            showToast(msg, "success");
+          }
+          refreshGit();
+        } catch (err) {
+          setStatus(err.message, "error");
+        }
+      } },
+    ]);
+}
+
+/** Uncheck the artifact group and re-check every source row. */
+function selectGitSourcesOnly() {
+  document.querySelectorAll("#git-files > .git-file input[type=checkbox]").forEach((cb) => {
+    cb.checked = true;
+  });
+  const include = document.getElementById("git-artifacts-toggle");
+  if (include) {
+    include.checked = false;
+    include.dispatchEvent(new Event("change"));
+  }
+  setStatus(t("sources_only"), "info");
 }
 
 // ── Diff pane helpers ──
@@ -4000,8 +4464,12 @@ async function showGitDiff(filePath, activeEl) {
 }
 
 async function doCommit() {
-  const checkboxes = document.querySelectorAll("#git-files input[type=checkbox]");
-  const selectedFiles = [...checkboxes].filter((cb) => cb.checked).map((cb) => cb.dataset.path);
+  // Only change rows carry a path; the artifact-group checkbox has none.
+  const checkboxes = document.querySelectorAll("#git-files .git-file input[type=checkbox]");
+  const selectedFiles = [...checkboxes]
+    .filter((cb) => cb.checked && !cb.disabled && cb.dataset.path)
+    .map((cb) => cb.dataset.path);
+  const includesArtifacts = selectedFiles.some((path) => isArtifact(path));
 
   if (S.gitFiles && S.gitFiles.length > 0 && selectedFiles.length === 0) {
     setStatus(t("no_files_selected"), "warning");
@@ -4019,13 +4487,27 @@ async function doCommit() {
   }
 
   if (S.modified.has(S.currentFile)) await saveCurrentFile();
-  const r = await api("POST", `/api/projects/${enc(S.projectName)}/git/commit`, {
+  const payload = {
     message: msg,
     files: selectedFiles.length ? selectedFiles : null,
-  });
-  setStatus(r.success ? t("committed") : r.message, r.success ? "success" : "error");
-  if (r.success && msgEl) msgEl.value = "";
-  refreshGit();
+  };
+  // Artifacts travel only after an explicit opt-in; the backend rejects them
+  // otherwise with a 400 artifacts_not_allowed envelope.
+  if (includesArtifacts) payload.allow_artifacts = true;
+  try {
+    const r = await api("POST", `/api/projects/${enc(S.projectName)}/git/commit`, payload);
+    setStatus(r.success ? t("committed") : r.message, r.success ? "success" : "error");
+    if (r.success && msgEl) msgEl.value = "";
+    refreshGit();
+  } catch (err) {
+    if (err.code === "artifacts_not_allowed") {
+      const paths = err.detail?.paths || [];
+      const detail = paths.length ? `: ${paths.join(", ")}` : "";
+      setStatus(`${t("commit_artifacts_blocked")}${detail}`, "error");
+    } else {
+      setStatus(err.message, "error");
+    }
+  }
 }
 
 async function doPush() {
@@ -5096,7 +5578,11 @@ function setupKeybindings() {
 // ══════════════════════════════════════════
 // Wire up buttons
 // ══════════════════════════════════════════
-document.getElementById("btn-home").onclick = () => {
+/**
+ * Return to the project list. In multi mode, flush every dirty tab first so
+ * an edit made inside the autosave window is not lost.
+ */
+function goHome() {
   if (S.mode === "multi") {
     // Flush any dirty tabs synchronously (best effort)
     for (const path of S.tabs) {
@@ -5114,7 +5600,18 @@ document.getElementById("btn-home").onclick = () => {
     document.getElementById("project-name").textContent = "\u2014";
     showProjectList();
   }
-};
+}
+
+/** The mobile back button only makes sense in multi-project mode. */
+function syncHomeButton() {
+  const btn = document.getElementById("btn-home-mobile");
+  if (btn) btn.hidden = S.mode !== "multi";
+}
+
+// Mobile back affordance: the wordmark is hidden at <=900px, so phones need
+// an explicit way back to the project list. Same handler as the wordmark.
+document.getElementById("btn-home-mobile").onclick = goHome;
+document.getElementById("btn-home").onclick = goHome;
 document.getElementById("btn-compile").onclick = compile;
 document.getElementById("btn-clean").onclick = doClean;
 document.getElementById("btn-export-zip").onclick = () => {
@@ -5137,6 +5634,12 @@ document.getElementById("auto-compile-toggle").onchange = (e) => {
 };
 document.getElementById("btn-git-commit-selected").onclick = doCommit;
 document.getElementById("btn-git-push").onclick = doPush;
+const ignoreArtifactsBtn = document.getElementById("btn-git-ignore-artifacts");
+if (ignoreArtifactsBtn) ignoreArtifactsBtn.onclick = ignoreArtifacts;
+const selectSourcesBtn = document.getElementById("btn-git-select-sources");
+if (selectSourcesBtn) selectSourcesBtn.onclick = selectGitSourcesOnly;
+const artifactToggleBtn = document.getElementById("btn-artifact-toggle");
+if (artifactToggleBtn) artifactToggleBtn.onclick = toggleArtifacts;
 document.getElementById("btn-git-refresh").onclick = refreshGit;
 document.getElementById("git-branch-btn").onclick = toggleBranchDropdown;
 document.getElementById("btn-git-create-branch").onclick = createBranchDialog;
