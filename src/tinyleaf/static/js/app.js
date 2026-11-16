@@ -1352,6 +1352,7 @@ async function init() {
 
   const info = await api("GET", "/api/mode");
   S.mode = info.mode;
+  syncHomeButton();
   S.useDocker = info.docker;
   S.dockerImage = info.image || "oaklight/texlive:alpine-science-cn";
   document.getElementById("about-version").textContent = `v${info.version || "0.0.0"}`;
@@ -5577,10 +5578,11 @@ function setupKeybindings() {
 // ══════════════════════════════════════════
 // Wire up buttons
 // ══════════════════════════════════════════
-// Mobile back affordance: the wordmark is hidden at <=900px, so phones need
-// an explicit way back to the project list.
-document.getElementById("btn-home-mobile").onclick = showProjectList;
-document.getElementById("btn-home").onclick = () => {
+/**
+ * Return to the project list. In multi mode, flush every dirty tab first so
+ * an edit made inside the autosave window is not lost.
+ */
+function goHome() {
   if (S.mode === "multi") {
     // Flush any dirty tabs synchronously (best effort)
     for (const path of S.tabs) {
@@ -5598,7 +5600,18 @@ document.getElementById("btn-home").onclick = () => {
     document.getElementById("project-name").textContent = "\u2014";
     showProjectList();
   }
-};
+}
+
+/** The mobile back button only makes sense in multi-project mode. */
+function syncHomeButton() {
+  const btn = document.getElementById("btn-home-mobile");
+  if (btn) btn.hidden = S.mode !== "multi";
+}
+
+// Mobile back affordance: the wordmark is hidden at <=900px, so phones need
+// an explicit way back to the project list. Same handler as the wordmark.
+document.getElementById("btn-home-mobile").onclick = goHome;
+document.getElementById("btn-home").onclick = goHome;
 document.getElementById("btn-compile").onclick = compile;
 document.getElementById("btn-clean").onclick = doClean;
 document.getElementById("btn-export-zip").onclick = () => {

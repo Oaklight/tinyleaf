@@ -2043,3 +2043,6 @@ button.mobile-home-btn { display: none; }
 @media (max-width: 380px) {
   #compile-badge { display: none; }
 }
+
+/* [hidden] must win over the display rule that shows the mobile back button. */
+button.mobile-home-btn[hidden] { display: none; }
