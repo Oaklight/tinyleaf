@@ -5788,20 +5788,25 @@ function quickOpenUpdate(value) {
   renderQuickOpenResults();
 }
 
-async function openQuickOpen(prefix = "") {
+function openQuickOpen(prefix = "") {
   const overlay = document.getElementById("quick-open-overlay");
   const input = document.getElementById("quick-open-input");
   if (!overlay || !input) return;
-  if (S.mode === "multi") {
-    try {
-      QO.projects = await api("GET", "/api/projects");
-    } catch { /* keep the cached list */ }
-  }
+  // Show and focus synchronously: a fetch before this point would send the
+  // first keystrokes into the editor.
   input.value = prefix;
   overlay.classList.add("open");
   quickOpenUpdate(prefix);
-  // Focus after the overlay becomes visible
-  setTimeout(() => input.focus(), 0);
+  input.focus();
+  if (S.mode === "multi") {
+    // Refresh the project list in the background; keep the typed query.
+    api("GET", "/api/projects").then((projects) => {
+      QO.projects = projects;
+      if (overlay.classList.contains("open") && QO.mode === "actions") {
+        quickOpenUpdate(input.value);
+      }
+    }).catch(() => { /* keep the cached list */ });
+  }
 }
 
 function closeQuickOpen() {
