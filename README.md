@@ -153,10 +153,20 @@ From the project page you can:
 For a simple containerized setup:
 
 ```bash
+export TINYLEAF_TOKEN="$(openssl rand -hex 24)"
 docker compose up
 ```
 
-Tinyleaf starts at `http://localhost:14159`.
+Compose refuses to start without `TINYLEAF_TOKEN` because the container binds
+`0.0.0.0`. Tinyleaf starts at `http://localhost:14159`; the first browser visit
+must include the token:
+
+```text
+http://localhost:14159/?token=$TINYLEAF_TOKEN
+```
+
+If clients use a different hostname or IP, set `TINYLEAF_ALLOWED_HOST` to that
+value before starting Compose.
 
 ## Tinyleaf vs. Overleaf CE
 
