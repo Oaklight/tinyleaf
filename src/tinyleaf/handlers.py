@@ -379,9 +379,12 @@ def handle_vendor_status(config):
     vendor_dir = os.path.join(config_dir, "vendor")
     manifest = vendor.get_manifest(vendor_dir)
     proxy = vendor.load_proxy(config_dir) or ""
+    # A manifest is written even when some downloads failed, so its presence
+    # alone does not mean every module exists on disk.
+    result = {"ready": vendor.is_vendor_ready(vendor_dir), "proxy": proxy}
     if manifest:
-        return {"ready": True, "manifest": manifest, "proxy": proxy}
-    return {"ready": False, "proxy": proxy}
+        result["manifest"] = manifest
+    return result
 
 
 def handle_update_vendor(body, config):
@@ -391,9 +394,15 @@ def handle_update_vendor(body, config):
     proxy = body.get("proxy", "").strip() if body else ""
     vendor.save_proxy(config_dir, proxy)
     vendor_dir = os.path.join(config_dir, "vendor")
+    failures = []
     try:
-        manifest = vendor.download_vendor(vendor_dir, proxy=proxy or None)
-        return {"ok": True, "manifest": manifest}
+        manifest = vendor.download_vendor(vendor_dir, proxy=proxy or None, failures=failures)
+        return {
+            "ok": not failures,
+            "ready": vendor.is_vendor_ready(vendor_dir),
+            "manifest": manifest,
+            "failed": failures,
+        }
     except Exception as e:
         abort(500, str(e))
 
