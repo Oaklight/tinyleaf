@@ -166,6 +166,13 @@ async def api_cancel_docker_pull(request):
     return handle_cancel_docker_pull(request.json())
 
 
+@app.get("/api/docker/pull/status")
+def api_docker_pull_status(request):
+    from tinyleaf.handlers import handle_docker_pull_status
+
+    return handle_docker_pull_status(request.query_params, _config)
+
+
 @app.get("/api/vendor/status")
 def api_vendor_status(request):
     from tinyleaf.handlers import handle_vendor_status

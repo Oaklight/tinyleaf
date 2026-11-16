@@ -5,6 +5,7 @@ Supports local latexmk and Docker-based compilation.
 
 import asyncio
 import os
+import time
 import uuid
 
 _DONE_SENTINEL = object()
@@ -451,6 +452,8 @@ async def docker_pull_image(image, registry_mirror=None):
     Returns:
         Tuple of (success: bool, message: str).
     """
+    reset_pull_state(image)
+
     candidates = []
     if registry_mirror:
         candidates.append((f"{registry_mirror}/{image}", True))
@@ -471,13 +474,16 @@ async def docker_pull_image(image, registry_mirror=None):
             assert proc.stdout is not None
             output_lines = []
             async for raw_line in proc.stdout:
-                output_lines.append(raw_line.decode("utf-8", errors="replace"))
+                line = raw_line.decode("utf-8", errors="replace").rstrip("\n")
+                output_lines.append(line + "\n")
+                _record_pull_line(image, line)
             await proc.wait()
 
             _pull_procs.pop(image, None)
 
             if proc.returncode != 0:
                 if proc.returncode in (-9, -15):
+                    _finish_pull_state(image, False, "Cancelled")
                     return False, "Cancelled"
                 last_error = "".join(output_lines).strip() or "Pull failed"
                 continue
@@ -485,6 +491,7 @@ async def docker_pull_image(image, registry_mirror=None):
             if via_mirror:
                 await _retag_image(pull_image, image)
 
+            _finish_pull_state(image, True, "OK")
             return True, "OK"
         except asyncio.TimeoutError:
             _pull_procs.pop(image, None)
@@ -493,11 +500,56 @@ async def docker_pull_image(image, registry_mirror=None):
             _pull_procs.pop(image, None)
             last_error = str(e)
 
+    _finish_pull_state(image, False, last_error)
     return False, last_error
 
 
 # Track standalone pull processes for cancellation
 _pull_procs: dict[str, asyncio.subprocess.Process] = {}
+
+# Progress state for the manual pull endpoint (single-threaded asyncio).
+_pull_states: dict[str, dict] = {}
+
+
+def reset_pull_state(image):
+    """Start a fresh progress record for a manual image pull."""
+    _pull_states[image] = {
+        "image": image,
+        "lines": [],
+        "layers_done": 0,
+        "done": False,
+        "success": None,
+        "message": "",
+        "started_at": time.time(),
+        "finished_at": None,
+    }
+
+
+def get_pull_state(image):
+    """Return the progress record for *image*, or None."""
+    return _pull_states.get(image)
+
+
+def _record_pull_line(image, line):
+    state = _pull_states.get(image)
+    if state is None:
+        return
+    lines = state["lines"]
+    lines.append(line)
+    if len(lines) > 200:
+        del lines[:-200]
+    if "Pull complete" in line:
+        state["layers_done"] += 1
+
+
+def _finish_pull_state(image, success, message):
+    state = _pull_states.get(image)
+    if state is None:
+        return
+    state["done"] = True
+    state["success"] = success
+    state["message"] = message
+    state["finished_at"] = time.time()
 
 
 def cancel_docker_pull(image):

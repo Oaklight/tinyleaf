@@ -1160,6 +1160,31 @@ function setupSettingsPopup() {
     api("PUT", "/api/settings", { registry_mirror: e.target.value.trim() });
   };
 
+  const pullProgress = document.getElementById("pull-progress");
+  let pullTimer = null;
+  const renderPullProgress = (st) => {
+    if (!st || !st.known) return;
+    pullProgress.hidden = false;
+    pullProgress.classList.remove("error", "success");
+    if (st.done) {
+      if (st.success) {
+        pullProgress.textContent = t("pull_success");
+        pullProgress.classList.add("success");
+      } else if (st.message === "Cancelled") {
+        pullProgress.textContent = t("pull_cancelled");
+      } else {
+        pullProgress.textContent = t("pull_failed") + ": " + (st.message || "");
+        pullProgress.classList.add("error");
+      }
+      return;
+    }
+    const elapsed = Number(st.elapsed || 0).toFixed(1);
+    const last = st.lines && st.lines.length ? st.lines[st.lines.length - 1] : "";
+    const layers = st.layers_done ? ` \u00b7 ${st.layers_done} layers` : "";
+    pullProgress.textContent =
+      `${t("pulling_image")} ${elapsed}s${layers}${last ? " \u00b7 " + last : ""}`;
+  };
+
   // Docker pull
   document.getElementById("btn-docker-pull").onclick = async () => {
     const sel = document.getElementById("docker-image-select");
@@ -1179,6 +1204,18 @@ function setupSettingsPopup() {
     S.pullingImage = image;
     btn.textContent = t("cancel");
     setStatus(t("pulling_image"));
+    pullProgress.hidden = false;
+    pullProgress.textContent = t("pulling_image");
+    pullProgress.classList.remove("error", "success");
+    pullTimer = setInterval(async () => {
+      try {
+        const st = await api(
+          "GET",
+          `/api/docker/pull/status?image=${encodeURIComponent(image)}`
+        );
+        renderPullProgress(st);
+      } catch {}
+    }, 1000);
     try {
       const res = await api("POST", "/api/docker/pull", { image });
       if (res.success) {
@@ -1192,6 +1229,15 @@ function setupSettingsPopup() {
     } catch (e) {
       setStatus(t("pull_failed") + ": " + e.message, "error");
     } finally {
+      if (pullTimer) {
+        clearInterval(pullTimer);
+        pullTimer = null;
+      }
+      try {
+        renderPullProgress(
+          await api("GET", `/api/docker/pull/status?image=${encodeURIComponent(image)}`)
+        );
+      } catch {}
       S.pulling = false;
       S.pullingImage = null;
       btn.textContent = t("pull");
