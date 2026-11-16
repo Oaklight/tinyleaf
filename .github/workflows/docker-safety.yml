@@ -47,5 +47,7 @@ jobs:
           fi
 
       - name: Validate Docker Compose config
+        env:
+          TINYLEAF_TOKEN: ci-validation-token
         run: docker compose config --quiet
 

@@ -210,3 +210,110 @@ class TestCliAuthPolicy:
     def test_auth_policy(self, host, token, insecure, blocked):
         error = cli._auth_policy_error(host, token, insecure)
         assert (error is not None) is blocked
+
+
+class TestTokenValidation:
+    @pytest.mark.parametrize(
+        "token",
+        ["a" * 16, "0123456789abcdef0123456789abcdef", "abc.DEF_123~+/=-xyz"],
+    )
+    def test_valid_token(self, token):
+        assert cli._validate_token(token) is None
+
+    @pytest.mark.parametrize("token", ["short", "has space in this token", "é" * 16])
+    def test_invalid_token(self, token):
+        assert cli._validate_token(token) is not None
+
+    def test_empty_token_means_no_auth(self):
+        assert cli._validate_token("") is None
+
+
+class TestTokenComparison:
+    def test_non_ascii_candidate_does_not_raise(self):
+        assert server._token_matches("é" * 16, "a" * 16) is False
+
+    def test_non_ascii_configured_token_does_not_raise(self):
+        assert server._token_matches("a" * 16, "é" * 16) is False
+
+
+class TestHostNormalization:
+    def test_uppercase_host_header(self, config):
+        request = _request(headers={"Host": "LOCALHOST:14159"})
+        assert server.enforce_access(request) is None
+
+    def test_trailing_dot_host(self, config):
+        request = _request(headers={"Host": "localhost.:14159"})
+        assert server.enforce_access(request) is None
+
+    def test_allowed_host_case_insensitive(self, config):
+        config["allowed_hosts"] = ["Papers.Example.com"]
+        request = _request(headers={"Host": "papers.example.com:14159"})
+        assert server.enforce_access(request) is None
+
+
+class TestAuthResponseCaching:
+    def test_session_success_is_not_cached(self, config):
+        config["token"] = TOKEN
+        request = _request(
+            method="POST",
+            path="/api/auth/session",
+            body=json.dumps({"token": TOKEN}).encode(),
+        )
+        response = server.api_auth_session(request)
+        assert response.headers["Cache-Control"] == "no-store"
+
+    def test_session_failure_is_not_cached(self, config):
+        config["token"] = TOKEN
+        request = _request(
+            method="POST",
+            path="/api/auth/session",
+            body=json.dumps({"token": "wrong"}).encode(),
+        )
+        response = server.api_auth_session(request)
+        assert response.status_code == 401
+        assert response.headers["Cache-Control"] == "no-store"
+        assert response.headers["WWW-Authenticate"] == "Bearer"
+
+    def test_bootstrap_redirect_is_not_cached(self, config):
+        config["token"] = TOKEN
+        request = _request(path="/", query_string=f"token={TOKEN}")
+        response = server.serve_index(request)
+        assert response.headers["Cache-Control"] == "no-store"
+
+    def test_bootstrap_failure_has_www_authenticate(self, config):
+        config["token"] = TOKEN
+        request = _request(path="/", query_string="token=wrong")
+        response = server.serve_index(request)
+        assert response.status_code == 401
+        assert response.headers["WWW-Authenticate"] == "Bearer"
+
+
+class TestSessionBodyValidation:
+    def test_array_body_is_400(self, config):
+        config["token"] = TOKEN
+        request = _request(method="POST", path="/api/auth/session", body=b"[]")
+        response = server.api_auth_session(request)
+        assert response.status_code == 400
+        assert _body(response)["code"] == "bad_request"
+
+    def test_string_body_is_400(self, config):
+        config["token"] = TOKEN
+        request = _request(method="POST", path="/api/auth/session", body=b'"text"')
+        response = server.api_auth_session(request)
+        assert response.status_code == 400
+
+    def test_invalid_json_is_400(self, config):
+        config["token"] = TOKEN
+        request = _request(method="POST", path="/api/auth/session", body=b"{not json")
+        response = server.api_auth_session(request)
+        assert response.status_code == 400
+
+    def test_non_ascii_token_is_401(self, config):
+        config["token"] = TOKEN
+        request = _request(
+            method="POST",
+            path="/api/auth/session",
+            body=json.dumps({"token": "é" * 16}).encode(),
+        )
+        response = server.api_auth_session(request)
+        assert response.status_code == 401

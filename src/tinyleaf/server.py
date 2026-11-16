@@ -159,19 +159,25 @@ _SESSION_COOKIE = "tinyleaf_session"
 _SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
+def _normalize_host(name):
+    return name.strip().lower().rstrip(".")
+
+
 def _host_name(host_header):
-    """Return the hostname from a Host or Origin authority string."""
+    """Return the normalized hostname from a Host or Origin authority string."""
     if host_header.startswith("["):
         end = host_header.find("]")
-        return host_header[1:end] if end != -1 else host_header
-    return host_header.split(":", 1)[0]
+        name = host_header[1:end] if end != -1 else host_header
+    else:
+        name = host_header.split(":", 1)[0]
+    return _normalize_host(name)
 
 
 def _allowed_host_names(config):
     names = {"localhost", "127.0.0.1", "::1"}
     if config.get("host"):
-        names.add(config["host"])
-    names.update(config.get("allowed_hosts") or [])
+        names.add(_normalize_host(config["host"]))
+    names.update(_normalize_host(host) for host in (config.get("allowed_hosts") or []))
     return names
 
 
@@ -180,14 +186,22 @@ def _host_allowed(host_header, config):
     return bool(name) and name in _allowed_host_names(config)
 
 
+def _token_matches(candidate, token):
+    """Constant-time token comparison that never raises on odd input."""
+    return (
+        isinstance(candidate, str)
+        and candidate.isascii()
+        and token.isascii()
+        and hmac.compare_digest(candidate, token)
+    )
+
+
 def _has_valid_token(request, token):
     header = request.headers.get("authorization", "")
     if header[:7].lower() == "bearer ":
-        candidate = header[7:].strip()
-        if hmac.compare_digest(candidate, token):
+        if _token_matches(header[7:].strip(), token):
             return True
-    cookie = request.cookies.get(_SESSION_COOKIE, "")
-    return bool(cookie) and hmac.compare_digest(cookie, token)
+    return _token_matches(request.cookies.get(_SESSION_COOKIE, ""), token)
 
 
 def _origin_allowed(request, config):
@@ -300,9 +314,15 @@ def serve_index(request):
     token = _config.get("token")
     candidate = request.query_params.get("token", [None])[0]
     if token and candidate is not None:
-        if not hmac.compare_digest(candidate, token):
-            return _error_envelope(request, 401, "Invalid token", "unauthorized")
-        response = Response(status_code=302, headers={"Location": "/"})
+        if not _token_matches(candidate, token):
+            response = _error_envelope(request, 401, "Invalid token", "unauthorized")
+            response.headers["WWW-Authenticate"] = "Bearer"
+            response.headers["Cache-Control"] = "no-store"
+            return response
+        response = Response(
+            status_code=302,
+            headers={"Location": "/", "Cache-Control": "no-store"},
+        )
         response.set_cookie(
             _SESSION_COOKIE,
             token,
@@ -415,12 +435,22 @@ def api_schema(request):
 def api_auth_session(request):
     """Exchange a valid token for an HttpOnly session cookie."""
     token = _config.get("token")
-    candidate = _json_body(request).get("token", "")
+    try:
+        payload = _json_body(request)
+    except ValueError:
+        return _error_envelope(request, 400, "Invalid JSON body", "bad_request")
+    if not isinstance(payload, dict):
+        return _error_envelope(request, 400, "Request body must be a JSON object", "bad_request")
+    candidate = payload.get("token", "")
     if not token:
         return {"authenticated": False, "auth_required": False}
-    if not isinstance(candidate, str) or not hmac.compare_digest(candidate, token):
-        return _error_envelope(request, 401, "Invalid token", "unauthorized")
+    if not _token_matches(candidate, token):
+        response = _error_envelope(request, 401, "Invalid token", "unauthorized")
+        response.headers["WWW-Authenticate"] = "Bearer"
+        response.headers["Cache-Control"] = "no-store"
+        return response
     response = JSONResponse({"authenticated": True})
+    response.headers["Cache-Control"] = "no-store"
     response.set_cookie(
         _SESSION_COOKIE,
         token,

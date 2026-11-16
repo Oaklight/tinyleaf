@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import re
 import shutil
 import sys
 import webbrowser
@@ -12,6 +13,10 @@ from tinyleaf.server import run_server
 DEFAULT_CONFIG_DIR = os.path.join(os.path.expanduser("~"), ".config", "tinyleaf")
 DEFAULT_PORT = 14159
 DEFAULT_HOST = "127.0.0.1"
+
+# hmac.compare_digest rejects non-ASCII str values, and very short tokens are
+# not worth the ceremony.
+_TOKEN_RE = re.compile(r"[A-Za-z0-9._~+/=-]{16,}")
 
 
 def _get_pypi_latest(pkg: str = "tinyleaf") -> str | None:
@@ -124,6 +129,19 @@ def _auth_policy_error(host: str, token: str, insecure_no_auth: bool) -> str | N
         f"refusing to bind to {host} without an API token. "
         "Pass --token or set TINYLEAF_TOKEN, or pass --insecure-no-auth."
     )
+
+
+def _validate_token(token: str) -> str | None:
+    """Return an error when a token is unsafe or too short, else None.
+
+    ``hmac.compare_digest`` raises ``TypeError`` for non-ASCII strings, so
+    token values must stay ASCII. Sixteen characters is the minimum.
+    """
+    if not token:
+        return None
+    if _TOKEN_RE.fullmatch(token):
+        return None
+    return "invalid API token: use at least 16 ASCII characters from A-Z a-z 0-9 . _ ~ + / = -"
 
 
 def main():
@@ -254,6 +272,11 @@ def main():
         if not token:
             print("Error: --token-file is empty", file=sys.stderr)
             sys.exit(1)
+
+    token_error = _validate_token(token)
+    if token_error:
+        print(f"Error: {token_error}", file=sys.stderr)
+        sys.exit(1)
 
     policy_error = _auth_policy_error(args.host, token, args.insecure_no_auth)
     if policy_error:
