@@ -194,6 +194,18 @@ async def _run_compile(job: CompileJob):
     the except handler.
     """
     try:
+        # Ensure the image is present before probing for latexmk. `docker run`
+        # implicitly pulls a missing image, and the probe's 15s timeout would
+        # kill that pull, then the explicit pull would start over.
+        if job.use_docker:
+            if not await _docker_image_exists(job.docker_image):
+                if job.is_cancelled:
+                    return
+                if not await _docker_pull(job, job.docker_image, job.registry_mirror):
+                    return
+            if job.is_cancelled:
+                return
+
         if job.engine == "latexmk":
             cmds = [_build_latexmk_args("pdflatex", job.main_file)]
         elif job.engine in ("pdflatex", "lualatex", "xelatex"):
@@ -205,15 +217,6 @@ async def _run_compile(job: CompileJob):
             cmds = [_build_latexmk_args("pdflatex", job.main_file)]
 
         if job.use_docker:
-            if not await _docker_image_exists(job.docker_image):
-                if job.is_cancelled:
-                    return
-                if not await _docker_pull(job, job.docker_image, job.registry_mirror):
-                    return
-
-            if job.is_cancelled:
-                return
-
             docker_prefix = [
                 "docker",
                 "run",
@@ -292,8 +295,15 @@ def _classify_log_line(line):
 
 
 async def _has_latexmk(job):
-    """Check if latexmk is available (in Docker or locally)."""
+    """Check if latexmk is available (in Docker or locally).
+
+    When Docker is in use this must not trigger a pull: `docker run` on a
+    missing image pulls implicitly, which is exactly the behaviour the
+    compile flow now avoids.
+    """
     try:
+        if job.use_docker and not await _docker_image_exists(job.docker_image):
+            return False
         if job.use_docker:
             proc = await asyncio.create_subprocess_exec(
                 "docker",
@@ -343,138 +353,147 @@ async def _docker_image_exists(image):
         return False
 
 
+async def _retag_image(pull_image, image):
+    """Retag a mirror-pulled image to its canonical name and drop the mirror tag."""
+    retag = await asyncio.create_subprocess_exec(
+        "docker",
+        "tag",
+        pull_image,
+        image,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    await asyncio.wait_for(retag.wait(), timeout=10)
+    rmi = await asyncio.create_subprocess_exec(
+        "docker",
+        "rmi",
+        pull_image,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    await asyncio.wait_for(rmi.wait(), timeout=10)
+
+
 async def _docker_pull(job, image, registry_mirror=None):
     """Pull a Docker image, streaming output to the compile job log.
+
+    Tries the configured mirror first, then the default registry. A slow or
+    broken mirror therefore cannot block the first compile.
 
     Returns:
         True if pull succeeded, False otherwise.
     """
+    candidates = []
     if registry_mirror:
-        pull_image = f"{registry_mirror}/{image}"
-        job.append_log(
-            f"Image '{image}' not found locally, pulling from mirror {registry_mirror}..."
-        )
-    else:
-        pull_image = image
-        job.append_log(f"Image '{image}' not found locally, pulling...")
+        candidates.append((f"{registry_mirror}/{image}", True))
+    candidates.append((image, False))
 
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "docker",
-            "pull",
-            pull_image,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-        job.proc = proc
+    for pull_image, via_mirror in candidates:
+        if job.is_cancelled:
+            return False
 
-        assert proc.stdout is not None
-        async for raw_line in proc.stdout:
-            if job.is_cancelled:
-                proc.kill()
-                await proc.wait()
-                return False
-            job.append_log(raw_line.decode("utf-8", errors="replace").rstrip("\n"))
-        await proc.wait()
+        if via_mirror:
+            job.append_log(
+                f"Image '{image}' not found locally, pulling from mirror {registry_mirror}..."
+            )
+        elif registry_mirror:
+            job.append_log(
+                f"Pull from mirror failed; retrying '{image}' from the default registry...",
+                level="warning",
+            )
+        else:
+            job.append_log(f"Image '{image}' not found locally, pulling...")
+
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "docker",
+                "pull",
+                pull_image,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            job.proc = proc
+
+            assert proc.stdout is not None
+            async for raw_line in proc.stdout:
+                if job.is_cancelled:
+                    proc.kill()
+                    await proc.wait()
+                    return False
+                job.append_log(raw_line.decode("utf-8", errors="replace").rstrip("\n"))
+            await proc.wait()
+        except Exception as e:
+            job.append_log(f"Pull error: {e}", level="error")
+            job.finish("error")
+            return False
 
         if job.is_cancelled:
             return False
 
-        if proc.returncode != 0:
-            job.append_log(f"Failed to pull image '{pull_image}'", level="error")
-            job.finish("error")
-            return False
+        if proc.returncode == 0:
+            if via_mirror:
+                await _retag_image(pull_image, image)
+                job.append_log(f"Retagged '{pull_image}' -> '{image}'")
+            job.append_log("Image ready.")
+            return True
 
-        if registry_mirror and pull_image != image:
-            retag = await asyncio.create_subprocess_exec(
-                "docker",
-                "tag",
-                pull_image,
-                image,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-            )
-            await asyncio.wait_for(retag.wait(), timeout=10)
-            rmi = await asyncio.create_subprocess_exec(
-                "docker",
-                "rmi",
-                pull_image,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-            )
-            await asyncio.wait_for(rmi.wait(), timeout=10)
-            job.append_log(f"Retagged '{pull_image}' -> '{image}'")
+        job.append_log(f"Failed to pull image '{pull_image}'", level="error")
 
-        job.append_log("Image ready.")
-        return True
-
-    except Exception as e:
-        job.append_log(f"Pull error: {e}", level="error")
-        job.finish("error")
-        return False
+    job.finish("error")
+    return False
 
 
 async def docker_pull_image(image, registry_mirror=None):
     """Pull a Docker image (standalone, not tied to a compile job).
 
+    Tries the configured mirror first, then the default registry.
+
     Returns:
         Tuple of (success: bool, message: str).
     """
+    candidates = []
     if registry_mirror:
-        pull_image = f"{registry_mirror}/{image}"
-    else:
-        pull_image = image
+        candidates.append((f"{registry_mirror}/{image}", True))
+    candidates.append((image, False))
 
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "docker",
-            "pull",
-            pull_image,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-        _pull_procs[image] = proc
-
-        assert proc.stdout is not None
-        output_lines = []
-        async for raw_line in proc.stdout:
-            output_lines.append(raw_line.decode("utf-8", errors="replace"))
-        await proc.wait()
-
-        _pull_procs.pop(image, None)
-
-        if proc.returncode != 0:
-            stderr = "".join(output_lines).strip()
-            if proc.returncode in (-9, -15):
-                return False, "Cancelled"
-            return False, stderr or "Pull failed"
-
-        if registry_mirror and pull_image != image:
-            retag = await asyncio.create_subprocess_exec(
+    last_error = "Pull failed"
+    for pull_image, via_mirror in candidates:
+        try:
+            proc = await asyncio.create_subprocess_exec(
                 "docker",
-                "tag",
+                "pull",
                 pull_image,
-                image,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
             )
-            await asyncio.wait_for(retag.wait(), timeout=10)
-            rmi = await asyncio.create_subprocess_exec(
-                "docker",
-                "rmi",
-                pull_image,
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-            )
-            await asyncio.wait_for(rmi.wait(), timeout=10)
+            _pull_procs[image] = proc
 
-        return True, "OK"
-    except asyncio.TimeoutError:
-        _pull_procs.pop(image, None)
-        return False, "Pull timed out"
-    except Exception as e:
-        _pull_procs.pop(image, None)
-        return False, str(e)
+            assert proc.stdout is not None
+            output_lines = []
+            async for raw_line in proc.stdout:
+                output_lines.append(raw_line.decode("utf-8", errors="replace"))
+            await proc.wait()
+
+            _pull_procs.pop(image, None)
+
+            if proc.returncode != 0:
+                if proc.returncode in (-9, -15):
+                    return False, "Cancelled"
+                last_error = "".join(output_lines).strip() or "Pull failed"
+                continue
+
+            if via_mirror:
+                await _retag_image(pull_image, image)
+
+            return True, "OK"
+        except asyncio.TimeoutError:
+            _pull_procs.pop(image, None)
+            last_error = "Pull timed out"
+        except Exception as e:
+            _pull_procs.pop(image, None)
+            last_error = str(e)
+
+    return False, last_error
 
 
 # Track standalone pull processes for cancellation
