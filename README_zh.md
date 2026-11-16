@@ -93,6 +93,9 @@ Tinyleaf **没有额外 Python 运行时依赖**，仅使用标准库。Web 编�
 
 ```text
 usage: tinyleaf [-h] [-V] [--projects-dir DIR] [--config-dir DIR]
+                [--browse-root DIR]
+                [--token TOKEN | --token-file FILE] [--allowed-host HOST]
+                [--read-only] [--insecure-no-auth]
                 [--docker | --no-docker] [--image IMAGE] [--port PORT]
                 [--host HOST] [--no-browser]
                 [project_path]
@@ -107,8 +110,14 @@ tinyleaf ~/papers/my-paper
 # 使用本机 latexmk，而不是 Docker。
 tinyleaf ~/papers/my-paper --no-docker
 
-# 在服务器上监听所有网卡。
-tinyleaf ~/papers/my-paper --host 0.0.0.0 --port 14159
+# 在服务器上监听所有网卡。非回环地址必须提供 token。
+printf '%s' "$(openssl rand -hex 24)" > ~/.tinyleaf-token
+chmod 600 ~/.tinyleaf-token
+tinyleaf ~/papers/my-paper --host 0.0.0.0 --port 14159 \
+    --token-file ~/.tinyleaf-token --allowed-host papers.example.com
+
+# 首次浏览器登录：打开一次 http://SERVER:14159/?token=THE_TOKEN
+# 脚本可发送：Authorization: Bearer THE_TOKEN
 
 # 打开多项目注册表。
 tinyleaf

@@ -116,6 +116,16 @@ def _resolve_browse_roots(explicit, project_path, projects_dir):
     return roots
 
 
+def _auth_policy_error(host: str, token: str, insecure_no_auth: bool) -> str | None:
+    """Return an error when a bind would expose an unauthenticated API."""
+    if _is_loopback(host) or token or insecure_no_auth:
+        return None
+    return (
+        f"refusing to bind to {host} without an API token. "
+        "Pass --token or set TINYLEAF_TOKEN, or pass --insecure-no-auth."
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="tinyleaf",
@@ -151,6 +161,31 @@ def main():
             "Directory the file browser may access (repeatable; default: $HOME, "
             "the active project, and --projects-dir)"
         ),
+    )
+    parser.add_argument(
+        "--token",
+        help="API token for non-loopback binds (default: TINYLEAF_TOKEN)",
+    )
+    parser.add_argument(
+        "--token-file",
+        metavar="FILE",
+        help="Read the API token from a file instead of the command line",
+    )
+    parser.add_argument(
+        "--allowed-host",
+        metavar="HOST",
+        action="append",
+        help="Additional Host header value to accept (repeatable)",
+    )
+    parser.add_argument(
+        "--read-only",
+        action="store_true",
+        help="Reject every mutating API request",
+    )
+    parser.add_argument(
+        "--insecure-no-auth",
+        action="store_true",
+        help="Allow a non-loopback bind without a token (not recommended)",
     )
     parser.add_argument(
         "--docker",
@@ -204,6 +239,25 @@ def main():
         sys.exit(1)
     if args.ssl_key and not os.path.isfile(args.ssl_key):
         print(f"Error: TLS private key not found: {args.ssl_key}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.token and args.token_file:
+        parser.error("--token and --token-file are mutually exclusive")
+    token = args.token or os.environ.get("TINYLEAF_TOKEN", "")
+    if args.token_file:
+        try:
+            with open(args.token_file, encoding="utf-8") as token_file:
+                token = token_file.read().strip()
+        except OSError as exc:
+            print(f"Error: cannot read --token-file: {exc}", file=sys.stderr)
+            sys.exit(1)
+        if not token:
+            print("Error: --token-file is empty", file=sys.stderr)
+            sys.exit(1)
+
+    policy_error = _auth_policy_error(args.host, token, args.insecure_no_auth)
+    if policy_error:
+        print(f"Error: {policy_error}", file=sys.stderr)
         sys.exit(1)
 
     # Validate
@@ -282,6 +336,9 @@ def main():
         "ssl_cert": args.ssl_cert,
         "ssl_key": args.ssl_key,
         "browse_roots": browse_roots,
+        "token": token,
+        "allowed_hosts": args.allowed_host or [],
+        "read_only": args.read_only,
     }
 
     scheme = "https" if args.ssl_cert else "http"
@@ -297,14 +354,18 @@ def main():
         print(f"  Config:   {config_dir}")
     if args.ssl_cert:
         print(f"  TLS:      {args.ssl_cert}")
+    if token:
+        print("  Auth:     bearer token or session cookie")
+    if args.read_only:
+        print("  Read-only: yes")
     print(f"  URL:      {url}")
 
     _check_port_available(args.host, args.port)
 
-    if not _is_loopback(args.host):
+    if not _is_loopback(args.host) and not token:
         print(
-            f"Warning: the API has no authentication. Binding to {args.host} "
-            "exposes project files and compile controls to the network.",
+            f"Warning: --insecure-no-auth is set. Binding to {args.host} "
+            "exposes project files and compile controls without authentication.",
             file=sys.stderr,
         )
 

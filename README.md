@@ -93,6 +93,9 @@ For compilation, choose one of:
 
 ```text
 usage: tinyleaf [-h] [-V] [--projects-dir DIR] [--config-dir DIR]
+                [--browse-root DIR]
+                [--token TOKEN | --token-file FILE] [--allowed-host HOST]
+                [--read-only] [--insecure-no-auth]
                 [--docker | --no-docker] [--image IMAGE] [--port PORT]
                 [--host HOST] [--no-browser]
                 [project_path]
@@ -107,8 +110,14 @@ tinyleaf ~/papers/my-paper
 # Use local latexmk instead of Docker.
 tinyleaf ~/papers/my-paper --no-docker
 
-# Bind to all interfaces on a server.
-tinyleaf ~/papers/my-paper --host 0.0.0.0 --port 14159
+# Bind to all interfaces on a server. Off loopback a token is required.
+printf '%s' "$(openssl rand -hex 24)" > ~/.tinyleaf-token
+chmod 600 ~/.tinyleaf-token
+tinyleaf ~/papers/my-paper --host 0.0.0.0 --port 14159 \
+    --token-file ~/.tinyleaf-token --allowed-host papers.example.com
+
+# First browser login: open http://SERVER:14159/?token=THE_TOKEN once.
+# Scripts can send: Authorization: Bearer THE_TOKEN
 
 # Start the multi-project registry view.
 tinyleaf

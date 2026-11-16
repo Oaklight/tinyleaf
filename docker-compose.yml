@@ -2,6 +2,10 @@
 # image (installed by the Dockerfile) and access to the host daemon through
 # the mounted socket. Compilation runs `docker run` through that socket, so
 # no separate TeX Live service is required.
+#
+# Binding to 0.0.0.0 requires a token. Export TINYLEAF_TOKEN before
+# `docker compose up`, and set TINYLEAF_ALLOWED_HOST to the hostname or IP
+# clients use (for example TINYLEAF_ALLOWED_HOST=papers.example.com).
 services:
   web:
     build: .
@@ -10,4 +14,13 @@ services:
     volumes:
       - ./projects:/data/projects
       - /var/run/docker.sock:/var/run/docker.sock
-    command: ["--projects-dir", "/data/projects", "--docker", "--host", "0.0.0.0"]
+    environment:
+      - TINYLEAF_TOKEN=${TINYLEAF_TOKEN:?set TINYLEAF_TOKEN before docker compose up}
+    command:
+      - "--projects-dir"
+      - "/data/projects"
+      - "--docker"
+      - "--host"
+      - "0.0.0.0"
+      - "--allowed-host"
+      - "${TINYLEAF_ALLOWED_HOST:-localhost}"

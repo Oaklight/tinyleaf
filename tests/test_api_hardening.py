@@ -13,6 +13,7 @@ from tinyleaf.server import APIError
 
 def _request(method="GET", path="/", headers=None, query_string=""):
     lowered = {key.lower(): value for key, value in (headers or {}).items()}
+    lowered.setdefault("host", "127.0.0.1:14159")
     return Request(method, path, query_string, lowered, b"", ("127.0.0.1", 1234), server.app)
 
 
