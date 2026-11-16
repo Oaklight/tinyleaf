@@ -87,6 +87,35 @@ def _is_loopback(host: str) -> bool:
         return host == "localhost"
 
 
+def _resolve_browse_roots(explicit, project_path, projects_dir):
+    """Resolve the directories the file browser may access.
+
+    Explicit ``--browse-root`` values replace the defaults. Otherwise the
+    browser may access the home directory plus the active project (single
+    mode) and the legacy ``--projects-dir``. Those are paths tinyleaf already
+    serves, so the Open Folder dialog can reach them without an extra flag.
+
+    Args:
+        explicit: Values from ``--browse-root`` (None or a list).
+        project_path: Active project in single mode, else None.
+        projects_dir: Legacy projects directory, else None.
+
+    Returns:
+        Absolute directory paths, in priority order.
+    """
+    if explicit:
+        return [os.path.abspath(os.path.expanduser(path)) for path in explicit]
+
+    roots = [os.path.abspath(os.path.expanduser("~"))]
+    for extra in (project_path, projects_dir):
+        if not extra:
+            continue
+        path = os.path.abspath(os.path.expanduser(extra))
+        if os.path.isdir(path) and path not in roots:
+            roots.append(path)
+    return roots
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="tinyleaf",
@@ -118,7 +147,10 @@ def main():
         "--browse-root",
         metavar="DIR",
         action="append",
-        help="Directory the file browser may access (repeatable; default: $HOME)",
+        help=(
+            "Directory the file browser may access (repeatable; default: $HOME, "
+            "the active project, and --projects-dir)"
+        ),
     )
     parser.add_argument(
         "--docker",
@@ -233,10 +265,7 @@ def main():
         print("Error: --docker specified but 'docker' not found in PATH", file=sys.stderr)
         sys.exit(1)
 
-    browse_roots = [
-        os.path.abspath(os.path.expanduser(path))
-        for path in (args.browse_root or [os.path.expanduser("~")])
-    ]
+    browse_roots = _resolve_browse_roots(args.browse_root, project_path, args.projects_dir)
     for root in browse_roots:
         if not os.path.isdir(root):
             print(f"Error: --browse-root is not a directory: {root}", file=sys.stderr)
