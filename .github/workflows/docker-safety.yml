@@ -5,11 +5,13 @@ on:
     paths:
       - "**/Dockerfile*"
       - "**/*.Dockerfile"
+      - "**/docker-compose*.yml"
       - ".dockerignore"
   pull_request:
     paths:
       - "**/Dockerfile*"
       - "**/*.Dockerfile"
+      - "**/docker-compose*.yml"
       - ".dockerignore"
 
 jobs:
@@ -43,4 +45,7 @@ jobs:
             echo "::warning::Broad COPY/ADD found (relies on .dockerignore for safety):"
             echo "$FOUND"
           fi
+
+      - name: Validate Docker Compose config
+        run: docker compose config --quiet
 

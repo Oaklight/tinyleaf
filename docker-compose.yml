@@ -1,3 +1,7 @@
+# The web service runs with --docker. It needs the Docker CLI inside the
+# image (installed by the Dockerfile) and access to the host daemon through
+# the mounted socket. Compilation runs `docker run` through that socket, so
+# no separate TeX Live service is required.
 services:
   web:
     build: .
@@ -7,12 +11,3 @@ services:
       - ./projects:/data/projects
       - /var/run/docker.sock:/var/run/docker.sock
     command: ["--projects-dir", "/data/projects", "--docker", "--host", "0.0.0.0"]
-    depends_on:
-      - texlive
-
-  texlive:
-    image: oaklight/texlive:latest
-    container_name: texlive-compiler
-    volumes:
-      - ./projects:/data/projects
-    command: ["sleep", "infinity"]
