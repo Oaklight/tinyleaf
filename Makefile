@@ -26,7 +26,7 @@ clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 
 test:
-	python -m pytest tests/ -v
+	PYTHONPATH=src python -m pytest tests/ -v
 
 # ──────────────────────────────────────────────
 # Nuitka binary builds
