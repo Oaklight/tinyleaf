@@ -4,6 +4,46 @@ import os
 import re
 import subprocess
 
+# LaTeX build products. Kept here so the git view, file clean, and export
+# agree on what counts as an artifact.
+ARTIFACT_EXTENSIONS = frozenset(
+    {
+        ".aux",
+        ".bbl",
+        ".bcf",
+        ".blg",
+        ".fdb_latexmk",
+        ".fls",
+        ".log",
+        ".out",
+        ".run.xml",
+        ".synctex.gz",
+        ".toc",
+        ".lof",
+        ".lot",
+        ".nav",
+        ".snm",
+        ".vrb",
+        ".xdv",
+    }
+)
+
+_COMPOUND_ARTIFACT_SUFFIXES = (".synctex.gz", ".run.xml")
+
+
+def artifact_extension(filename):
+    """Return the artifact extension token for a filename, else its suffix."""
+    lower = filename.lower()
+    for suffix in _COMPOUND_ARTIFACT_SUFFIXES:
+        if lower.endswith(suffix):
+            return suffix
+    return os.path.splitext(lower)[1]
+
+
+def is_build_artifact(filename):
+    """Return True when the path looks like a LaTeX build product."""
+    return artifact_extension(filename) in ARTIFACT_EXTENSIONS
+
 
 LOCAL_TIMEOUT = 30
 NETWORK_TIMEOUT = 300
@@ -192,8 +232,12 @@ def stash_pop(project_dir):
     return {"success": True, "message": (out + err).strip()}
 
 
-def status(project_dir):
+def status(project_dir, include_artifacts=False):
     """Get git status as structured data.
+
+    Args:
+        project_dir: Project directory.
+        include_artifacts: Include LaTeX build products in ``files``.
 
     Returns:
         Dict with branch, files (list of {path, status}), ahead, behind.
@@ -225,6 +269,8 @@ def status(project_dir):
                 continue
             status_code = line[:2].strip()
             filepath = line[3:]
+            if not include_artifacts and is_build_artifact(filepath):
+                continue
             result["files"].append({"path": filepath, "status": status_code})
 
     return result
