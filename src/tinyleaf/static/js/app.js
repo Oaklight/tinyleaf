@@ -275,6 +275,10 @@ const I18N = {
     build_artifacts: "Build artifacts",
     sources_only: "Sources only",
     commit_artifacts_blocked: "Refusing to commit build artifacts",
+    stop_tracking_artifacts: "Stop tracking build artifacts",
+    ignore_confirm: "Add {added} .gitignore patterns and stop tracking {removed} files.",
+    ignore_done: "Updated .gitignore; stopped tracking {removed} files",
+    ignore_none: "Nothing to change",
     sort_last_opened: "Last opened",
     sort_name: "Name",
     open: "Open",
@@ -554,6 +558,10 @@ const I18N = {
     build_artifacts: "构建产物",
     sources_only: "仅选源文件",
     commit_artifacts_blocked: "拒绝提交构建产物",
+    stop_tracking_artifacts: "停止跟踪构建产物",
+    ignore_confirm: "将添加 {added} 条 .gitignore 规则，并停止跟踪 {removed} 个文件。",
+    ignore_done: "已更新 .gitignore，停止跟踪 {removed} 个文件",
+    ignore_none: "无需更改",
     sort_last_opened: "最近打开",
     sort_name: "名称",
     open: "打开",
@@ -1192,6 +1200,7 @@ function setupResponsiveToolbar() {
     document.getElementById("btn-save"),
   ].filter(Boolean);
   const projectItems = [
+    document.getElementById("project-sort"),
     document.getElementById("btn-open-folder"),
     document.getElementById("btn-view-grid"),
     document.getElementById("btn-view-list"),
@@ -1212,10 +1221,12 @@ function setupResponsiveToolbar() {
     compileBtn.after(toolbarItems[2]);
     toolbarItems[2].after(toolbarItems[3]);
     projectToolbar.appendChild(toolbarItems[4]);
-    // Restore project toolbar: search, open folder, new project, grid, list.
-    projectListToolbar.insertBefore(projectItems[0], newProject);
-    projectMore.before(projectItems[1]);
+    // Restore project toolbar: search, sort, open folder, new project,
+    // grid, list. Insert open-folder first so sort can sit before it.
+    projectListToolbar.insertBefore(projectItems[1], newProject);
+    projectListToolbar.insertBefore(projectItems[0], projectItems[1]);
     projectMore.before(projectItems[2]);
+    projectMore.before(projectItems[3]);
     closeOverflowMenus();
   }
 
@@ -2058,6 +2069,7 @@ const projectSortSelect = document.getElementById("project-sort");
 if (projectSortSelect) {
   projectSortSelect.onchange = (e) => {
     localStorage.setItem("tinyleaf-project-sort", e.target.value);
+    closeOverflowMenus();
     showProjectList();
   };
 }
@@ -3000,7 +3012,8 @@ function showToast(message, level = "info") {
   if (!host) {
     host = document.createElement("div");
     host.id = "toast-container";
-    host.setAttribute("aria-live", "polite");
+    // Visual only: #status-left already announces compile results, so a live
+    // toast would repeat the same message to screen readers.
     document.body.appendChild(host);
   }
   const toast = document.createElement("div");
@@ -4200,6 +4213,64 @@ function _gitArtifactGroup(artifacts) {
     else setOpen(false);
   };
   return group;
+}
+
+/**
+ * Offer to add the artifact patterns to .gitignore and stop tracking any
+ * tracked artifacts. Runs a dry run first and shows exactly what would change.
+ */
+async function ignoreArtifacts() {
+  if (!S.projectName) return;
+  let dry;
+  try {
+    dry = await api("POST",
+      `/api/projects/${enc(S.projectName)}/git/ignore-artifacts`,
+      { dry_run: true, untrack: true });
+  } catch (err) {
+    setStatus(err.message, "error");
+    return;
+  }
+  const added = dry.gitignore?.added || [];
+  const removed = dry.removed_from_index || [];
+  if (added.length === 0 && removed.length === 0) {
+    setStatus(t("ignore_none"), "info");
+    showToast(t("ignore_none"), "info");
+    return;
+  }
+  const preview = (items) => {
+    const shown = items.slice(0, 12).map((item) => `<div>${escapeHtml(item)}</div>`).join("");
+    const more = items.length > 12 ? `<div>…</div>` : "";
+    return `<div class="ignore-preview">${shown}${more}</div>`;
+  };
+  const summary = t("ignore_confirm")
+    .replace("{added}", String(added.length))
+    .replace("{removed}", String(removed.length));
+  showModal(t("stop_tracking_artifacts"),
+    `<p style="margin-bottom:10px">${escapeHtml(summary)}</p>`
+    + (added.length ? preview(added) : "")
+    + (removed.length ? preview(removed) : ""),
+    [
+      { label: t("cancel"), action: closeModal },
+      { label: t("apply"), primary: true, action: async () => {
+        try {
+          const r = await api("POST",
+            `/api/projects/${enc(S.projectName)}/git/ignore-artifacts`,
+            { dry_run: false, untrack: true });
+          closeModal();
+          const count = (r.removed_from_index || []).length;
+          const msg = t("ignore_done").replace("{removed}", String(count));
+          if (r.failed?.length) {
+            setStatus(`${msg} · ${r.failed.length} failed`, "warning");
+          } else {
+            setStatus(msg, "success");
+            showToast(msg, "success");
+          }
+          refreshGit();
+        } catch (err) {
+          setStatus(err.message, "error");
+        }
+      } },
+    ]);
 }
 
 /** Uncheck the artifact group and re-check every source row. */
@@ -5483,6 +5554,9 @@ function setupKeybindings() {
 // ══════════════════════════════════════════
 // Wire up buttons
 // ══════════════════════════════════════════
+// Mobile back affordance: the wordmark is hidden at <=900px, so phones need
+// an explicit way back to the project list.
+document.getElementById("btn-home-mobile").onclick = showProjectList;
 document.getElementById("btn-home").onclick = () => {
   if (S.mode === "multi") {
     // Flush any dirty tabs synchronously (best effort)
@@ -5524,6 +5598,8 @@ document.getElementById("auto-compile-toggle").onchange = (e) => {
 };
 document.getElementById("btn-git-commit-selected").onclick = doCommit;
 document.getElementById("btn-git-push").onclick = doPush;
+const ignoreArtifactsBtn = document.getElementById("btn-git-ignore-artifacts");
+if (ignoreArtifactsBtn) ignoreArtifactsBtn.onclick = ignoreArtifacts;
 const selectSourcesBtn = document.getElementById("btn-git-select-sources");
 if (selectSourcesBtn) selectSourcesBtn.onclick = selectGitSourcesOnly;
 const artifactToggleBtn = document.getElementById("btn-artifact-toggle");

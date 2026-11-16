@@ -15,6 +15,7 @@
   <!-- Toolbar -->
   <div id="toolbar">
     <span class="toolbar-brand" id="btn-home" role="button" tabindex="0" aria-label="Projects" data-i18n-label="projects" style="cursor:pointer"><img src="/static/assets/brand-wordmark-light.svg" alt="Tinyleaf" class="toolbar-logo toolbar-logo-wordmark brand-wordmark"></span>
+    <button class="icon-btn mobile-home-btn" id="btn-home-mobile" title="Projects" data-i18n-title="projects" aria-label="Projects" data-testid="mobile-home"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
     <span id="toolbar-project-name" style="display:none;align-items:center;gap:8px">
     <span class="toolbar-sep"></span>
     <span id="project-name" style="font-size: 13px; color: var(--text-dim);">&mdash;</span>
@@ -35,7 +36,7 @@
       <span data-i18n="auto_compile">Auto</span>
     </label>
     <button id="btn-compile" class="primary" data-i18n="compile" data-testid="compile-button">Compile</button>
-    <span id="compile-badge" class="compile-badge" role="status" aria-live="polite" data-testid="compile-badge" hidden></span>
+    <span id="compile-badge" class="compile-badge" data-testid="compile-badge" hidden></span>
     <button id="btn-clean" class="sm danger" data-i18n="clean" title="Remove build artifacts" data-i18n-title="clean_title" data-testid="clean-button">Clean</button>
     <button id="btn-export-zip" class="sm" data-i18n="export_zip" title="Export project as ZIP" data-i18n-title="export_zip_title" data-testid="export-button">Export ZIP</button>
     <span class="toolbar-sep"></span>
@@ -134,6 +135,7 @@
                 <button class="sm primary" id="btn-git-commit-selected" data-i18n="commit">Commit</button>
                 <button class="sm" id="btn-git-push" data-i18n="push">Push</button>
               </div>
+              <button class="sm git-ignore-btn" id="btn-git-ignore-artifacts" data-i18n="stop_tracking_artifacts" data-testid="git-ignore-artifacts">Stop tracking build artifacts</button>
             </div>
             </div>
             <div id="git-history-panel" role="tabpanel" aria-labelledby="git-tab-history" style="display:none">

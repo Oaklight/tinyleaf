@@ -2002,3 +2002,38 @@ textarea:focus-visible,
   #app.project-list-mode #toolbar { display: none; }
   #project-sort { max-width: 108px; }
 }
+
+/* The project sort select lives inside the overflow menu on mobile. */
+#project-more-menu #project-sort { width: 100%; max-width: none; }
+
+/* Mobile back-to-projects button; the wordmark is hidden at this width. */
+.mobile-home-btn { display: none; }
+@media (max-width: 900px) {
+  .mobile-home-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  #toolbar-project #main-file-select { max-width: 84px; }
+}
+
+.git-ignore-btn {
+  width: 100%;
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.ignore-preview {
+  max-height: 120px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
