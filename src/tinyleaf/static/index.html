@@ -35,6 +35,7 @@
       <span data-i18n="auto_compile">Auto</span>
     </label>
     <button id="btn-compile" class="primary" data-i18n="compile" data-testid="compile-button">Compile</button>
+    <span id="compile-badge" class="compile-badge" role="status" aria-live="polite" data-testid="compile-badge" hidden></span>
     <button id="btn-clean" class="sm danger" data-i18n="clean" title="Remove build artifacts" data-i18n-title="clean_title" data-testid="clean-button">Clean</button>
     <button id="btn-export-zip" class="sm" data-i18n="export_zip" title="Export project as ZIP" data-i18n-title="export_zip_title" data-testid="export-button">Export ZIP</button>
     <span class="toolbar-sep"></span>
@@ -50,7 +51,11 @@
       <div class="project-header">
         <h1 data-i18n="projects">Projects</h1>
         <div class="project-toolbar">
-          <input type="text" id="project-search" data-i18n-placeholder="search_projects" placeholder="Search projects..." aria-label="Search projects" data-testid="project-search">
+          <input type="text" id="project-search" data-i18n-placeholder="search_projects" data-i18n-label="search_projects" placeholder="Search projects..." aria-label="Search projects" data-testid="project-search">
+          <select id="project-sort" title="Sort projects" data-i18n-title="sort_projects" aria-label="Sort projects" data-testid="project-sort">
+            <option value="last_opened" data-i18n="sort_last_opened">Last opened</option>
+            <option value="name" data-i18n="sort_name">Name</option>
+          </select>
           <button class="sm" id="btn-open-folder" style="font-size:12px" data-testid="open-folder"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2" style="vertical-align:-2px"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z"/></svg> <span data-i18n="open_folder">Open Folder</span></button>
           <button class="sm primary" id="btn-new-project" style="font-size:12px" data-testid="new-project"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2" style="vertical-align:-2px"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> <span data-i18n="new_project">New Project</span></button>
           <button class="view-toggle active" id="btn-view-grid" title="Grid view" data-i18n-title="grid_view" aria-label="Grid view" data-testid="view-grid"><svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
@@ -83,6 +88,7 @@
             <div class="sidebar-header">
               <span data-i18n="files">Files</span>
               <div class="sidebar-actions">
+                <button class="icon-btn artifact-toggle-btn" id="btn-artifact-toggle" title="Show build artifacts" aria-label="Show build artifacts" aria-pressed="false" data-testid="artifact-toggle" hidden><svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><span class="artifact-count" id="artifact-count" data-testid="artifact-count" hidden></span></button>
                 <button class="icon-btn" id="btn-collapse-all" title="Collapse all" data-i18n-title="collapse_all"><svg viewBox="0 0 24 24"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
                 <button class="icon-btn" id="btn-search-file" title="Search files" data-i18n-title="search_files_title"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
                 <button class="icon-btn" id="btn-upload-file" title="Upload file" data-i18n-title="upload_file_title"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></button>
@@ -91,7 +97,7 @@
               </div>
             </div>
             <div id="file-search-box">
-              <input type="text" id="file-search-input" placeholder="Search files..." data-i18n="search_files">
+              <input type="text" id="file-search-input" placeholder="Search files..." data-i18n="search_files" data-i18n-label="search_files">
             </div>
             <div id="file-tree" data-testid="file-tree"></div>
           </div>
@@ -124,6 +130,7 @@
             <div id="git-commit-area">
               <textarea id="git-commit-msg" placeholder="Commit message..." data-i18n-placeholder="commit_message" rows="2"></textarea>
               <div id="git-commit-btns">
+                <button class="sm" id="btn-git-select-sources" data-i18n="sources_only" data-testid="git-select-sources">Sources only</button>
                 <button class="sm primary" id="btn-git-commit-selected" data-i18n="commit">Commit</button>
                 <button class="sm" id="btn-git-push" data-i18n="push">Push</button>
               </div>
@@ -141,7 +148,7 @@
           </div>
           <div id="sidebar-search" role="tabpanel" aria-labelledby="tab-search">
             <div id="search-input-area">
-              <input type="text" id="project-search-input" data-i18n-placeholder="search_in_project_placeholder" placeholder="Search in project...">
+              <input type="text" id="project-search-input" data-i18n-placeholder="search_in_project_placeholder" data-i18n-label="search_in_project_placeholder" placeholder="Search in project...">
               <div id="search-options">
                 <label id="search-case-toggle"><input type="checkbox" id="search-case-cb"> <span>Aa</span></label>
               </div>
@@ -208,7 +215,7 @@
               <button class="sm" id="btn-pdf-search" title="Search in PDF" data-i18n-title="pdf_search_title"><svg viewBox="0 0 24 24" style="width:14px;height:14px;vertical-align:-2px" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></button>
             </div>
             <div id="pdf-search-bar" class="hidden">
-              <input id="pdf-search-input" type="text" placeholder="Search in PDF..." data-i18n-placeholder="pdf_search_placeholder">
+              <input id="pdf-search-input" type="text" placeholder="Search in PDF..." data-i18n-placeholder="pdf_search_placeholder" data-i18n-label="pdf_search_placeholder">
               <span id="pdf-search-count"></span>
               <button class="sm" id="btn-pdf-search-prev" title="Previous match" data-i18n-title="pdf_search_prev">▲</button>
               <button class="sm" id="btn-pdf-search-next" title="Next match" data-i18n-title="pdf_search_next">▼</button>
@@ -326,7 +333,7 @@
     <div class="settings-popup-item settings-collapsible" id="registry-mirror-row">
       <label data-i18n="registry_mirror">Registry Mirror</label>
       <input id="registry-mirror-input" type="text" placeholder="docker.1ms.run" data-testid="registry-mirror-input">
-      <button class="sm" id="btn-registry-mirror-apply" data-i18n="apply" aria-label="Apply registry mirror" data-testid="registry-mirror-apply">Apply</button>
+      <button class="sm" id="btn-registry-mirror-apply" data-i18n="apply" data-testid="registry-mirror-apply">Apply</button>
     </div>
     <div class="settings-divider"></div>
     <!-- Advanced -->
