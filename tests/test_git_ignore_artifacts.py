@@ -134,3 +134,27 @@ class TestHandler:
         assert result["gitignore"]["created"] is True
         assert result["removed_from_index"] == []
         assert not (repo / ".gitignore").exists()
+
+    @pytest.mark.parametrize(
+        "body",
+        [
+            {"dry_run": "false"},
+            {"untrack": "true"},
+            {"dry_run": "1"},
+            {"untrack": 1},
+            {"dry_run": 0},
+        ],
+    )
+    def test_rejects_non_boolean_flags(self, repo, body):
+        with pytest.raises(APIError) as excinfo:
+            handlers.handle_git_ignore_artifacts(body, _single_config(repo), "project")
+
+        assert excinfo.value.status_code == 400
+        assert excinfo.value.code == "bad_request"
+
+    def test_accepts_real_booleans(self, repo):
+        result = handlers.handle_git_ignore_artifacts(
+            {"dry_run": True, "untrack": False}, _single_config(repo), "project"
+        )
+
+        assert result["dry_run"] is True

@@ -1382,11 +1382,11 @@ def handle_git_ignore_artifacts(body, config, name):
         raise _api_error(400, "Request body must be a JSON object", "bad_request")
     if not git_ops.has_git(project_dir):
         raise _api_error(400, "Not a git repository", "not_a_git_repository")
-    return git_ops.ignore_build_artifacts(
-        project_dir,
-        dry_run=bool(body.get("dry_run", False)),
-        untrack=bool(body.get("untrack", True)),
-    )
+    dry_run = body.get("dry_run", False)
+    untrack = body.get("untrack", True)
+    if not isinstance(dry_run, bool) or not isinstance(untrack, bool):
+        raise _api_error(400, "dry_run and untrack must be booleans", "bad_request")
+    return git_ops.ignore_build_artifacts(project_dir, dry_run=dry_run, untrack=untrack)
 
 
 def handle_git_push(config, name):
