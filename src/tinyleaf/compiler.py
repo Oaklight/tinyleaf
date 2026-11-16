@@ -494,6 +494,21 @@ def cancel_docker_pull(image):
     return False
 
 
+def shutdown_all():
+    """Cancel every running compile job and image pull.
+
+    Registered as a server shutdown hook so child processes do not outlive
+    the HTTP server (zerodep httpserver ``on_shutdown`` signal).
+    """
+    for job in list(_jobs.values()):
+        if not job.is_done:
+            job.cancel()
+    for image in list(_pull_procs):
+        proc = _pull_procs.pop(image, None)
+        if proc is not None and proc.returncode is None:
+            proc.kill()
+
+
 async def docker_remove_image(image):
     """Remove a local Docker image.
 

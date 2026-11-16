@@ -1,0 +1,26 @@
+{
+  "generated_by": "zerodep 2026.10.24",
+  "lock_version": 1,
+  "modules": {
+    "httpserver": {
+      "files": {
+        "httpserver.py": "8f2d76e03801a7638e09116f44bddc492391baa7837a926240c3bd30f7a83130"
+      },
+      "requested": true,
+      "upstream_hash": "309a3fd37d99bc934ac6d589bf7ec0c7a6171b0bdc13da51fa2420ce78fcf472",
+      "version": "0.7.2"
+    },
+    "synctex": {
+      "files": {
+        "synctex.py": "e1651e293044331686c32c96e8bbae0a797c54e30fa07ec5976b075fc2172dff"
+      },
+      "requested": true,
+      "upstream_hash": "2373a0036723d65ddb14deb3aec0d0fa1c9038264e25e3b8c5fd015e7b2e2ff2",
+      "version": "0.2.0"
+    }
+  },
+  "source": {
+    "ref": "v2026.11.11",
+    "repo": "Oaklight/zerodep"
+  }
+}

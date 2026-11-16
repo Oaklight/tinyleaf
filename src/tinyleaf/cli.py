@@ -131,12 +131,32 @@ def main():
         action="store_true",
         help="Don't auto-open browser on start",
     )
+    parser.add_argument(
+        "--ssl-cert",
+        metavar="FILE",
+        help="TLS certificate file; enables HTTPS",
+    )
+    parser.add_argument(
+        "--ssl-key",
+        metavar="FILE",
+        help="TLS private key file (optional if the certificate file contains it)",
+    )
 
     args = parser.parse_args()
 
     if args.version:
         _print_version()
         sys.exit(0)
+
+    # Validate TLS options
+    if args.ssl_key and not args.ssl_cert:
+        parser.error("--ssl-key requires --ssl-cert")
+    if args.ssl_cert and not os.path.isfile(args.ssl_cert):
+        print(f"Error: TLS certificate not found: {args.ssl_cert}", file=sys.stderr)
+        sys.exit(1)
+    if args.ssl_key and not os.path.isfile(args.ssl_key):
+        print(f"Error: TLS private key not found: {args.ssl_key}", file=sys.stderr)
+        sys.exit(1)
 
     # Validate
     if args.project_path and args.projects_dir:
@@ -205,9 +225,12 @@ def main():
         "docker_image": args.image,
         "host": args.host,
         "port": args.port,
+        "ssl_cert": args.ssl_cert,
+        "ssl_key": args.ssl_key,
     }
 
-    url = f"http://{args.host}:{args.port}"
+    scheme = "https" if args.ssl_cert else "http"
+    url = f"{scheme}://{args.host}:{args.port}"
     print(f"Starting tinyleaf ({mode} mode)")
     if use_docker:
         print(f"  Compiler: Docker ({args.image})")
@@ -217,6 +240,8 @@ def main():
         print(f"  Project:  {project_path}")
     else:
         print(f"  Config:   {config_dir}")
+    if args.ssl_cert:
+        print(f"  TLS:      {args.ssl_cert}")
     print(f"  URL:      {url}")
 
     _check_port_available(args.host, args.port)
