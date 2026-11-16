@@ -383,7 +383,8 @@ def show_commit(project_dir, commit_hash):
         return ""
     if not re.match(r"^[0-9a-fA-F]{4,40}$", commit_hash):
         return ""
-    rc, out, _ = _run_git(project_dir, "show", "--format=", "--patch", "--", commit_hash)
+    # The revision must precede the path separator; otherwise it is treated as a path.
+    rc, out, _ = _run_git(project_dir, "show", "--format=", "--patch", commit_hash, "--")
     return out if rc == 0 else ""
 
 
