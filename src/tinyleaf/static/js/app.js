@@ -253,6 +253,7 @@ const I18N = {
     quick_open_hint_close: "close",
     quick_open_actions_placeholder: "Type an action…",
     quick_open_no_actions: "No matching actions",
+    quick_open_no_project: "Open a project first",
     quick_open_actions_hint: "> actions",
     action_switch_project: "Switch to {name}",
     action_toggle_pdf: "Toggle PDF pane",
@@ -564,6 +565,7 @@ const I18N = {
     quick_open_hint_close: "关闭",
     quick_open_actions_placeholder: "输入操作…",
     quick_open_no_actions: "没有匹配的操作",
+    quick_open_no_project: "请先打开项目",
     quick_open_actions_hint: "> 操作",
     action_switch_project: "切换到 {name}",
     action_toggle_pdf: "切换 PDF 面板",
@@ -2079,6 +2081,9 @@ async function showProjectList() {
   localStorage.removeItem("tinyleaf-project");
   clearTimeout(_deepLinkTimer);
   clearDeepLink();
+  // Drop the previous project's file list so Ctrl+P cannot offer stale files.
+  S.files = [];
+  S.fileTree = [];
   document.getElementById("app").classList.add("project-list-mode");
   document.getElementById("project-list-view").style.display = "block";
   document.getElementById("editor-view").style.display = "none";
@@ -2338,6 +2343,9 @@ async function navigateDir(containerId, path) {
 // Open Project
 // ══════════════════════════════════════════
 async function openProject(name) {
+  // About to close every tab: save any dirty ones first, whether this is a
+  // project switch or a reopen of the same project from the list.
+  if (S.projectName) flushDirtyTabs();
   // Clear any tabs from a previous project before switching
   if (S.tabs.length) closeAllTabs();
   S.modified.clear();
@@ -2845,6 +2853,7 @@ function latexCompletionSource(context) {
 // Open `filePath` as a tab. If already open, just focuses it (no re-fetch).
 // PDFs / images / other binaries are routed to preview, not the editor.
 async function openFile(filePath) {
+  if (!S.projectName) return;
   // PDF files: load in preview panel instead of editor
   if (filePath.endsWith(".pdf")) {
     const url = `/api/projects/${enc(S.projectName)}/output/${enc(filePath)}`;
@@ -2945,7 +2954,11 @@ async function openFile(filePath) {
   // Keep the deep link's line in step with scrolling, without racing cursor
   // updates (600 ms vs 400 ms).
   view.scrollDOM.addEventListener("scroll", () => {
-    if (S.activeTab === filePath) scheduleDeepLinkUpdate(true, 600);
+    if (S.activeTab !== filePath) return;
+    // A deep-link jump scrolls programmatically; do not let that rewrite the
+    // hash to the viewport top before the user scrolls.
+    if (Date.now() < (S._deepLinkJumpUntil || 0)) return;
+    scheduleDeepLinkUpdate(true, 600);
   }, { passive: true });
   if (!S.tabs.includes(filePath)) S.tabs.push(filePath);
   switchTab(filePath);
@@ -3941,6 +3954,9 @@ async function openFileAtLine(filePath, lineNum) {
   // PDFs and images open in the preview pane and keep the previous editor
   // active; only jump when the requested file is the active editor tab.
   if (S.currentFile === filePath && S.editorView) {
+    // Ignore the scroll events produced by this jump; the hash already points
+    // at the requested line.
+    S._deepLinkJumpUntil = Date.now() + 1200;
     const line = S.editorView.state.doc.line(Math.min(lineNum, S.editorView.state.doc.lines));
     S.editorView.dispatch({
       selection: { anchor: line.from },
@@ -5654,7 +5670,14 @@ function quickOpenActions() {
   if (S.projectName) {
     actions.push({
       label: t("action_toggle_pdf"),
-      run: () => setLayout(S.layoutMode === "pdf" ? "split" : "pdf"),
+      run: () => {
+        // On mobile the layout switcher is desktop-only; toggle the pane.
+        if (MOBILE_QUERY.matches) {
+          setMobilePane(S.mobilePane === "pdf" ? "editor" : "pdf");
+        } else {
+          setLayout(S.layoutMode === "pdf" ? "split" : "pdf");
+        }
+      },
     });
     actions.push({ label: t("action_toggle_log"), run: () => toggleLog() });
     actions.push({ label: t("action_compile"), run: () => compile() });
@@ -5714,7 +5737,10 @@ function updateQuickOpenAria() {
 function renderQuickOpenResults() {
   const container = document.getElementById("quick-open-results");
   if (!QO.matches.length) {
-    const msg = QO.mode === "actions" ? t("quick_open_no_actions") : t("quick_open_no_results");
+    let msg;
+    if (QO.mode === "actions") msg = t("quick_open_no_actions");
+    else if (!S.projectName) msg = t("quick_open_no_project");
+    else msg = t("quick_open_no_results");
     container.innerHTML = `<div class="qo-empty">${msg}</div>`;
     updateQuickOpenAria();
     return;
@@ -5977,22 +6003,27 @@ function setupKeybindings() {
 // ══════════════════════════════════════════
 // Wire up buttons
 // ══════════════════════════════════════════
+/** Best-effort synchronous save of every dirty tab before leaving a project. */
+function flushDirtyTabs() {
+  if (!S.projectName) return;
+  for (const path of S.tabs) {
+    if (S.modified.has(path)) {
+      const entry = S.editors.get(path);
+      if (entry && entry.view) {
+        const content = entry.view.state.doc.toString();
+        api("PUT", `/api/projects/${enc(S.projectName)}/files/${enc(path)}`, { content }).catch(() => {});
+      }
+    }
+  }
+}
+
 /**
  * Return to the project list. In multi mode, flush every dirty tab first so
  * an edit made inside the autosave window is not lost.
  */
 function goHome() {
   if (S.mode === "multi") {
-    // Flush any dirty tabs synchronously (best effort)
-    for (const path of S.tabs) {
-      if (S.modified.has(path)) {
-        const entry = S.editors.get(path);
-        if (entry && entry.view) {
-          const content = entry.view.state.doc.toString();
-          api("PUT", `/api/projects/${enc(S.projectName)}/files/${enc(path)}`, { content }).catch(() => {});
-        }
-      }
-    }
+    flushDirtyTabs();
     closeAllTabs();
     S.modified.clear();
     S.projectName = null;
