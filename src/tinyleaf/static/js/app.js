@@ -1267,15 +1267,27 @@ async function loadDockerImages(filterOnly) {
     const images = _allDockerImages.filter(img =>
       showDebian || !img.name.startsWith("debian")
     );
+
+    // Keep an explicitly configured image selectable when it is not a known
+    // tag (custom --image) or is hidden by the Debian filter. Only fall back
+    // to the first known tag when no image is configured at all.
+    const configured = S.dockerImage || "";
+    if (configured && !images.some(img => img.tag === configured)) {
+      const known = _allDockerImages.some(img => img.tag === configured);
+      const opt = document.createElement("option");
+      opt.value = configured;
+      opt.textContent = known ? configured : `${configured} (custom)`;
+      sel.appendChild(opt);
+    }
+
     for (const img of images) {
       const opt = document.createElement("option");
       opt.value = img.tag;
       opt.textContent = img.local ? `${img.name} ✓` : img.name;
       sel.appendChild(opt);
     }
-    const match = images.find(i => i.tag === S.dockerImage);
-    if (match) {
-      sel.value = match.tag;
+    if (configured) {
+      sel.value = configured;
     } else if (images.length > 0) {
       sel.value = images[0].tag;
       S.dockerImage = images[0].tag;
@@ -1827,7 +1839,8 @@ async function openProject(name) {
   }
   if (config.docker_image) {
     S.dockerImage = config.docker_image;
-    document.getElementById("docker-image-select").value = S.dockerImage;
+    // Rebuild the option list so a custom project image is selectable too.
+    await loadDockerImages(true);
   }
 
   await refreshFiles();
