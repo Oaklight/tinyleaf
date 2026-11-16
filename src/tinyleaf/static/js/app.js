@@ -646,10 +646,7 @@ function renderThemeOptions() {
     const optgroup = document.createElement("optgroup");
     optgroup.label = group.label;
     for (const name of group.names) {
-      const opt = document.createElement("option");
-      opt.value = name;
-      opt.textContent = t(THEME_LABEL_KEYS[name]);
-      optgroup.appendChild(opt);
+      addOption(optgroup, name, t(THEME_LABEL_KEYS[name]));
     }
     sel.appendChild(optgroup);
   }
@@ -666,10 +663,7 @@ function renderHighlightOptions() {
   const sel = document.getElementById("highlight-select");
   sel.replaceChildren();
   for (const [name, schema] of Object.entries(HIGHLIGHT_SCHEMAS)) {
-    const opt = document.createElement("option");
-    opt.value = name;
-    opt.textContent = t(schema.labelKey);
-    sel.appendChild(opt);
+    addOption(sel, name, t(schema.labelKey));
   }
   sel.value = currentHighlightSchema;
 }
@@ -1015,6 +1009,50 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+/**
+ * Append an <option> to a select or optgroup.
+ * @returns {HTMLOptionElement} the created option
+ */
+function addOption(parent, value, label) {
+  const opt = document.createElement("option");
+  opt.value = value;
+  opt.textContent = label;
+  parent.appendChild(opt);
+  return opt;
+}
+
+/**
+ * Create a .git-dialog overlay. Escape and a backdrop click close it.
+ * The caller fills `dialog` with content and wires its buttons.
+ * `onClose` runs once when the dialog closes for any reason (including an
+ * explicit close()).
+ * @returns {{dialog: HTMLElement, close: () => void}}
+ */
+function openDialog(onClose) {
+  const overlay = document.createElement("div");
+  overlay.className = "git-dialog-overlay";
+  const dialog = document.createElement("div");
+  dialog.className = "git-dialog";
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+
+  let closed = false;
+  function close() {
+    if (closed) return;
+    closed = true;
+    overlay.remove();
+    document.removeEventListener("keydown", onKey);
+    if (onClose) onClose();
+  }
+  function onKey(e) {
+    if (e.key === "Escape") close();
+  }
+  document.addEventListener("keydown", onKey);
+  overlay.onclick = (e) => { if (e.target === overlay) close(); };
+  return { dialog, close };
+}
+
 function setStatus(msg, level = "info") {
   const el = document.getElementById("status-left");
   el.textContent = msg;
@@ -1320,17 +1358,11 @@ async function loadDockerImages(filterOnly) {
     const configured = S.dockerImage || "";
     if (configured && !images.some(img => img.tag === configured)) {
       const known = _allDockerImages.some(img => img.tag === configured);
-      const opt = document.createElement("option");
-      opt.value = configured;
-      opt.textContent = known ? configured : `${configured} (custom)`;
-      sel.appendChild(opt);
+      addOption(sel, configured, known ? configured : `${configured} (custom)`);
     }
 
     for (const img of images) {
-      const opt = document.createElement("option");
-      opt.value = img.tag;
-      opt.textContent = img.local ? `${img.name} ✓` : img.name;
-      sel.appendChild(opt);
+      addOption(sel, img.tag, img.local ? `${img.name} ✓` : img.name);
     }
     if (configured) {
       sel.value = configured;
@@ -1339,10 +1371,7 @@ async function loadDockerImages(filterOnly) {
       S.dockerImage = images[0].tag;
     }
   } catch {
-    const opt = document.createElement("option");
-    opt.value = S.dockerImage;
-    opt.textContent = S.dockerImage;
-    sel.appendChild(opt);
+    addOption(sel, S.dockerImage, S.dockerImage);
   }
 }
 
@@ -1960,10 +1989,7 @@ function _populateMainFileSelect() {
   const texFiles = S.files.filter((f) => f.endsWith(".tex"));
   sel.innerHTML = "";
   for (const f of texFiles) {
-    const opt = document.createElement("option");
-    opt.value = f;
-    opt.textContent = f;
-    sel.appendChild(opt);
+    addOption(sel, f, f);
   }
   if (texFiles.includes(S.mainFile)) {
     sel.value = S.mainFile;
@@ -3934,11 +3960,7 @@ async function doSwitchBranch(branch, force = false) {
 }
 
 function showDirtyDialog(targetBranch) {
-  const overlay = document.createElement("div");
-  overlay.className = "git-dialog-overlay";
-  const dialog = document.createElement("div");
-  dialog.className = "git-dialog";
-
+  const { dialog, close } = openDialog();
   dialog.innerHTML = `
     <h3>${t("dirty_working_tree")}</h3>
     <p>${t("dirty_working_tree_desc")}</p>
@@ -3948,23 +3970,16 @@ function showDirtyDialog(targetBranch) {
       <button class="sm primary" id="dirty-stash">${t("dirty_stash_and_switch")}</button>
     </div>
   `;
-  overlay.appendChild(dialog);
-  document.body.appendChild(overlay);
 
-  const escHandler = (e) => { if (e.key === "Escape") closeDialog(); };
-  const closeDialog = () => { overlay.remove(); document.removeEventListener("keydown", escHandler); };
-  document.addEventListener("keydown", escHandler);
-
-  document.getElementById("dirty-cancel").onclick = () => closeDialog();
-  overlay.onclick = (e) => { if (e.target === overlay) closeDialog(); };
+  document.getElementById("dirty-cancel").onclick = close;
 
   document.getElementById("dirty-discard").onclick = async () => {
-    closeDialog();
+    close();
     await doSwitchBranch(targetBranch, true);
   };
 
   document.getElementById("dirty-stash").onclick = async () => {
-    closeDialog();
+    close();
     setStatus(t("stashing"));
     try {
       await api("POST", `/api/projects/${enc(S.projectName)}/git/stash`);
@@ -3978,11 +3993,7 @@ function showDirtyDialog(targetBranch) {
 async function createBranchDialog() {
   document.getElementById("git-branch-dropdown").style.display = "none";
 
-  const overlay = document.createElement("div");
-  overlay.className = "git-dialog-overlay";
-  const dialog = document.createElement("div");
-  dialog.className = "git-dialog";
-
+  const { dialog, close } = openDialog();
   dialog.innerHTML = `
     <h3>${t("create_branch")}</h3>
     <div style="margin-bottom:12px">
@@ -3998,23 +4009,15 @@ async function createBranchDialog() {
       <button class="sm primary" id="create-branch-ok">${t("create_branch")}</button>
     </div>
   `;
-  overlay.appendChild(dialog);
-  document.body.appendChild(overlay);
 
   document.getElementById("new-branch-name").focus();
-
-  const escHandler = (e) => { if (e.key === "Escape") closeDialog(); };
-  const closeDialog = () => { overlay.remove(); document.removeEventListener("keydown", escHandler); };
-  document.addEventListener("keydown", escHandler);
-
-  document.getElementById("create-branch-cancel").onclick = () => closeDialog();
-  overlay.onclick = (e) => { if (e.target === overlay) closeDialog(); };
+  document.getElementById("create-branch-cancel").onclick = close;
 
   document.getElementById("create-branch-ok").onclick = async () => {
     const name = document.getElementById("new-branch-name").value.trim();
     if (!name) return;
     const startPoint = document.getElementById("new-branch-start").value.trim() || undefined;
-    closeDialog();
+    close();
     try {
       const result = await api("POST", `/api/projects/${enc(S.projectName)}/git/branches`, { name, start_point: startPoint });
       if (result.success) {
@@ -4128,14 +4131,9 @@ async function switchWorktree(path) {
   // Check for unsaved editor changes before switching
   if (S.modified && S.modified.size > 0) {
     const action = await new Promise((resolve) => {
-      const overlay = document.createElement("div");
-      overlay.className = "git-dialog-overlay";
-      const dialog = document.createElement("div");
-      dialog.className = "git-dialog";
-
-      const closeDialog = () => { overlay.remove(); document.removeEventListener("keydown", escHandler); resolve("cancel"); };
-      const escHandler = (e) => { if (e.key === "Escape") closeDialog(); };
-      document.addEventListener("keydown", escHandler);
+      let settled = false;
+      const finish = (value) => { if (settled) return; settled = true; resolve(value); close(); };
+      const { dialog, close } = openDialog(() => finish("cancel"));
 
       const title = document.createElement("h3");
       title.textContent = t("unsaved_changes");
@@ -4147,26 +4145,22 @@ async function switchWorktree(path) {
       const cancelBtn = document.createElement("button");
       cancelBtn.className = "sm";
       cancelBtn.textContent = t("cancel");
-      cancelBtn.onclick = () => closeDialog();
+      cancelBtn.onclick = close;
 
       const discardBtn = document.createElement("button");
       discardBtn.className = "sm";
       discardBtn.textContent = t("discard_and_continue");
-      discardBtn.onclick = () => { overlay.remove(); document.removeEventListener("keydown", escHandler); resolve("discard"); };
+      discardBtn.onclick = () => finish("discard");
 
       const saveBtn = document.createElement("button");
       saveBtn.className = "sm primary";
       saveBtn.textContent = t("save_and_continue");
-      saveBtn.onclick = () => { overlay.remove(); document.removeEventListener("keydown", escHandler); resolve("save"); };
+      saveBtn.onclick = () => finish("save");
 
       btns.appendChild(cancelBtn);
       btns.appendChild(discardBtn);
       btns.appendChild(saveBtn);
       dialog.appendChild(btns);
-
-      overlay.appendChild(dialog);
-      document.body.appendChild(overlay);
-      overlay.onclick = (e) => { if (e.target === overlay) closeDialog(); };
     });
     if (action === "cancel") return;
     if (action === "save") await saveCurrentFile();
@@ -4193,11 +4187,6 @@ async function switchWorktree(path) {
 }
 
 async function addWorktreeDialog() {
-  const overlay = document.createElement("div");
-  overlay.className = "git-dialog-overlay";
-  const dialog = document.createElement("div");
-  dialog.className = "git-dialog";
-
   let branches;
   try {
     branches = await loadBranches();
@@ -4206,6 +4195,7 @@ async function addWorktreeDialog() {
     return;
   }
   const availableBranches = branches.local.filter(b => b !== branches.current);
+  const { dialog, close } = openDialog();
 
   // Title
   const title = document.createElement("h3");
@@ -4225,17 +4215,10 @@ async function addWorktreeDialog() {
   select.style.cssText = "width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--fg);font-size:13px;box-sizing:border-box";
 
   if (availableBranches.length === 0) {
-    const opt = document.createElement("option");
-    opt.value = "";
-    opt.disabled = true;
-    opt.textContent = t("no_worktrees");
-    select.appendChild(opt);
+    addOption(select, "", t("no_worktrees")).disabled = true;
   } else {
     for (const b of availableBranches) {
-      const opt = document.createElement("option");
-      opt.value = b;
-      opt.textContent = b;
-      select.appendChild(opt);
+      addOption(select, b, b);
     }
   }
   selectDiv.appendChild(select);
@@ -4255,20 +4238,11 @@ async function addWorktreeDialog() {
   btns.appendChild(okBtn);
   dialog.appendChild(btns);
 
-  overlay.appendChild(dialog);
-  document.body.appendChild(overlay);
-
-  const escHandler = (e) => { if (e.key === "Escape") closeDialog(); };
-  const closeDialog = () => { overlay.remove(); document.removeEventListener("keydown", escHandler); };
-  document.addEventListener("keydown", escHandler);
-
-  cancelBtn.onclick = () => closeDialog();
-  overlay.onclick = (e) => { if (e.target === overlay) closeDialog(); };
-
+  cancelBtn.onclick = close;
   okBtn.onclick = async () => {
     const branch = select.value;
     if (!branch) return;
-    closeDialog();
+    close();
     setStatus(t("loading"));
     try {
       const result = await api("POST", `/api/projects/${enc(S.projectName)}/git/worktrees`, { branch });
@@ -4286,10 +4260,9 @@ async function addWorktreeDialog() {
 
 async function removeWorktree(path, branchName) {
   const confirmed = await new Promise((resolve) => {
-    const overlay = document.createElement("div");
-    overlay.className = "git-dialog-overlay";
-    const dialog = document.createElement("div");
-    dialog.className = "git-dialog";
+    let settled = false;
+    const finish = (value) => { if (settled) return; settled = true; resolve(value); close(); };
+    const { dialog, close } = openDialog(() => finish(false));
 
     const title = document.createElement("h3");
     title.textContent = t("confirm_remove_worktree").replace("{name}", branchName);
@@ -4310,16 +4283,8 @@ async function removeWorktree(path, branchName) {
     btns.appendChild(okBtn);
     dialog.appendChild(btns);
 
-    overlay.appendChild(dialog);
-    document.body.appendChild(overlay);
-
-    const escHandler = (e) => { if (e.key === "Escape") { closeDialog(); resolve(false); } };
-    const closeDialog = () => { overlay.remove(); document.removeEventListener("keydown", escHandler); };
-    document.addEventListener("keydown", escHandler);
-
-    cancelBtn.onclick = () => { closeDialog(); resolve(false); };
-    okBtn.onclick = () => { closeDialog(); resolve(true); };
-    overlay.onclick = (e) => { if (e.target === overlay) { closeDialog(); resolve(false); } };
+    cancelBtn.onclick = () => finish(false);
+    okBtn.onclick = () => finish(true);
   });
   if (!confirmed) return;
 
