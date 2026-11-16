@@ -54,6 +54,9 @@ class TestResponseHeaders:
         csp = response.headers["Content-Security-Policy"]
         assert "frame-ancestors 'none'" in csp
         assert "default-src 'self'" in csp
+        # The UI imports its font CSS from jsdelivr until fonts are self-hosted.
+        assert "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net" in csp
+        assert "font-src 'self' data: https://cdn.jsdelivr.net" in csp
 
     def test_static_and_404_dispatch_include_headers(self):
         static_request = _request(path="/static/css/app.css")

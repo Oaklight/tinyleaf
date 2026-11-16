@@ -58,14 +58,17 @@ _STATUS_CODES = {
 }
 
 # The current UI uses inline handlers and style attributes, so the first CSP
-# needs 'unsafe-inline'. Removing those is a separate follow-up.
+# needs 'unsafe-inline'. Jost/Iosevka UI font CSS is imported from jsdelivr by
+# app.css, so those two directives allow that host; self-hosting the fonts is
+# a follow-up that lets the host be removed. Removing inline handlers/styles
+# is a separate follow-up.
 _SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "img-src 'self' data: blob:; "
-        "font-src 'self' data:; "
+        "font-src 'self' data: https://cdn.jsdelivr.net; "
         "connect-src 'self'; "
         "worker-src 'self' blob:; "
         "object-src 'none'; "
