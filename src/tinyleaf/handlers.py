@@ -437,6 +437,23 @@ def _build_file_tree(base_dir, current_dir):
         full = os.path.join(current_dir, item)
         rel = os.path.relpath(full, base_dir)
 
+        if os.path.islink(full):
+            # Never follow symlinks: a self-referential link would recurse
+            # forever, and a link can point outside the project. Present a
+            # symlinked directory as an empty directory.
+            if os.path.isdir(full):
+                dirs_list.append({"name": item, "path": rel, "type": "dir", "children": []})
+            else:
+                files_list.append(
+                    {
+                        "name": item,
+                        "path": rel,
+                        "type": "file",
+                        "mtime": os.lstat(full).st_mtime,
+                    }
+                )
+            continue
+
         if os.path.isdir(full):
             children = _build_file_tree(base_dir, full)
             dirs_list.append({"name": item, "path": rel, "type": "dir", "children": children})
