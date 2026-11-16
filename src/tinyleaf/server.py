@@ -1,12 +1,14 @@
 """HTTP server for tinyleaf, built on zerodep httpserver."""
 
 import email.utils
+import hmac
 import logging
 import os
 import re
 import ssl
 import time
 import uuid
+from urllib.parse import urlsplit
 
 from tinyleaf import __version__
 from tinyleaf._vendor.httpserver import (
@@ -56,14 +58,17 @@ _STATUS_CODES = {
 }
 
 # The current UI uses inline handlers and style attributes, so the first CSP
-# needs 'unsafe-inline'. Removing those is a separate follow-up.
+# needs 'unsafe-inline'. Jost/Iosevka UI font CSS is imported from jsdelivr by
+# app.css, so those two directives allow that host; self-hosting the fonts is
+# a follow-up that lets the host be removed. Removing inline handlers/styles
+# is a separate follow-up.
 _SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
         "img-src 'self' data: blob:; "
-        "font-src 'self' data:; "
+        "font-src 'self' data: https://cdn.jsdelivr.net; "
         "connect-src 'self'; "
         "worker-src 'self' blob:; "
         "object-src 'none'; "
@@ -150,6 +155,101 @@ def handle_unexpected_exception(request, exception):
     return _error_envelope(request, 500, "Internal Server Error")
 
 
+# Paths reachable without a token; everything else under /api/ requires one.
+_PUBLIC_API_PATHS = {"/api/health", "/api/version", "/api/auth/session"}
+
+_SESSION_COOKIE = "tinyleaf_session"
+_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+
+def _normalize_host(name):
+    return name.strip().lower().rstrip(".")
+
+
+def _host_name(host_header):
+    """Return the normalized hostname from a Host or Origin authority string."""
+    if host_header.startswith("["):
+        end = host_header.find("]")
+        name = host_header[1:end] if end != -1 else host_header
+    else:
+        name = host_header.split(":", 1)[0]
+    return _normalize_host(name)
+
+
+def _allowed_host_names(config):
+    names = {"localhost", "127.0.0.1", "::1"}
+    if config.get("host"):
+        names.add(_normalize_host(config["host"]))
+    names.update(_normalize_host(host) for host in (config.get("allowed_hosts") or []))
+    return names
+
+
+def _host_allowed(host_header, config):
+    name = _host_name(host_header)
+    return bool(name) and name in _allowed_host_names(config)
+
+
+def _token_matches(candidate, token):
+    """Constant-time token comparison that never raises on odd input."""
+    return (
+        isinstance(candidate, str)
+        and candidate.isascii()
+        and token.isascii()
+        and hmac.compare_digest(candidate, token)
+    )
+
+
+def _has_valid_token(request, token):
+    header = request.headers.get("authorization", "")
+    if header[:7].lower() == "bearer ":
+        if _token_matches(header[7:].strip(), token):
+            return True
+    return _token_matches(request.cookies.get(_SESSION_COOKIE, ""), token)
+
+
+def _origin_allowed(request, config):
+    if request.headers.get("sec-fetch-site") == "cross-site":
+        return False
+    origin = request.headers.get("origin")
+    if not origin:
+        return True
+    try:
+        authority = urlsplit(origin).netloc
+    except ValueError:
+        return False
+    return _host_allowed(authority, config)
+
+
+@app.before_request
+def enforce_access(request):
+    """Enforce Host, token, read-only, and Origin policy."""
+    if not _host_allowed(request.headers.get("host", ""), _config):
+        return _error_envelope(request, 400, "Host not allowed", "host_not_allowed")
+
+    token = _config.get("token")
+    if (
+        token
+        and request.path.startswith("/api/")
+        and request.path not in _PUBLIC_API_PATHS
+        and not _has_valid_token(request, token)
+    ):
+        response = _error_envelope(request, 401, "Authentication required", "unauthorized")
+        response.headers["WWW-Authenticate"] = "Bearer"
+        return response
+
+    if (
+        _config.get("read_only")
+        and request.method not in _SAFE_METHODS
+        and request.path != "/api/auth/session"
+    ):
+        return _error_envelope(request, 403, "Server is read-only", "read_only")
+
+    if request.method not in _SAFE_METHODS and not _origin_allowed(request, _config):
+        return _error_envelope(request, 403, "Origin not allowed", "origin_not_allowed")
+
+    return None
+
+
 def _json_body(request):
     """Parse JSON body, returning {} for empty bodies."""
     return request.json() if request.body else {}
@@ -214,6 +314,27 @@ def _send_cached_response(filepath, content_type, cache_control, request, charse
 @app.route("/", methods=["GET", "HEAD"])
 @app.route("/index.html", methods=["GET", "HEAD"])
 def serve_index(request):
+    token = _config.get("token")
+    candidate = request.query_params.get("token", [None])[0]
+    if token and candidate is not None:
+        if not _token_matches(candidate, token):
+            response = _error_envelope(request, 401, "Invalid token", "unauthorized")
+            response.headers["WWW-Authenticate"] = "Bearer"
+            response.headers["Cache-Control"] = "no-store"
+            return response
+        response = Response(
+            status_code=302,
+            headers={"Location": "/", "Cache-Control": "no-store"},
+        )
+        response.set_cookie(
+            _SESSION_COOKIE,
+            token,
+            httponly=True,
+            samesite="Strict",
+            secure=bool(_config.get("ssl_cert")),
+            path="/",
+        )
+        return response
     filepath = os.path.join(STATIC_DIR, "index.html")
     return _send_cached_response(filepath, "text/html", "no-cache", request)
 
@@ -311,6 +432,37 @@ def api_version(request):
 @app.get("/api/schema")
 def api_schema(request):
     return _schema_payload()
+
+
+@app.post("/api/auth/session")
+def api_auth_session(request):
+    """Exchange a valid token for an HttpOnly session cookie."""
+    token = _config.get("token")
+    try:
+        payload = _json_body(request)
+    except ValueError:
+        return _error_envelope(request, 400, "Invalid JSON body", "bad_request")
+    if not isinstance(payload, dict):
+        return _error_envelope(request, 400, "Request body must be a JSON object", "bad_request")
+    candidate = payload.get("token", "")
+    if not token:
+        return {"authenticated": False, "auth_required": False}
+    if not _token_matches(candidate, token):
+        response = _error_envelope(request, 401, "Invalid token", "unauthorized")
+        response.headers["WWW-Authenticate"] = "Bearer"
+        response.headers["Cache-Control"] = "no-store"
+        return response
+    response = JSONResponse({"authenticated": True})
+    response.headers["Cache-Control"] = "no-store"
+    response.set_cookie(
+        _SESSION_COOKIE,
+        token,
+        httponly=True,
+        samesite="Strict",
+        secure=bool(_config.get("ssl_cert")),
+        path="/",
+    )
+    return response
 
 
 # ── Global API routes ──

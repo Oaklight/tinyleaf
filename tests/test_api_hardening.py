@@ -13,6 +13,7 @@ from tinyleaf.server import APIError
 
 def _request(method="GET", path="/", headers=None, query_string=""):
     lowered = {key.lower(): value for key, value in (headers or {}).items()}
+    lowered.setdefault("host", "127.0.0.1:14159")
     return Request(method, path, query_string, lowered, b"", ("127.0.0.1", 1234), server.app)
 
 
@@ -53,6 +54,9 @@ class TestResponseHeaders:
         csp = response.headers["Content-Security-Policy"]
         assert "frame-ancestors 'none'" in csp
         assert "default-src 'self'" in csp
+        # The UI imports its font CSS from jsdelivr until fonts are self-hosted.
+        assert "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net" in csp
+        assert "font-src 'self' data: https://cdn.jsdelivr.net" in csp
 
     def test_static_and_404_dispatch_include_headers(self):
         static_request = _request(path="/static/css/app.css")

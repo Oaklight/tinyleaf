@@ -3,10 +3,10 @@
 @import url("https://cdn.jsdelivr.net/npm/@fontsource/jost@5.2.8/600.css");
 @import url("https://cdn.jsdelivr.net/npm/@fontsource/jost@5.2.8/700.css");
 @import url("https://cdn.jsdelivr.net/npm/@alleyway-boop/fonts@1.0.0/css/index.css");
-@import url("https://cdn.jsdelivr.net/npm/@fontsource/iosevka@5.2.8/400.css");
-@import url("https://cdn.jsdelivr.net/npm/@fontsource/iosevka@5.2.8/500.css");
-@import url("https://cdn.jsdelivr.net/npm/@fontsource/iosevka@5.2.8/600.css");
-@import url("https://cdn.jsdelivr.net/npm/@fontsource/iosevka@5.2.8/700.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/iosevka@5.2.5/400.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/iosevka@5.2.5/500.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/iosevka@5.2.5/600.css");
+@import url("https://cdn.jsdelivr.net/npm/@fontsource/iosevka@5.2.5/700.css");
 
 /* ── CSS Variables (Light - default, from llm-rosetta) ── */
 :root {
