@@ -919,25 +919,7 @@ def handle_synctex_forward(query_params, config, name):
 
 # ── Clean ──
 
-_CLEAN_EXTENSIONS = {
-    ".aux",
-    ".bbl",
-    ".bcf",
-    ".blg",
-    ".fdb_latexmk",
-    ".fls",
-    ".log",
-    ".out",
-    ".run.xml",
-    ".synctex.gz",
-    ".toc",
-    ".lof",
-    ".lot",
-    ".nav",
-    ".snm",
-    ".vrb",
-    ".xdv",
-}
+_CLEAN_EXTENSIONS = git_ops.ARTIFACT_EXTENSIONS
 
 
 def handle_clean(config, name):
@@ -947,17 +929,15 @@ def handle_clean(config, name):
     for root, dirs, filenames in os.walk(project_dir):
         dirs[:] = [d for d in dirs if not d.startswith(".")]
         for fname in filenames:
-            _, ext = os.path.splitext(fname)
-            if fname.endswith(".synctex.gz"):
-                ext = ".synctex.gz"
-            if ext in _CLEAN_EXTENSIONS:
-                full = os.path.join(root, fname)
-                rel = os.path.relpath(full, project_dir)
-                try:
-                    os.remove(full)
-                    removed.append(rel)
-                except OSError:
-                    pass
+            if git_ops.artifact_extension(fname) not in _CLEAN_EXTENSIONS:
+                continue
+            full = os.path.join(root, fname)
+            rel = os.path.relpath(full, project_dir)
+            try:
+                os.remove(full)
+                removed.append(rel)
+            except OSError:
+                pass
 
     return {"removed": removed, "count": len(removed)}
 
@@ -1065,19 +1045,7 @@ def _parse_texcount_output(output):
 
 _EXPORT_SKIP_DIRS = {".git", "__pycache__", ".tinyleaf"}
 
-_EXPORT_SKIP_EXTS = {
-    ".aux",
-    ".log",
-    ".out",
-    ".bbl",
-    ".blg",
-    ".fls",
-    ".fdb_latexmk",
-    ".synctex.gz",
-    ".toc",
-    ".lof",
-    ".lot",
-}
+_EXPORT_SKIP_EXTS = git_ops.ARTIFACT_EXTENSIONS
 
 
 def handle_export_zip(config, name):
@@ -1090,10 +1058,7 @@ def handle_export_zip(config, name):
             for fname in files:
                 if fname == CONFIG_FILE:
                     continue
-                if fname.endswith(".synctex.gz"):
-                    continue
-                ext = os.path.splitext(fname)[1].lower()
-                if ext in _EXPORT_SKIP_EXTS:
+                if git_ops.artifact_extension(fname) in _EXPORT_SKIP_EXTS:
                     continue
                 full = os.path.join(root, fname)
                 arcname = os.path.relpath(full, project_dir)
@@ -1330,9 +1295,10 @@ def handle_git_stash_pop(config, name):
     return git_ops.stash_pop(project_dir)
 
 
-def handle_git_status(config, name):
+def handle_git_status(query_params, config, name):
     project_dir = _get_project_dir(config, name)
-    return git_ops.status(project_dir)
+    include = query_params.get("include_artifacts", ["0"])[0].lower()
+    return git_ops.status(project_dir, include_artifacts=include in ("1", "true", "yes"))
 
 
 def _parse_diff_qs(query_params):
@@ -1381,7 +1347,31 @@ def handle_git_commit(body, config, name):
     if not message:
         abort(400, "Commit message required")
 
+    allow_artifacts = body.get("allow_artifacts") is True
     files = body.get("files")
+    if files is not None and (
+        not isinstance(files, list) or not all(isinstance(path, str) and path for path in files)
+    ):
+        raise _api_error(400, "files must be a list of paths", "bad_request")
+    if not allow_artifacts:
+        if files:
+            blocked = [path for path in files if git_ops.is_build_artifact(path)]
+            if blocked:
+                raise _api_error(
+                    400,
+                    "Refusing to commit build artifacts",
+                    "artifacts_not_allowed",
+                    {"paths": blocked},
+                )
+        else:
+            status = git_ops.status(project_dir, include_artifacts=True)
+            files = [
+                entry["path"]
+                for entry in status.get("files", [])
+                if not git_ops.is_build_artifact(entry["path"])
+            ]
+            if not files:
+                return {"success": False, "message": "No files to commit"}
     return git_ops.commit(project_dir, message, files=files)
 
 

@@ -785,7 +785,7 @@ def api_git_stash_pop(request, name):
 def api_git_status(request, name):
     from tinyleaf.handlers import handle_git_status
 
-    return handle_git_status(_config, name)
+    return handle_git_status(request.query_params, _config, name)
 
 
 @app.get("/api/projects/<name>/git/diff")
