@@ -153,10 +153,18 @@ tinyleaf
 使用 Docker Compose 快速启动：
 
 ```bash
+export TINYLEAF_TOKEN="$(openssl rand -hex 24)"
 docker compose up
 ```
 
-Tinyleaf 会运行在 `http://localhost:14159`。
+容器绑定 `0.0.0.0`，未设置 `TINYLEAF_TOKEN` 时 Compose 会拒绝启动。Tinyleaf
+运行在 `http://localhost:14159`，首次在浏览器访问时必须带上令牌：
+
+```text
+http://localhost:14159/?token=$TINYLEAF_TOKEN
+```
+
+如果客户端使用其他主机名或 IP，请在启动前把 `TINYLEAF_ALLOWED_HOST` 设为该值。
 
 ## Tinyleaf vs. Overleaf CE
 
