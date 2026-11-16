@@ -14,7 +14,7 @@ import zipfile
 
 from tinyleaf import compiler, git_ops, registry, vendor
 from tinyleaf._vendor import synctex
-from tinyleaf._vendor.httpserver import FileResponse, Response, abort
+from tinyleaf._vendor.httpserver import FileResponse, JSONResponse, Response, abort
 
 # Project config file name
 CONFIG_FILE = ".tinyleaf.json"
@@ -200,7 +200,7 @@ def handle_list_docker_images():
     for name in _KNOWN_TAGS:
         full = f"{_DOCKER_IMAGE_PREFIX}:{name}"
         all_tags.append({"tag": full, "name": name, "local": full in local_tags})
-    return all_tags
+    return JSONResponse(all_tags)
 
 
 async def handle_docker_pull(body, config):
@@ -241,19 +241,21 @@ def handle_cancel_docker_pull(body):
 
 def handle_list_projects(config):
     if config["mode"] == "single":
-        return [
-            {
-                "name": os.path.basename(config["project_path"]),
-                "path": config["project_path"],
-                "exists": True,
-                "git": git_ops.has_git(config["project_path"]),
-            }
-        ]
+        return JSONResponse(
+            [
+                {
+                    "name": os.path.basename(config["project_path"]),
+                    "path": config["project_path"],
+                    "exists": True,
+                    "git": git_ops.has_git(config["project_path"]),
+                }
+            ]
+        )
 
     projects = registry.list_projects(config["config_dir"])
     for p in projects:
         p["git"] = git_ops.has_git(p["path"]) if p["exists"] else False
-    return projects
+    return JSONResponse(projects)
 
 
 def handle_create_project(body, config):
@@ -415,7 +417,7 @@ def handle_put_settings(body, config):
 
 def handle_list_files(config, name):
     project_dir = _get_project_dir(config, name)
-    return _build_file_tree(project_dir, project_dir)
+    return JSONResponse(_build_file_tree(project_dir, project_dir))
 
 
 def _build_file_tree(base_dir, current_dir):
@@ -1288,7 +1290,7 @@ def handle_git_pull(config, name):
 
 def handle_git_log(config, name):
     project_dir = _get_project_dir(config, name)
-    return git_ops.log(project_dir)
+    return JSONResponse(git_ops.log(project_dir))
 
 
 # ── Git Worktrees ──
@@ -1296,7 +1298,7 @@ def handle_git_log(config, name):
 
 def handle_git_worktree_list(config, name):
     project_dir = _get_project_dir(config, name)
-    return git_ops.worktree_list(project_dir)
+    return JSONResponse(git_ops.worktree_list(project_dir))
 
 
 def handle_git_worktree_add(body, config, name):
