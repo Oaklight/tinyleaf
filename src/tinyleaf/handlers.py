@@ -11,6 +11,7 @@ import os
 import re
 import subprocess
 import threading
+import time
 import zipfile
 
 from tinyleaf import compiler, git_ops, registry, vendor
@@ -240,6 +241,29 @@ def handle_cancel_docker_pull(body):
         abort(400, "Missing image")
     cancelled = compiler.cancel_docker_pull(image)
     return {"cancelled": cancelled}
+
+
+def handle_docker_pull_status(query_params, config):
+    """Return live progress for a manual Docker image pull."""
+    image = query_params.get("image", [None])[0]
+    if not image:
+        abort(400, "Missing image")
+    _validate_docker_image(image, config)
+
+    state = compiler.get_pull_state(image)
+    if state is None:
+        return {"known": False, "image": image}
+
+    return {
+        "known": True,
+        "image": state["image"],
+        "lines": list(state["lines"]),
+        "layers_done": state["layers_done"],
+        "done": state["done"],
+        "success": state["success"],
+        "message": state["message"],
+        "elapsed": round(time.time() - state["started_at"], 2),
+    }
 
 
 # ── Projects ──

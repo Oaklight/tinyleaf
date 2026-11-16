@@ -25,6 +25,7 @@ if [ "$1" = "pull" ]; then
       ;;
   esac
   touch "$DSTATE"
+  echo "abc123: Pull complete"
   echo "pulled $*"
   exit 0
 fi
@@ -127,3 +128,22 @@ def test_no_mirror_pulls_once(tmp_path, monkeypatch):
 
     assert (success, message) == (True, "OK")
     assert [call for call in calls if call.startswith("pull ")] == [f"pull {IMAGE}"]
+
+
+def test_pull_progress_state_is_recorded(tmp_path, monkeypatch):
+    bindir, calls_log, state = _fake_docker(tmp_path)
+    _env(monkeypatch, bindir, calls_log, state, mirror_fails=False)
+    compiler._pull_states.pop(IMAGE, None)
+
+    try:
+        success, message = asyncio.run(compiler.docker_pull_image(IMAGE))
+        record = compiler.get_pull_state(IMAGE)
+    finally:
+        compiler._pull_states.pop(IMAGE, None)
+
+    assert (success, message) == (True, "OK")
+    assert record["done"] is True
+    assert record["success"] is True
+    assert record["layers_done"] == 1
+    assert any("Pull complete" in line for line in record["lines"])
+    assert record["finished_at"] >= record["started_at"]
