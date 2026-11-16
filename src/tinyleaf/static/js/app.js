@@ -204,6 +204,12 @@ const I18N = {
     image_error: "Failed to load image",
     binary_not_supported: "Binary file — cannot open in editor",
     registry_mirror: "Registry Mirror",
+    more_actions: "More actions",
+    pane_files: "Files",
+    pane_editor: "Editor",
+    pane_pdf: "PDF",
+    close_settings: "Close settings",
+    apply: "Apply",
     pull: "Pull",
     pulling_image: "Pulling image...",
     pull_success: "Image pulled successfully",
@@ -468,6 +474,12 @@ const I18N = {
     image_error: "图片加载失败",
     binary_not_supported: "二进制文件 — 无法在编辑器中打开",
     registry_mirror: "镜像仓库",
+    more_actions: "更多操作",
+    pane_files: "文件",
+    pane_editor: "编辑器",
+    pane_pdf: "PDF",
+    close_settings: "关闭设置",
+    apply: "应用",
     pull: "拉取",
     pulling_image: "正在拉取镜像...",
     pull_success: "镜像拉取成功",
@@ -548,6 +560,16 @@ function applyI18n() {
   });
   document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
     el.placeholder = t(el.getAttribute("data-i18n-placeholder"));
+  });
+  // Icon-only controls: mirror the localized title into aria-label so screen
+  // readers get a name even though the button has no text.
+  document.querySelectorAll("button[title], [role='button'][title]").forEach((el) => {
+    if (!el.getAttribute("aria-label") && !el.textContent.trim()) {
+      el.setAttribute("aria-label", el.title);
+    }
+  });
+  document.querySelectorAll("[data-i18n-label]").forEach((el) => {
+    el.setAttribute("aria-label", t(el.getAttribute("data-i18n-label")));
   });
 }
 
@@ -1034,6 +1056,8 @@ function openDialog(onClose) {
   overlay.className = "git-dialog-overlay";
   const dialog = document.createElement("div");
   dialog.className = "git-dialog";
+  dialog.setAttribute("role", "dialog");
+  dialog.setAttribute("aria-modal", "true");
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);
 
@@ -1051,6 +1075,168 @@ function openDialog(onClose) {
   document.addEventListener("keydown", onKey);
   overlay.onclick = (e) => { if (e.target === overlay) close(); };
   return { dialog, close };
+}
+
+// ══════════════════════════════════════════
+// Responsive toolbar, mobile panes, a11y
+// ══════════════════════════════════════════
+const MOBILE_QUERY = window.matchMedia("(max-width: 900px)");
+
+/** Collapse/expand the settings rows that only apply when Docker is on. */
+function syncDockerRows() {
+  const on = !!S.useDocker;
+  ["docker-image-row", "debian-toggle-row", "registry-mirror-row"].forEach((id) => {
+    document.getElementById(id)?.classList.toggle("collapsed", !on);
+  });
+}
+
+/** Close every toolbar overflow menu and reset its trigger. */
+function closeOverflowMenus() {
+  document.querySelectorAll(".overflow-menu").forEach((menu) => { menu.hidden = true; });
+  document.querySelectorAll(".toolbar-more-btn, .project-more-btn").forEach((btn) => {
+    btn.setAttribute("aria-expanded", "false");
+  });
+}
+
+function toggleOverflowMenu(menu, button) {
+  const willOpen = menu.hidden;
+  closeOverflowMenus();
+  if (willOpen) {
+    menu.hidden = false;
+    button.setAttribute("aria-expanded", "true");
+  }
+}
+
+/**
+ * Move secondary toolbar controls into an overflow menu on narrow screens.
+ * Nodes are relocated (not cloned), so their existing listeners and state
+ * survive. On desktop they are put back in their original order.
+ */
+function setupResponsiveToolbar() {
+  const toolbarMenu = document.getElementById("toolbar-more-menu");
+  const projectMenu = document.getElementById("project-more-menu");
+  const toolbarMore = document.getElementById("btn-toolbar-more");
+  const projectMore = document.getElementById("btn-project-more");
+  const projectToolbar = document.getElementById("toolbar-project");
+  const projectListToolbar = document.querySelector(".project-toolbar");
+  const compileBtn = document.getElementById("btn-compile");
+  const newProject = document.getElementById("btn-new-project");
+
+  const toolbarItems = [
+    document.getElementById("engine-select"),
+    document.getElementById("auto-compile-label"),
+    document.getElementById("btn-clean"),
+    document.getElementById("btn-export-zip"),
+    document.getElementById("btn-save"),
+  ].filter(Boolean);
+  const projectItems = [
+    document.getElementById("btn-open-folder"),
+    document.getElementById("btn-view-grid"),
+    document.getElementById("btn-view-list"),
+  ].filter(Boolean);
+
+  function placeMobile() {
+    toolbarMenu.replaceChildren(...toolbarItems);
+    projectMenu.replaceChildren(...projectItems);
+    closeOverflowMenus();
+  }
+
+  function placeDesktop() {
+    toolbarMenu.replaceChildren();
+    projectMenu.replaceChildren();
+    // Restore: main file, engine, auto, compile, clean, export, separator, save.
+    projectToolbar.insertBefore(toolbarItems[0], compileBtn);
+    projectToolbar.insertBefore(toolbarItems[1], compileBtn);
+    compileBtn.after(toolbarItems[2]);
+    toolbarItems[2].after(toolbarItems[3]);
+    projectToolbar.appendChild(toolbarItems[4]);
+    // Restore project toolbar: search, open folder, new project, grid, list.
+    projectListToolbar.insertBefore(projectItems[0], newProject);
+    projectMore.before(projectItems[1]);
+    projectMore.before(projectItems[2]);
+    closeOverflowMenus();
+  }
+
+  function applyLayout() {
+    if (MOBILE_QUERY.matches) placeMobile();
+    else placeDesktop();
+  }
+
+  toolbarMore.onclick = (e) => {
+    e.stopPropagation();
+    toggleOverflowMenu(toolbarMenu, toolbarMore);
+  };
+  projectMore.onclick = (e) => {
+    e.stopPropagation();
+    toggleOverflowMenu(projectMenu, projectMore);
+  };
+
+  [toolbarMenu, projectMenu].forEach((menu) => {
+    menu.addEventListener("click", (e) => {
+      if (e.target.closest("button")) closeOverflowMenus();
+    });
+  });
+  document.addEventListener("click", (e) => {
+    if (e.target.closest(".overflow-menu") || e.target === toolbarMore || e.target === projectMore) return;
+    closeOverflowMenus();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeOverflowMenus();
+  });
+
+  MOBILE_QUERY.addEventListener?.("change", applyLayout);
+  applyLayout();
+}
+
+/** Initialise the Files / Editor / PDF single-pane switch used on mobile. */
+function setupMobilePanes() {
+  const switchEl = document.getElementById("mobile-pane-switch");
+  if (!switchEl) return;
+  S.mobilePane = localStorage.getItem("tinyleaf-mobile-pane") || "files";
+  switchEl.querySelectorAll("[data-pane]").forEach((btn) => {
+    btn.onclick = () => setMobilePane(btn.dataset.pane);
+  });
+  MOBILE_QUERY.addEventListener?.("change", () => {
+    if (MOBILE_QUERY.matches) setMobilePane(S.mobilePane || "files", true);
+    else clearMobilePane();
+  });
+  if (MOBILE_QUERY.matches) setMobilePane(S.mobilePane, true);
+}
+
+function setMobilePane(pane, skipPersist = false) {
+  S.mobilePane = pane;
+  if (!skipPersist) localStorage.setItem("tinyleaf-mobile-pane", pane);
+  const view = document.getElementById("editor-view");
+  view.classList.remove("mobile-pane-files", "mobile-pane-editor", "mobile-pane-pdf");
+  view.classList.add("mobile-pane-" + pane);
+  document.querySelectorAll("#mobile-pane-switch [data-pane]").forEach((btn) => {
+    const on = btn.dataset.pane === pane;
+    btn.classList.toggle("active", on);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+  });
+  if (pane === "pdf" && S.pdfDoc) {
+    requestAnimationFrame(() => requestAnimationFrame(() => renderPDF()));
+  }
+}
+
+function clearMobilePane() {
+  document.getElementById("editor-view")
+    .classList.remove("mobile-pane-files", "mobile-pane-editor", "mobile-pane-pdf");
+}
+
+/** Make the wordmark behave like a labelled, keyboard-operable button. */
+function setupHomeButton() {
+  const home = document.getElementById("btn-home");
+  if (!home) return;
+  home.setAttribute("role", "button");
+  home.setAttribute("tabindex", "0");
+  home.setAttribute("aria-label", t("projects"));
+  home.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      home.click();
+    }
+  });
 }
 
 function setStatus(msg, level = "info") {
@@ -1076,26 +1262,24 @@ async function init() {
 
   // Always load docker images list and sync toggle
   document.getElementById("docker-toggle").checked = S.useDocker;
-  document.getElementById("docker-image-row").classList.toggle("collapsed", !S.useDocker);
+  syncDockerRows();
 
   // Load global settings (show_debian, etc.)
   try {
     const globalSettings = await api("GET", "/api/settings");
     S._globalSettings = globalSettings;
     document.getElementById("show-debian-toggle").checked = !!globalSettings.show_debian;
-    if (globalSettings.registry_mirror) {
-      document.getElementById("registry-mirror-input").value = globalSettings.registry_mirror;
+    const mirrorInput = document.getElementById("registry-mirror-input");
+    if (Object.prototype.hasOwnProperty.call(globalSettings, "registry_mirror")) {
+      // Respect an explicit value, including an explicit "".
+      mirrorInput.value = globalSettings.registry_mirror || "";
     } else {
-      // Auto-detect China region and suggest registry mirror
+      // Fresh install: prefill a suggestion, but never save it automatically.
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
       const isCN = tz.startsWith("Asia/Shanghai") || tz.startsWith("Asia/Chongqing")
         || tz.startsWith("Asia/Harbin") || tz.startsWith("Asia/Urumqi")
         || navigator.language?.startsWith("zh");
-      if (isCN) {
-        const mirror = "docker.1ms.run";
-        document.getElementById("registry-mirror-input").value = mirror;
-        api("PUT", "/api/settings", { registry_mirror: mirror });
-      }
+      if (isCN) mirrorInput.value = "docker.1ms.run";
     }
   } catch {}
   await loadDockerImages();
@@ -1116,6 +1300,9 @@ async function init() {
 
   setupKeybindings();
   setupSettingsPopup();
+  setupResponsiveToolbar();
+  setupMobilePanes();
+  setupHomeButton();
   setupFileSearch();
   setupUpload();
   setupLogClickHandler();
@@ -1139,6 +1326,11 @@ function setupSettingsPopup() {
     e.stopPropagation();
     popup.classList.toggle("open");
     closeContextMenu();
+  };
+
+  document.getElementById("btn-settings-close").onclick = () => {
+    popup.classList.remove("open");
+    btn.focus();
   };
 
   document.getElementById("btn-shortcuts").onclick = (e) => {
@@ -1175,7 +1367,7 @@ function setupSettingsPopup() {
 
   document.getElementById("docker-toggle").onchange = (e) => {
     S.useDocker = e.target.checked;
-    document.getElementById("docker-image-row").classList.toggle("collapsed", !S.useDocker);
+    syncDockerRows();
     if (S.projectName) {
       api("PUT", `/api/projects/${enc(S.projectName)}/config`, { use_docker: S.useDocker });
     }
@@ -1193,9 +1385,17 @@ function setupSettingsPopup() {
     loadDockerImages(true);
   };
 
-  // Registry mirror — save on blur
-  document.getElementById("registry-mirror-input").onblur = (e) => {
-    api("PUT", "/api/settings", { registry_mirror: e.target.value.trim() });
+  // Registry mirror — explicit Apply only. Never auto-save a suggestion.
+  document.getElementById("btn-registry-mirror-apply").onclick = async () => {
+    const input = document.getElementById("registry-mirror-input");
+    const value = input.value.trim();
+    try {
+      await api("PUT", "/api/settings", { registry_mirror: value });
+      if (S._globalSettings) S._globalSettings.registry_mirror = value;
+      setStatus(t("saved"), "success");
+    } catch (e) {
+      setStatus(e.message, "error");
+    }
   };
 
   const pullProgress = document.getElementById("pull-progress");
@@ -1677,15 +1877,26 @@ async function showProjectList() {
   for (const p of projects) {
     const card = document.createElement("div");
     card.className = "project-card" + (p.exists === false ? " stale" : "");
+    card.dataset.testid = "project-card";
+    card.dataset.project = p.name;
+    card.tabIndex = 0;
+    card.setAttribute("aria-label", `${p.name} — ${p.path || ""}`);
+    card.addEventListener("keydown", (e) => {
+      if (e.target !== card) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        if (p.exists !== false) openProject(p.name);
+      }
+    });
     const timeStr = p.last_opened
       ? new Date(p.last_opened).toLocaleString()
       : (p.added_at ? new Date(p.added_at).toLocaleString() : "");
     const gitBadge = p.git ? `<span class="git-badge" title="Git repository"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" stroke-width="2"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></span>` : "";
     card.innerHTML = `<h3>${escapeHtml(p.name)} ${gitBadge}</h3>`
-      + `<div class="project-path">${escapeHtml(p.path || "")}</div>`
-      + `<div class="project-time">${escapeHtml(timeStr)}</div>`
-      + `<button class="rename-btn" title="${t("rename_project")}"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>`
-      + `<button class="remove-btn" title="${t("remove_project")}"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
+      + `<div class="project-path" title="${escapeHtml(p.path || "")}">${escapeHtml(p.path || "")}</div>`
+      + `<div class="project-time" data-testid="project-time">${escapeHtml(timeStr)}</div>`
+      + `<button class="rename-btn" title="${t("rename_project")}" aria-label="${escapeHtml(t("rename_project"))}" data-testid="project-rename"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg></button>`
+      + `<button class="remove-btn" title="${t("remove_project")}" aria-label="${escapeHtml(t("remove_project"))}" data-testid="project-remove"><svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill="none" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
     if (p.exists !== false) {
       card.onclick = (e) => { if (!e.target.closest(".remove-btn") && !e.target.closest(".rename-btn")) openProject(p.name); };
     }
@@ -1910,7 +2121,7 @@ async function openProject(name) {
   if ("use_docker" in config) {
     S.useDocker = config.use_docker;
     document.getElementById("docker-toggle").checked = S.useDocker;
-    document.getElementById("docker-image-row").classList.toggle("collapsed", !S.useDocker);
+    syncDockerRows();
   }
   if (config.docker_image) {
     S.dockerImage = config.docker_image;
@@ -2335,6 +2546,7 @@ async function openFile(filePath) {
   if (filePath.endsWith(".pdf")) {
     const url = `/api/projects/${enc(S.projectName)}/output/${enc(filePath)}`;
     loadPDF(url);
+    if (MOBILE_QUERY.matches) setMobilePane("pdf");
     return;
   }
 
@@ -2343,6 +2555,7 @@ async function openFile(filePath) {
   if (imgExts.some(e => filePath.toLowerCase().endsWith(e))) {
     const url = `/api/projects/${enc(S.projectName)}/output/${enc(filePath)}`;
     showImagePreview(url, filePath);
+    if (MOBILE_QUERY.matches) setMobilePane("pdf");
     return;
   }
 
@@ -2360,6 +2573,7 @@ async function openFile(filePath) {
   // Already open → just focus it
   if (S.tabs.includes(filePath) && S.editors.has(filePath)) {
     switchTab(filePath);
+    if (MOBILE_QUERY.matches) setMobilePane("editor");
     return;
   }
 
@@ -2421,6 +2635,7 @@ async function openFile(filePath) {
   S.editors.set(filePath, { view, mtime: data.mtime || 0 });
   if (!S.tabs.includes(filePath)) S.tabs.push(filePath);
   switchTab(filePath);
+  if (MOBILE_QUERY.matches) setMobilePane("editor");
 }
 
 function scheduleAutoSave() {
@@ -3227,7 +3442,11 @@ function setupLogClickHandler() {
 // Sidebar Tab Switching
 // ══════════════════════════════════════════
 function switchSidebarTab(tabName) {
-  document.querySelectorAll(".sidebar-tab").forEach((t) => t.classList.toggle("active", t.dataset.tab === tabName));
+  document.querySelectorAll(".sidebar-tab").forEach((t) => {
+    const on = t.dataset.tab === tabName;
+    t.classList.toggle("active", on);
+    t.setAttribute("aria-selected", on ? "true" : "false");
+  });
   document.getElementById("sidebar-files").style.display = tabName === "files" ? "flex" : "none";
   document.getElementById("sidebar-git").style.display = tabName === "git" ? "flex" : "none";
   document.getElementById("sidebar-search").style.display = tabName === "search" ? "flex" : "none";
@@ -4318,7 +4537,11 @@ async function openAsWorktree(branch) {
 }
 
 function switchGitSubTab(tabName) {
-  document.querySelectorAll(".git-sub-tab").forEach(b => b.classList.toggle("active", b.dataset.gitTab === tabName));
+  document.querySelectorAll(".git-sub-tab").forEach(b => {
+    const on = b.dataset.gitTab === tabName;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+  });
   document.getElementById("git-changes-panel").style.display = tabName === "changes" ? "" : "none";
   document.getElementById("git-history-panel").style.display = tabName === "history" ? "" : "none";
   document.getElementById("git-versions-panel").style.display = tabName === "versions" ? "" : "none";
