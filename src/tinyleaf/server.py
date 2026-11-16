@@ -3,10 +3,16 @@
 import email.utils
 import logging
 import os
+import re
 import ssl
+import time
+import uuid
 
+from tinyleaf import __version__
 from tinyleaf._vendor.httpserver import (
     App,
+    HTTPException,
+    JSONResponse,
     Response,
     StreamingResponse,
     abort,
@@ -23,6 +29,125 @@ app = App(
 )
 
 _config: dict = {}
+
+_STARTED_AT = time.time()
+
+# Request ids are echoed from the client only when they are safe to log and
+# return unchanged.
+_REQUEST_ID_RE = re.compile(r"[A-Za-z0-9._-]{1,64}")
+
+_STATUS_CODES = {
+    400: "bad_request",
+    401: "unauthorized",
+    403: "forbidden",
+    404: "not_found",
+    405: "method_not_allowed",
+    408: "timeout",
+    409: "conflict",
+    413: "payload_too_large",
+    415: "unsupported_media_type",
+    422: "processing_failed",
+    424: "dependency_missing",
+    429: "rate_limited",
+    500: "internal_error",
+    502: "upstream_error",
+    503: "dependency_missing",
+    504: "timeout",
+}
+
+# The current UI uses inline handlers and style attributes, so the first CSP
+# needs 'unsafe-inline'. Removing those is a separate follow-up.
+_SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self' data:; "
+        "connect-src 'self'; "
+        "worker-src 'self' blob:; "
+        "object-src 'none'; "
+        "base-uri 'none'; "
+        "form-action 'self'; "
+        "frame-ancestors 'none'"
+    ),
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
+
+
+class APIError(HTTPException):
+    """HTTP error carrying a stable machine-readable code and detail.
+
+    Handlers raise this for expected client and dependency failures so the
+    error envelope can distinguish them from unexpected server errors.
+    """
+
+    __slots__ = ("code", "detail")
+
+    def __init__(self, status_code, message, code=None, detail=None):
+        super().__init__(status_code, message)
+        self.code = code
+        self.detail = detail
+
+
+def _request_id(request):
+    return getattr(request.state, "request_id", "")
+
+
+def _error_envelope(request, status, error, code=None, detail=None):
+    """Build the JSON error envelope shared by every API error."""
+    return JSONResponse(
+        {
+            "error": error,
+            "code": code or _STATUS_CODES.get(status, f"http_{status}"),
+            "detail": detail,
+            "request_id": _request_id(request),
+        },
+        status_code=status,
+    )
+
+
+@app.before_request
+def assign_request_id(request):
+    """Attach a request id to every request, reusing a valid client id."""
+    candidate = request.headers.get("x-request-id", "")
+    request.state.request_id = (
+        candidate if _REQUEST_ID_RE.fullmatch(candidate) else uuid.uuid4().hex[:16]
+    )
+
+
+@app.on_response_started
+def add_response_headers(request, response):
+    """Add the request id and security headers to every response.
+
+    ``on_response_started`` fires for static files, errors, and short-circuits;
+    ``after_request`` does not.
+    """
+    request_id = _request_id(request)
+    if request_id:
+        response.headers.setdefault("X-Request-Id", request_id)
+    for name, value in _SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
+
+
+@app.errorhandler(HTTPException)
+def handle_http_exception(request, exception):
+    return _error_envelope(
+        request,
+        exception.status_code,
+        exception.message,
+        getattr(exception, "code", None),
+        getattr(exception, "detail", None),
+    )
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_exception(request, exception):
+    logger.error("Unhandled exception for request %s: %s", _request_id(request), exception)
+    return _error_envelope(request, 500, "Internal Server Error")
 
 
 def _json_body(request):
@@ -128,6 +253,66 @@ def serve_vendor(request, filepath):
     )
 
 
+# ── API metadata ──
+
+
+def _route_template(route):
+    """Render a compiled route regex back as a ``{param}`` path template."""
+    body = route.pattern.pattern
+    if body.startswith("^"):
+        body = body[1:]
+    if body.endswith("$"):
+        body = body[:-1]
+    parts = re.split(r"(\([^()]*\))", body)
+    names = iter(route.param_names)
+    rendered = []
+    for part in parts:
+        if re.fullmatch(r"\([^()]*\)", part):
+            name = next(names, None)
+            rendered.append("{" + name + "}" if name else part)
+        else:
+            rendered.append(part)
+    return "".join(rendered)
+
+
+def _schema_payload():
+    routes = []
+    for route in app._routes:
+        path = _route_template(route)
+        if not path.startswith("/api/"):
+            continue
+        for method in route.methods:
+            if method != "*":
+                routes.append({"method": method, "path": path})
+    routes.sort(key=lambda item: (item["path"], item["method"]))
+    return {
+        "name": "tinyleaf",
+        "version": __version__,
+        "auth_required": bool(_config.get("token")),
+        "routes": routes,
+    }
+
+
+@app.get("/api/health")
+def api_health(request):
+    return {
+        "status": "ok",
+        "version": __version__,
+        "mode": _config.get("mode", ""),
+        "uptime_seconds": int(time.time() - _STARTED_AT),
+    }
+
+
+@app.get("/api/version")
+def api_version(request):
+    return {"name": "tinyleaf", "version": __version__}
+
+
+@app.get("/api/schema")
+def api_schema(request):
+    return _schema_payload()
+
+
 # ── Global API routes ──
 
 
@@ -226,7 +411,7 @@ def api_register_project(request):
 def api_browse_filesystem(request):
     from tinyleaf.handlers import handle_browse_filesystem
 
-    return handle_browse_filesystem(request.query_params)
+    return handle_browse_filesystem(request.query_params, _config)
 
 
 # ── Project-scoped API routes ──
