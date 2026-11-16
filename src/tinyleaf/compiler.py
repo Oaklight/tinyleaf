@@ -187,6 +187,27 @@ def _build_multipass_cmds(engine, main_file):
     return [engine_cmd, bibtex_cmd, engine_cmd, engine_cmd]
 
 
+def _docker_run_prefix(project_dir, image):
+    """Build the ``docker run`` arguments used for compilation.
+
+    The container runs as the invoking user so it does not leave root-owned
+    output files in the bind-mounted project. ``HOME`` points at the writable
+    container ``/tmp`` because the image has no home for an arbitrary uid.
+    Platforms without ``os.getuid`` (Windows) keep the image default user.
+    """
+    prefix = ["docker", "run", "--rm"]
+    if hasattr(os, "getuid"):
+        prefix += ["--user", f"{os.getuid()}:{os.getgid()}", "-e", "HOME=/tmp"]
+    prefix += [
+        "-v",
+        f"{project_dir}:/workspace",
+        "-w",
+        "/workspace",
+        image,
+    ]
+    return prefix
+
+
 async def _run_compile(job: CompileJob):
     """Run the compilation as an async task.
 
@@ -218,16 +239,7 @@ async def _run_compile(job: CompileJob):
             cmds = [_build_latexmk_args("pdflatex", job.main_file)]
 
         if job.use_docker:
-            docker_prefix = [
-                "docker",
-                "run",
-                "--rm",
-                "-v",
-                f"{job.project_dir}:/workspace",
-                "-w",
-                "/workspace",
-                job.docker_image,
-            ]
+            docker_prefix = _docker_run_prefix(job.project_dir, job.docker_image)
             cmds = [docker_prefix + c for c in cmds]
 
         last_rc = 0
