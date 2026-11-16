@@ -1,9 +1,12 @@
 """CLI entry point for tinyleaf."""
 
 import argparse
+import json
+import logging
 import os
 import re
 import shutil
+import socket
 import sys
 import webbrowser
 
@@ -17,6 +20,8 @@ DEFAULT_HOST = "127.0.0.1"
 # hmac.compare_digest rejects non-ASCII str values, and very short tokens are
 # not worth the ceremony.
 _TOKEN_RE = re.compile(r"[A-Za-z0-9._~+/=-]{16,}")
+
+_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 
 
 def _get_pypi_latest(pkg: str = "tinyleaf") -> str | None:
@@ -144,6 +149,58 @@ def _validate_token(token: str) -> str | None:
     return "invalid API token: use at least 16 ASCII characters from A-Z a-z 0-9 . _ ~ + / = -"
 
 
+def _resolve_port(host: str, port: int) -> int:
+    """Return ``port``, resolving ``0`` to a free port before startup."""
+    if port:
+        return port
+    info = socket.getaddrinfo(host, 0, type=socket.SOCK_STREAM)
+    af, socktype, proto, _canonname, sa = info[0]
+    with socket.socket(af, socktype, proto) as sock:
+        sock.bind(sa)
+        return sock.getsockname()[1]
+
+
+def _configure_logging(log_file: str | None, level: str) -> None:
+    """Send logs to stderr and, when given, to a file."""
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    if log_file:
+        handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
+    logging.basicConfig(
+        level=getattr(logging, level),
+        handlers=handlers,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        force=True,
+    )
+
+
+def _startup_payload(mode, url, host, port, use_docker, config_dir, read_only):
+    """Build the machine-readable startup object for ``--json``."""
+    return {
+        "status": "ok",
+        "mode": mode,
+        "url": url,
+        "host": host,
+        "port": port,
+        "pid": os.getpid(),
+        "version": __version__,
+        "docker": bool(use_docker),
+        "config_dir": config_dir,
+        "read_only": bool(read_only),
+    }
+
+
+def _write_pid_file(path: str) -> None:
+    with open(path, "w", encoding="utf-8") as pid_file:
+        pid_file.write(f"{os.getpid()}\n")
+
+
+def _remove_pid_file(path: str) -> None:
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="tinyleaf",
@@ -206,6 +263,32 @@ def main():
         help="Allow a non-loopback bind without a token (not recommended)",
     )
     parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print one JSON startup object to stdout; do not open a browser",
+    )
+    parser.add_argument(
+        "--print-url",
+        action="store_true",
+        help="Print only the server URL to stdout; do not open a browser",
+    )
+    parser.add_argument(
+        "--pid-file",
+        metavar="PATH",
+        help="Write the server PID to PATH and remove it on clean exit",
+    )
+    parser.add_argument(
+        "--log-file",
+        metavar="PATH",
+        help="Also write logs to PATH",
+    )
+    parser.add_argument(
+        "--log-level",
+        default=os.environ.get("TINYLEAF_LOG_LEVEL", "INFO"),
+        metavar="LEVEL",
+        help="Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL (default: INFO)",
+    )
+    parser.add_argument(
         "--docker",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -248,6 +331,19 @@ def main():
     if args.version:
         _print_version()
         sys.exit(0)
+
+    if args.json and args.print_url:
+        parser.error("--json and --print-url are mutually exclusive")
+    args.log_level = args.log_level.upper()
+    if args.log_level not in _LOG_LEVELS:
+        parser.error(f"invalid --log-level: {args.log_level}")
+    try:
+        _configure_logging(args.log_file, args.log_level)
+    except OSError as exc:
+        print(f"Error: cannot open --log-file: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    port = _resolve_port(args.host, args.port)
 
     # Validate TLS options
     if args.ssl_key and not args.ssl_cert:
@@ -307,7 +403,10 @@ def main():
             if os.path.isdir(projects_dir):
                 count = _migrate_projects_dir(config_dir, projects_dir)
                 if count:
-                    print(f"  Migrated {count} project(s) from {projects_dir}")
+                    print(
+                        f"  Migrated {count} project(s) from {projects_dir}",
+                        file=sys.stderr,
+                    )
 
     # Auto-download vendor JS modules on first start
     from tinyleaf import vendor
@@ -316,16 +415,21 @@ def main():
     if not vendor.is_vendor_ready(vendor_dir):
         proxy = vendor.load_proxy(config_dir)
         if proxy:
-            print(f"  Using proxy: {proxy}")
+            print(f"  Using proxy: {proxy}", file=sys.stderr)
 
         def _progress(done, total, name):
-            print(f"\r  Downloading JS modules... {done}/{total}\033[K", end="", flush=True)
+            print(
+                f"\r  Downloading JS modules... {done}/{total}\033[K",
+                end="",
+                flush=True,
+                file=sys.stderr,
+            )
 
         try:
             vendor.download_vendor(vendor_dir, proxy=proxy, progress=_progress)
-            print("\r  JS modules ready\033[K")
+            print("\r  JS modules ready\033[K", file=sys.stderr)
         except Exception as e:
-            print()
+            print(file=sys.stderr)
             print(f"  Warning: failed to download JS modules: {e}", file=sys.stderr)
             print("  Editor will try CDN as fallback", file=sys.stderr)
 
@@ -355,7 +459,7 @@ def main():
         "use_docker": use_docker,
         "docker_image": args.image,
         "host": args.host,
-        "port": args.port,
+        "port": port,
         "ssl_cert": args.ssl_cert,
         "ssl_key": args.ssl_key,
         "browse_roots": browse_roots,
@@ -365,25 +469,9 @@ def main():
     }
 
     scheme = "https" if args.ssl_cert else "http"
-    url = f"{scheme}://{args.host}:{args.port}"
-    print(f"Starting tinyleaf ({mode} mode)")
-    if use_docker:
-        print(f"  Compiler: Docker ({args.image})")
-    else:
-        print("  Compiler: local latexmk")
-    if mode == "single":
-        print(f"  Project:  {project_path}")
-    else:
-        print(f"  Config:   {config_dir}")
-    if args.ssl_cert:
-        print(f"  TLS:      {args.ssl_cert}")
-    if token:
-        print("  Auth:     bearer token or session cookie")
-    if args.read_only:
-        print("  Read-only: yes")
-    print(f"  URL:      {url}")
+    url = f"{scheme}://{args.host}:{port}"
 
-    _check_port_available(args.host, args.port)
+    _check_port_available(args.host, port)
 
     if not _is_loopback(args.host) and not token:
         print(
@@ -392,10 +480,56 @@ def main():
             file=sys.stderr,
         )
 
-    if not args.no_browser:
+    if args.pid_file:
+        try:
+            _write_pid_file(args.pid_file)
+        except OSError as exc:
+            print(f"Error: cannot write --pid-file: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+    if args.json:
+        print(
+            json.dumps(
+                _startup_payload(
+                    mode,
+                    url,
+                    args.host,
+                    port,
+                    use_docker,
+                    config_dir,
+                    args.read_only,
+                )
+            ),
+            flush=True,
+        )
+    elif args.print_url:
+        print(url, flush=True)
+    else:
+        print(f"Starting tinyleaf ({mode} mode)")
+        if use_docker:
+            print(f"  Compiler: Docker ({args.image})")
+        else:
+            print("  Compiler: local latexmk")
+        if mode == "single":
+            print(f"  Project:  {project_path}")
+        else:
+            print(f"  Config:   {config_dir}")
+        if args.ssl_cert:
+            print(f"  TLS:      {args.ssl_cert}")
+        if token:
+            print("  Auth:     bearer token or session cookie")
+        if args.read_only:
+            print("  Read-only: yes")
+        print(f"  URL:      {url}")
+
+    if not (args.no_browser or args.json or args.print_url):
         webbrowser.open(url)
 
-    run_server(config)
+    try:
+        run_server(config)
+    finally:
+        if args.pid_file:
+            _remove_pid_file(args.pid_file)
 
 
 def _migrate_projects_dir(config_dir, projects_dir):

@@ -23,6 +23,7 @@ from tinyleaf._vendor.httpserver import (
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
 logger = logging.getLogger(__name__)
+_audit_logger = logging.getLogger("tinyleaf.audit")
 
 app = App(
     max_body_size=50 * 1024 * 1024,
@@ -116,6 +117,12 @@ def _error_envelope(request, status, error, code=None, detail=None):
 
 
 @app.before_request
+def record_request_start(request):
+    """Timestamp every request so mutating requests can report duration."""
+    request.state.started_at = time.monotonic()
+
+
+@app.before_request
 def assign_request_id(request):
     """Attach a request id to every request, reusing a valid client id."""
     candidate = request.headers.get("x-request-id", "")
@@ -136,6 +143,24 @@ def add_response_headers(request, response):
         response.headers.setdefault("X-Request-Id", request_id)
     for name, value in _SECURITY_HEADERS.items():
         response.headers.setdefault(name, value)
+
+
+@app.on_response_completed
+def audit_mutation(request, response):
+    """Log every completed mutating request; never log bodies or query strings."""
+    if request.method in _SAFE_METHODS:
+        return
+    started = getattr(request.state, "started_at", None)
+    duration_ms = round((time.monotonic() - started) * 1000, 1) if started else None
+    _audit_logger.info(
+        "mutation method=%s path=%s status=%s request_id=%s duration_ms=%s client=%s",
+        request.method,
+        request.path,
+        response.status_code,
+        _request_id(request),
+        duration_ms,
+        request.client_addr[0],
+    )
 
 
 @app.errorhandler(HTTPException)
