@@ -115,6 +115,12 @@ def main():
         help=f"Config directory for project registry (default: {DEFAULT_CONFIG_DIR})",
     )
     parser.add_argument(
+        "--browse-root",
+        metavar="DIR",
+        action="append",
+        help="Directory the file browser may access (repeatable; default: $HOME)",
+    )
+    parser.add_argument(
         "--docker",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -227,6 +233,15 @@ def main():
         print("Error: --docker specified but 'docker' not found in PATH", file=sys.stderr)
         sys.exit(1)
 
+    browse_roots = [
+        os.path.abspath(os.path.expanduser(path))
+        for path in (args.browse_root or [os.path.expanduser("~")])
+    ]
+    for root in browse_roots:
+        if not os.path.isdir(root):
+            print(f"Error: --browse-root is not a directory: {root}", file=sys.stderr)
+            sys.exit(1)
+
     config = {
         "mode": mode,
         "project_path": project_path,
@@ -237,6 +252,7 @@ def main():
         "port": args.port,
         "ssl_cert": args.ssl_cert,
         "ssl_key": args.ssl_key,
+        "browse_roots": browse_roots,
     }
 
     scheme = "https" if args.ssl_cert else "http"

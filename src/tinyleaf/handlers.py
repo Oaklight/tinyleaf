@@ -29,6 +29,13 @@ _settings_lock = threading.Lock()
 # ── Helpers ──
 
 
+def _api_error(status, error, code=None, detail=None):
+    """Build an :class:`APIError` without a module-level server import."""
+    from tinyleaf.server import APIError
+
+    return APIError(status, error, code, detail)
+
+
 def _get_project_dir(config, name):
     """Resolve project name to directory path. Raises on failure."""
     if config["mode"] == "single":
@@ -372,9 +379,26 @@ def handle_rename_project(body, config, name):
     return {"old_name": name, "new_name": new_name}
 
 
-def handle_browse_filesystem(query_params):
-    path = query_params.get("path", [os.path.expanduser("~")])[0]
+def _is_within_roots(path, roots):
+    """Return True when ``path`` resolves inside one of ``roots``."""
+    for root in roots:
+        root_real = os.path.realpath(os.path.expanduser(root))
+        try:
+            if os.path.commonpath([root_real, path]) == root_real:
+                return True
+        except ValueError:
+            # Different drives on Windows.
+            continue
+    return False
+
+
+def handle_browse_filesystem(query_params, config):
+    roots = config.get("browse_roots") or [os.path.expanduser("~")]
+    path = query_params.get("path", [roots[0]])[0]
     path = os.path.expanduser(path)
+
+    if not _is_within_roots(os.path.realpath(path), roots):
+        abort(403, "Path is outside the allowed browse roots")
 
     if not os.path.isdir(path):
         abort(400, f"Not a directory: {path}")
@@ -847,7 +871,12 @@ def handle_synctex_query(query_params, config, name):
         data = synctex.parse_synctex(synctex_path, strip_prefix="/workspace/")
         result = synctex.inverse_search(data, page, x, y)
     except Exception as exc:
-        abort(500, f"SyncTeX parse error: {exc}")
+        raise _api_error(
+            422,
+            "SyncTeX parse error",
+            "processing_failed",
+            {"reason": str(exc)[:2000]},
+        ) from exc
 
     if result is None:
         abort(404, "No match found")
@@ -875,7 +904,12 @@ def handle_synctex_forward(query_params, config, name):
         data = synctex.parse_synctex(synctex_path, strip_prefix="/workspace/")
         result = synctex.forward_search(data, file_param, line_num)
     except Exception as exc:
-        abort(500, f"SyncTeX parse error: {exc}")
+        raise _api_error(
+            422,
+            "SyncTeX parse error",
+            "processing_failed",
+            {"reason": str(exc)[:2000]},
+        ) from exc
 
     if result is None:
         abort(404, "No match found")
@@ -969,13 +1003,29 @@ def handle_word_count(config, name):
             timeout=30,
         )
     except FileNotFoundError:
-        abort(500, "texcount not found. Enable Docker or install texcount locally.")
+        dependency = "docker" if use_docker else "texcount"
+        hint = (
+            "Pull the configured image or enable Docker."
+            if use_docker
+            else "Enable Docker or install texcount locally."
+        )
+        raise _api_error(
+            503,
+            f"{dependency} not found",
+            "dependency_missing",
+            {"dependency": dependency, "hint": hint},
+        )
     except subprocess.TimeoutExpired:
-        abort(500, "texcount timed out")
+        raise _api_error(504, "texcount timed out", "timeout", {"dependency": "texcount"})
 
     if result.returncode != 0:
         stderr = result.stderr.strip() or result.stdout.strip()
-        abort(500, f"texcount failed: {stderr}")
+        raise _api_error(
+            422,
+            "texcount failed",
+            "processing_failed",
+            {"stderr": stderr[:2000]},
+        )
 
     return _parse_texcount_output(result.stdout)
 

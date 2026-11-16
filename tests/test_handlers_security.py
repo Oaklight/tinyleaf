@@ -72,11 +72,17 @@ def test_default_image_from_server_config_is_allowed(tmp_path):
     assert handlers._validate_docker_image("my/private-texlive:2026", config)
 
 
-def test_server_registers_no_cors_hooks():
+def test_server_sends_no_cors_headers():
     from tinyleaf import server
+    from tinyleaf._vendor.httpserver import Request, Response
 
-    assert server.app._before_request_handlers == []
-    assert server.app._after_request_handlers == []
+    request = Request("GET", "/", "", {}, b"", ("127.0.0.1", 1), server.app)
+    response = Response(body=b"ok")
+    for hook in server.app._after_request_handlers:
+        hook(request, response)
+    for hook in server.app._on_response_started_handlers:
+        hook(request, response)
+    assert "Access-Control-Allow-Origin" not in response.headers
 
 
 @pytest.mark.parametrize(
