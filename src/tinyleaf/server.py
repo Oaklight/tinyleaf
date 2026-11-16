@@ -14,12 +14,6 @@ from tinyleaf._vendor.httpserver import (
 
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
-_CORS_HEADERS = {
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-}
-
 logger = logging.getLogger(__name__)
 
 app = App(
@@ -162,7 +156,7 @@ async def api_docker_pull(request):
 async def api_docker_rmi(request):
     from tinyleaf.handlers import handle_docker_rmi
 
-    return await handle_docker_rmi(request.json())
+    return await handle_docker_rmi(request.json(), _config)
 
 
 @app.post("/api/docker/cancel-pull")
@@ -297,7 +291,6 @@ async def api_compile_stream(request, name, compile_id):
     return StreamingResponse(
         sse_compile_stream(compile_id, name),
         content_type="text/event-stream",
-        headers=_CORS_HEADERS.copy(),
     )
 
 
@@ -519,23 +512,6 @@ def api_git_worktree_switch(request, name):
     from tinyleaf.handlers import handle_git_worktree_switch
 
     return handle_git_worktree_switch(request.json(), _config, name)
-
-
-# ── CORS middleware ──
-
-
-@app.before_request
-def handle_cors_preflight(request):
-    if request.method == "OPTIONS":
-        return Response(status_code=204, headers=_CORS_HEADERS)
-
-
-@app.after_request
-def add_cors_headers(request, response):
-    if isinstance(response, Response) and not isinstance(response, StreamingResponse):
-        for k, v in _CORS_HEADERS.items():
-            response.headers.setdefault(k, v)
-    return response
 
 
 # ── Lifecycle hooks ──

@@ -154,6 +154,31 @@ _KNOWN_TAGS = [
 ]
 
 
+def _allowed_docker_images(config):
+    """Return the Docker images this server may pull, run, or remove."""
+    allowed = {f"{_DOCKER_IMAGE_PREFIX}:{tag}" for tag in _KNOWN_TAGS}
+    default = config.get("docker_image")
+    if default:
+        allowed.add(default)
+    return allowed
+
+
+def _validate_docker_image(image, config):
+    """Reject images that are not the server default or a known tag.
+
+    The compile and pull APIs accept an image name from the browser. Without
+    this check a same-origin script could make the server run an arbitrary
+    container with the project mounted.
+    """
+    if image not in _allowed_docker_images(config):
+        abort(
+            400,
+            f"Docker image not allowed: {image}. "
+            "Use a known oaklight/texlive tag or start tinyleaf with --image.",
+        )
+    return image
+
+
 def handle_list_docker_images():
     local_tags = set()
     try:
@@ -182,6 +207,7 @@ async def handle_docker_pull(body, config):
     image = body.get("image")
     if not image:
         abort(400, "Missing image")
+    _validate_docker_image(image, config)
 
     config_dir = config.get("config_dir")
     registry_mirror = None
@@ -193,10 +219,11 @@ async def handle_docker_pull(body, config):
     return {"success": success, "message": msg}
 
 
-async def handle_docker_rmi(body):
+async def handle_docker_rmi(body, config):
     image = body.get("image")
     if not image:
         abort(400, "Missing image")
+    _validate_docker_image(image, config)
     success, msg = await compiler.docker_remove_image(image)
     return {"success": success, "message": msg}
 
@@ -615,6 +642,8 @@ def handle_put_config(body, config, name):
 
     existing = _read_project_config(project_dir)
     existing.update(body)
+    if "docker_image" in body:
+        _validate_docker_image(body["docker_image"], config)
     _write_project_config(project_dir, existing)
     return existing
 
@@ -636,6 +665,8 @@ async def handle_compile(body, config, name):
     docker_image = (
         body.get("docker_image") or config_data.get("docker_image") or config["docker_image"]
     )
+    if use_docker:
+        _validate_docker_image(docker_image, config)
     config_dir = config.get("config_dir")
     registry_mirror = None
     if config_dir:
@@ -849,6 +880,8 @@ def handle_word_count(config, name):
 
     use_docker = config_data.get("use_docker", config["use_docker"])
     docker_image = config_data.get("docker_image") or config["docker_image"]
+    if use_docker:
+        _validate_docker_image(docker_image, config)
 
     texcount_cmd = ["texcount", "-inc", "-sum", "-merge", main_file]
 

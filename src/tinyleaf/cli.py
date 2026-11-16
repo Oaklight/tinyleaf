@@ -77,6 +77,16 @@ def _check_port_available(host: str, port: int):
         sys.exit(1)
 
 
+def _is_loopback(host: str) -> bool:
+    """Return True for loopback addresses and ``localhost``."""
+    import ipaddress
+
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return host == "localhost"
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="tinyleaf",
@@ -245,6 +255,13 @@ def main():
     print(f"  URL:      {url}")
 
     _check_port_available(args.host, args.port)
+
+    if not _is_loopback(args.host):
+        print(
+            f"Warning: the API has no authentication. Binding to {args.host} "
+            "exposes project files and compile controls to the network.",
+            file=sys.stderr,
+        )
 
     if not args.no_browser:
         webbrowser.open(url)
