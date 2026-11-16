@@ -1961,14 +1961,36 @@ function getCompileStatus(projectName) {
   }
 }
 
-function setCompileStatus(projectName, status) {
+function setCompileStatus(projectName, status, elapsed = null) {
   if (!projectName) return;
   try {
     localStorage.setItem(
       COMPILE_STATUS_KEY + projectName,
-      JSON.stringify({ status, at: Date.now() })
+      JSON.stringify({ status, at: Date.now(), elapsed })
     );
   } catch { /* storage full or blocked */ }
+}
+
+/** Show the stored compile result for a project, or hide the toolbar badge. */
+function restoreCompileBadge(projectName) {
+  const badge = document.getElementById("compile-badge");
+  if (!badge) return;
+  badge.hidden = true;
+  badge.textContent = "";
+  badge.className = "compile-badge";
+  badge.title = "";
+  badge.removeAttribute("aria-label");
+  const state = getCompileStatus(projectName);
+  if (!state) return;
+  const ok = state.status === "success";
+  const cancelled = state.status === "cancelled";
+  const label = ok ? t("compile_success") : cancelled ? t("compile_cancelled") : t("compile_failed");
+  const elapsedText = state.elapsed != null ? formatCompileElapsed(state.elapsed) : "";
+  badge.hidden = false;
+  badge.className = "compile-badge " + (ok ? "success" : cancelled ? "warning" : "error");
+  badge.textContent = `${ok ? "✓" : cancelled ? "—" : "✕"} ${elapsedText}`.trim();
+  badge.title = `${label} · ${new Date(state.at).toLocaleString()}`;
+  badge.setAttribute("aria-label", badge.title);
 }
 
 async function showProjectList() {
@@ -2238,6 +2260,7 @@ async function openProject(name) {
   S.projectName = name;
   localStorage.setItem("tinyleaf-project", name);
   document.getElementById("project-name").textContent = name;
+  restoreCompileBadge(name);
   document.getElementById("app").classList.remove("project-list-mode");
   document.getElementById("project-list-view").style.display = "none";
   document.getElementById("editor-view").style.display = "flex";
@@ -3002,7 +3025,7 @@ function finishCompileUI(status) {
     badge.title = `${label} · ${elapsedText}`;
     badge.setAttribute("aria-label", badge.title);
   }
-  setCompileStatus(S.projectName, status);
+  setCompileStatus(S.projectName, status, elapsed);
   showToast(`${label} (${elapsedText})`, ok ? "success" : status === "cancelled" ? "info" : "error");
 }
 
