@@ -12,6 +12,59 @@ hide:
 
 ## [Unreleased]
 
+## [0.8.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.8.0) - 2026-11-17
+
+### 新增
+
+- Token 认证（`--token` / `TINYLEAF_TOKEN`、`--token-file`）、可选只读模式（`--read-only`）和主机白名单（`--allowed-host`），带 DNS 重绑定防护（#122）
+- `POST /api/auth/logout` 端点，用于清除会话 Cookie（#129）
+- 结构化 JSON 错误（稳定错误码、请求 ID）、安全响应头，以及 `GET /api/health`、`/api/version`、`/api/schema` 元数据端点（#121）
+- CLI 自动化：机器可读启动输出、PID/日志文件、变更审计日志（#126）
+- Git 构建产物过滤：LaTeX 构建产物从状态中隐藏并在提交时保护；新增 `POST /api/projects/{name}/git/ignore-artifacts`（#125、#131）
+- UI：深链接、命令面板操作、API 访问面板（#132）
+- UI：感知构建产物的文件/Git 视图、项目卡片、编译反馈（#130）
+- UI：响应式移动布局、更大的触控目标、可访问性改进（#127）
+- 设置面板中的 Docker 拉取进度流式显示（#111）
+- Docker 快速开始文档补充 `TINYLEAF_TOKEN`（#128）
+
+### 变更
+
+- **breaking**：绑定到非回环地址时现在必须设置 `TINYLEAF_TOKEN`（或 `--token-file`）；仅在可信网络中才使用 `--insecure-no-auth`（#122）
+- **breaking**：API 错误改为 `{error, code, detail, request_id}` 结构；解析旧纯文本错误的客户端需要适配（#121）
+- **breaking**：默认拒绝跨站变更请求；未知 Host 返回 `400 host_not_allowed`；反向代理部署需设置 `--allowed-host`（#122）
+- **breaking**：`/api/fs/browse` 受 `--browse-root` 限制，默认根之外的路径返回 403；需要额外根目录时添加 `--browse-root`（#121）
+- Docker 编译以调用者用户身份运行，而不是 root（#124）
+- 在探测 `latexmk` 前先拉取镜像，并支持 registry mirror 回退（#104）
+- 设置读取-修改-写入使用锁串行化（#107）
+- 自定义 `--image` 不再被已知 tag 替换（#108）
+- 明确报告 vendor 就绪状态和部分下载失败（#110）
+- 提取 options 和 dialogs 的共享前端辅助函数（#112）
+- vendored `httpserver` 更新到 0.7.2（#98）
+- Docker 镜像安装 Docker CLI，移除未使用的 compose 服务（#99）
+- CI 增加 pytest job，`make test` 可在全新 checkout 中运行（#100）
+
+### 修复
+
+- 返回列表的 handler 改为返回 `JSONResponse`，不再返回裸列表（#109）
+- Git 操作处理 `TimeoutExpired`（#97）
+- `git show` 在路径分隔符前传递 commit hash（#96）
+
+### 安全
+
+- 移除通配符 CORS，增加 Docker 镜像校验（#103）
+- 转义所有 HTML 属性中的引号，统一转义逻辑（#102）
+- 强制真实项目路径包含检查（#101）
+- 文件树不再跟随符号链接（#106）
+- 使用显式 `ProxyHandler` 替代修改 `os.environ`（#105）
+
+### 迁移
+
+- 非回环部署：设置 `TINYLEAF_TOKEN` 或传入 `--token-file`。除非传入 `--insecure-no-auth`，服务将拒绝启动。
+- 反向代理：用 `--allowed-host` 添加每个公开主机名（可重复）。
+- API 客户端：从新的错误结构中读取 `code` 和 `detail`；配置 token 时发送 `Authorization: Bearer <token>`。
+- 文件浏览：默认根之外的目录需通过 `--browse-root` 添加。
+- Git：LaTeX 构建产物默认从状态中隐藏；通过 `POST /api/projects/{name}/git/ignore-artifacts` 管理忽略列表。
+
 ## [0.7.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.7.0) - 2026-09-14
 
 ### 新增
