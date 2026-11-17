@@ -12,6 +12,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.8.0) - 2026-11-17
+
+### Added
+
+- Token authentication (`--token` / `TINYLEAF_TOKEN`, `--token-file`), optional read-only mode (`--read-only`), and a host allow-list (`--allowed-host`) with DNS-rebinding protection (#122)
+- `POST /api/auth/logout` to clear the session cookie (#129)
+- Structured JSON errors with stable codes and request IDs, security headers, and `GET /api/health`, `/api/version`, and `/api/schema` metadata routes (#121)
+- CLI automation: machine-readable startup output, PID/log files, and a mutation audit log (#126)
+- Git artifact filtering: LaTeX build artifacts are hidden from status and guarded in commits; `POST /api/projects/{name}/git/ignore-artifacts` (#125, #131)
+- UI: deep links, command palette actions, and an API access panel (#132)
+- UI: artifact-aware files and Git views, project cards, and compile feedback (#130)
+- UI: responsive mobile layout, larger touch targets, and accessibility improvements (#127)
+- Docker pull progress streaming in the settings panel (#111)
+- Docker quick-start documentation for `TINYLEAF_TOKEN` (#128)
+
+### Changed
+
+- **breaking**: Binding to a non-loopback host now requires `TINYLEAF_TOKEN` (or `--token-file`); use `--insecure-no-auth` only on trusted networks (#122)
+- **breaking**: API errors now use the `{error, code, detail, request_id}` envelope; clients that parse plain-text errors must adapt (#121)
+- **breaking**: Mutating cross-site requests are rejected by default, and unknown hosts receive `400 host_not_allowed`; reverse-proxy deployments must set `--allowed-host` (#122)
+- **breaking**: `/api/fs/browse` is bounded by `--browse-root`; paths outside the default roots return 403. Add `--browse-root` for additional roots (#121)
+- Docker compiles run as the invoking user instead of root (#124)
+- Pull the image before the `latexmk` probe, with a registry-mirror fallback (#104)
+- Serialise settings read-modify-write with a lock (#107)
+- Preserve a custom `--image` instead of replacing it with a known tag (#108)
+- Report vendor readiness and partial download failures explicitly (#110)
+- Extract shared frontend helpers for options and dialogs (#112)
+- Update vendored `httpserver` to 0.7.2 (#98)
+- Install the Docker CLI in the image and drop the unused compose service (#99)
+- Run pytest in CI and make `make test` work on a fresh checkout (#100)
+
+### Fixed
+
+- Return `JSONResponse` from list-returning handlers instead of bare lists (#109)
+- Handle `TimeoutExpired` in Git operations (#97)
+- Pass the commit hash before the path separator in `git show` (#96)
+
+### Security
+
+- Remove wildcard CORS and validate Docker images (#103)
+- Escape quotes in every HTML attribute and unify escaping (#102)
+- Enforce real project path containment (#101)
+- Do not follow symlinks when building the file tree (#106)
+- Replace `os.environ` mutation with an explicit `ProxyHandler` (#105)
+
+### Migration
+
+- Non-loopback deployments: set `TINYLEAF_TOKEN` or pass `--token-file`. The server refuses to start without one unless `--insecure-no-auth` is passed.
+- Reverse proxies: add each public hostname with `--allowed-host` (repeatable).
+- API clients: read `code` and `detail` from the new error envelope and send `Authorization: Bearer <token>` when a token is configured.
+- Files: add `--browse-root` for directories outside the default roots.
+- Git: LaTeX build artifacts are hidden from status by default; manage the ignore list with `POST /api/projects/{name}/git/ignore-artifacts`.
+
 ## [0.7.0](https://github.com/Oaklight/tinyleaf/releases/tag/v0.7.0) - 2026-09-14
 
 ### Added
