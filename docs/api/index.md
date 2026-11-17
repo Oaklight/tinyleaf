@@ -1,9 +1,61 @@
 # API 参考
 
-Tinyleaf 暴露 RESTful HTTP API，由浏览器前端消费。所有响应使用 UTF-8 编码。错误统一返回 `{"error": "描述"}`。
+Tinyleaf 暴露 RESTful HTTP API，由浏览器前端消费。所有响应使用 UTF-8 编码。错误统一返回包含 `error`、`code`、`detail`、`request_id` 的 JSON 结构。
 
 !!! note "单项目 vs. 多项目模式"
     在**单项目模式**下，项目管理端点（`POST /api/projects`、`DELETE` 等）不可用。在**多项目模式**下，所有端点均可用。
+
+## v0.8.0：认证与元数据
+
+### 错误结构
+
+所有 API 错误都返回稳定的 `code`、可选的 `detail` 和请求 ID：
+
+```json
+{"error": "Authentication required", "code": "unauthorized", "detail": null, "request_id": "a1b2c3d4"}
+```
+
+响应还包含 `X-Request-Id`。客户端提供合法的 `X-Request-Id` 时会被复用。
+
+### 认证
+
+设置 `--token` / `TINYLEAF_TOKEN`（或 `--token-file`）后，除下列公开路由外，所有 `/api/` 路由都需要 `Authorization: Bearer <token>` 或 `tinyleaf_session` Cookie。
+
+- `POST /api/auth/session` — 请求体 `{"token": "..."}`。设置 HttpOnly `tinyleaf_session` Cookie 并返回 `{"authenticated": true}`。token 无效时返回 `401 unauthorized`；未配置 token 时返回 `{"authenticated": false, "auth_required": false}`。
+- `POST /api/auth/logout` — 清除 Cookie 并返回 `{"authenticated": false}`。公开且幂等。
+
+绑定到非回环地址时必须提供 token，除非传入 `--insecure-no-auth`。
+
+### 元数据
+
+- `GET /api/health` → `{"status": "ok", "version": "...", "mode": "single", "uptime_seconds": 123}`（公开）
+- `GET /api/version` → `{"name": "tinyleaf", "version": "..."}`（公开）
+- `GET /api/schema` → `{"name": "tinyleaf", "version": "...", "auth_required": true, "routes": [{"method": "GET", "path": "/api/health"}]}`（配置 token 时需要认证）
+
+### 访问策略错误
+
+- 未知 `Host`：`400 host_not_allowed`
+- token 缺失或无效：`401 unauthorized`
+- 跨站变更请求：`403 origin_not_allowed`
+- `--read-only` 下的变更请求：`403 read_only`
+- `/api/fs/browse` 超出 `--browse-root` 根目录：`403`
+
+### `POST /api/projects/{name}/git/ignore-artifacts`
+
+将 LaTeX 构建产物规则写入 `.gitignore`，并可选地从索引中移除已跟踪的产物。磁盘文件不会被删除。
+
+**请求：** `{"dry_run": false, "untrack": true}` — 两个值都必须是布尔值；`untrack` 默认为 `true`。
+
+**响应：**
+
+```json
+{
+  "dry_run": false,
+  "gitignore": {"created": false, "added": ["*.aux", "*.log"]},
+  "removed_from_index": ["main.aux"],
+  "failed": []
+}
+```
 
 ---
 
