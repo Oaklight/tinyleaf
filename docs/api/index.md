@@ -1,9 +1,61 @@
 # API Reference
 
-Tinyleaf exposes a RESTful HTTP API consumed by the browser frontend. All responses use UTF-8 encoding. Errors return `{"error": "description"}`.
+Tinyleaf exposes a RESTful HTTP API consumed by the browser frontend. All responses use UTF-8 encoding. Errors return a JSON envelope with `error`, `code`, `detail`, and `request_id`.
 
 !!! note "Single vs. Multi-project mode"
     In **single-project mode**, project management endpoints (`POST /api/projects`, `DELETE`, etc.) are unavailable. In **multi-project mode**, all endpoints are active.
+
+## v0.8.0: Authentication and metadata
+
+### Error envelope
+
+Every API error returns a stable `code`, an optional `detail`, and the request id:
+
+```json
+{"error": "Authentication required", "code": "unauthorized", "detail": null, "request_id": "a1b2c3d4"}
+```
+
+Responses also include `X-Request-Id`. A valid client-supplied `X-Request-Id` is reused.
+
+### Authentication
+
+When `--token` / `TINYLEAF_TOKEN` (or `--token-file`) is set, every `/api/` route except the public routes below requires `Authorization: Bearer <token>` or the `tinyleaf_session` cookie.
+
+- `POST /api/auth/session` — body `{"token": "..."}`. Sets an HttpOnly `tinyleaf_session` cookie and returns `{"authenticated": true}`. An invalid token returns `401 unauthorized`; with no token configured it returns `{"authenticated": false, "auth_required": false}`.
+- `POST /api/auth/logout` — clears the cookie and returns `{"authenticated": false}`. Public and idempotent.
+
+Binding to a non-loopback host requires a token unless `--insecure-no-auth` is passed.
+
+### Metadata
+
+- `GET /api/health` → `{"status": "ok", "version": "...", "mode": "single", "uptime_seconds": 123}` (public)
+- `GET /api/version` → `{"name": "tinyleaf", "version": "..."}` (public)
+- `GET /api/schema` → `{"name": "tinyleaf", "version": "...", "auth_required": true, "routes": [{"method": "GET", "path": "/api/health"}]}` (token required when configured)
+
+### Access policy errors
+
+- Unknown `Host`: `400 host_not_allowed`
+- Missing or invalid token: `401 unauthorized`
+- Cross-site mutating request: `403 origin_not_allowed`
+- Mutating request with `--read-only`: `403 read_only`
+- `/api/fs/browse` outside the `--browse-root` roots: `403`
+
+### `POST /api/projects/{name}/git/ignore-artifacts`
+
+Writes LaTeX build-artifact patterns to `.gitignore` and optionally removes tracked artifacts from the index. Files on disk are never deleted.
+
+**Request:** `{"dry_run": false, "untrack": true}` — both values must be booleans; `untrack` defaults to `true`.
+
+**Response:**
+
+```json
+{
+  "dry_run": false,
+  "gitignore": {"created": false, "added": ["*.aux", "*.log"]},
+  "removed_from_index": ["main.aux"],
+  "failed": []
+}
+```
 
 ---
 
