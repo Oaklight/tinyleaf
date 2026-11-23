@@ -1,5 +1,5 @@
 # /// zerodep
-# version = "0.7.2"
+# version = "0.8.0"
 # deps = []
 # tier = "subsystem"
 # category = "network"
@@ -115,6 +115,7 @@ _STATUS_REASONS: dict[int, str] = {
     409: "Conflict",
     413: "Content Too Large",
     415: "Unsupported Media Type",
+    421: "Misdirected Request",
     422: "Unprocessable Entity",
     429: "Too Many Requests",
     500: "Internal Server Error",
@@ -909,6 +910,7 @@ class RejectedRequest:
             generated id.
         method: Request method, once the request line was parsed.
         path: Decoded request path, once the request line was parsed.
+        query_string: Raw query string, once the request line was parsed.
         headers: Read-only view of the lower-cased request headers parsed
             so far, or ``None``
             when the request line itself was not usable.
@@ -926,6 +928,8 @@ class RejectedRequest:
     headers: Mapping[str, str] | None = None
     content_length: int | None = None
     bytes_received: int = 0
+    # Appended last so positional construction keeps its old field order.
+    query_string: str = ""
 
 
 class _ReadState:
@@ -934,6 +938,7 @@ class _ReadState:
     __slots__ = (
         "method",
         "path",
+        "query_string",
         "headers",
         "content_length",
         "bytes_received",
@@ -943,6 +948,7 @@ class _ReadState:
     def __init__(self) -> None:
         self.method: str | None = None
         self.path: str | None = None
+        self.query_string: str = ""
         self.headers: dict[str, str] | None = None
         self.content_length: int | None = None
         self.bytes_received = 0
@@ -1076,6 +1082,7 @@ async def _read_request(
     if state is not None:
         state.method = method.upper()
         state.path = path
+        state.query_string = query_string
 
     # -- Headers --
     headers: dict[str, str] = {}
@@ -1345,6 +1352,10 @@ class App:
           → on_response_started → write → on_response_completed
                                     ↘ on_client_disconnect
 
+    ``after_request`` runs for every response the server sends, including
+    404/405, static files, ``before_request`` short-circuits and read
+    rejections whose request line was parsed (those carry an empty body).
+
     Args:
         max_body_size: Maximum request body size in bytes.
         read_timeout: Timeout for reading a single request (seconds).
@@ -1507,7 +1518,11 @@ class App:
         """Register an after-request hook.
 
         The hook receives ``(request, response)`` and may return a new
-        or modified ``Response``.
+        or modified ``Response``.  It runs once for every response the
+        server sends, not only for a routed handler: 404/405, static files,
+        ``before_request`` short-circuits, and read rejections whose request
+        line was parsed also pass through it.  A rejection's ``request`` has
+        an empty body because the body is what failed to read.
         """
         self._after_request_handlers.append(handler)
         return handler
@@ -1638,9 +1653,9 @@ class App:
     def on_request_rejected(self, handler: Callable[..., Any]) -> Callable[..., Any]:
         """Register a request-rejected signal.
 
-        Fired when a request is refused while it is being read, before a
-        :class:`Request` exists, so none of the other lifecycle hooks see
-        it: malformed request line, ``Content-Length`` or chunk size (``400``), a body over
+        Fired when a request is refused while it is being read, before
+        dispatch reaches the other lifecycle hooks: malformed request line,
+        ``Content-Length`` or chunk size (``400``), a body over
         ``max_body_size`` (``413``), a read timeout (``408``), a body
         shorter than ``Content-Length`` (``400``) and any other read error
         (``500``).  A keep-alive connection that goes idle or closes
@@ -1766,6 +1781,16 @@ class App:
         return response
 
     async def _dispatch(self, request: Request) -> Response | StreamingResponse:
+        """Route a request and run the after-request hooks exactly once.
+
+        Every response leaves through the hooks: handler output, static
+        files, ``before_request`` short-circuits and 404/405 rejections
+        alike, so a hook that adds headers applies uniformly.
+        """
+        response = await self._route_request(request)
+        return await self._run_after_hooks(request, response)
+
+    async def _route_request(self, request: Request) -> Response | StreamingResponse:
         """Match a request to a route and invoke the handler."""
         # -- before_request hooks --
         short_circuit = await self._run_before_hooks(request)
@@ -1782,8 +1807,7 @@ class App:
         route, match, path_existed = self._match_route(request)
 
         if route is not None and match is not None:
-            response = await self._invoke_route(route, match, request)
-            return await self._run_after_hooks(request, response)
+            return await self._invoke_route(route, match, request)
 
         # -- No route matched --
         if path_existed:
@@ -1853,7 +1877,7 @@ class App:
     async def _send_error_and_close(
         self,
         writer: asyncio.StreamWriter,
-        response: Response | JSONResponse,
+        response: Response | StreamingResponse,
         reader: asyncio.StreamReader | None = None,
         exc: Exception | None = None,
         state: _ReadState | None = None,
@@ -1869,8 +1893,8 @@ class App:
         already disconnected.
         """
         try:
-            await response._write(writer)
-        except (BrokenPipeError, ConnectionResetError):
+            await response._write(writer, reader)
+        except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
             writer.close()
             return
         if reader is not None and exc is not None:
@@ -2080,6 +2104,7 @@ class App:
                 request_id=request_id,
                 method=state.method,
                 path=state.path,
+                query_string=state.query_string,
                 headers=(
                     None
                     if state.headers is None
@@ -2089,6 +2114,23 @@ class App:
                 bytes_received=bytes_received,
             ),
         )
+        # A rejection is a response too: run the after-request hooks when the
+        # request line was parsed far enough to build a Request.  The body is
+        # not available here (it is what failed to read), so hooks see b"".
+        if state.method is not None and state.path is not None:
+            rejected = Request(
+                method=state.method,
+                path=state.path,
+                query_string=state.query_string,
+                headers=dict(state.headers or {}),
+                body=b"",
+                client_addr=(client_addr[0], client_addr[1]),
+                app=self,
+            )
+            response = await self._run_after_hooks(rejected, response)
+            # A hook may return a new response under any casing.
+            if not any(key.lower() == "x-request-id" for key in response.headers):
+                response.headers["X-Request-Id"] = request_id
         await self._send_error_and_close(writer, response, reader, exc, state)
 
     @staticmethod
